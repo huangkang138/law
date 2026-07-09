@@ -1,0 +1,893 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   YYS-Law Design System - Inspired by shadcn/ui
+   ============================================ */
+
+@layer base {
+  :root {
+    /* Background Colors - 星空浅色系 */
+    --background: 0 0% 100%;
+    --foreground: 220 15% 20%;
+    
+    /* Card Colors */
+    --card: 0 0% 98%;
+    --card-foreground: 220 15% 25%;
+    
+    /* Popover Colors */
+    --popover: 0 0% 98%;
+    --popover-foreground: 220 15% 25%;
+    
+    /* Primary Colors - 星空蓝 */
+    --primary: 210 70% 60%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary Colors */
+    --secondary: 210 40% 94%;
+    --secondary-foreground: 220 15% 25%;
+    
+    /* Muted Colors */
+    --muted: 210 30% 96%;
+    --muted-foreground: 220 10% 45%;
+    
+    /* Accent Colors */
+    --accent: 210 40% 94%;
+    --accent-foreground: 220 15% 25%;
+    
+    /* Destructive Colors */
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Border & Input */
+    --border: 210 25% 88%;
+    --input: 210 25% 88%;
+    --ring: 210 70% 60%;
+    
+    /* Radius */
+    --radius: 0.5rem;
+    
+    /* Starry Sky Brand Colors - 星空渐变色主题 */
+    --star-light-blue: 210 80% 75%;
+    --star-blue: 210 70% 60%;
+    --star-indigo: 230 60% 65%;
+    --star-purple: 260 50% 70%;
+    --star-cyan: 190 70% 70%;
+  }
+
+  .dark {
+    /* Background Colors - 深色星空 */
+    --background: 220 20% 12%;
+    --foreground: 210 20% 95%;
+    
+    /* Card Colors */
+    --card: 220 20% 15%;
+    --card-foreground: 210 20% 95%;
+    
+    /* Popover Colors */
+    --popover: 220 20% 15%;
+    --popover-foreground: 210 20% 95%;
+    
+    /* Primary Colors - 星空蓝 */
+    --primary: 210 70% 70%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary Colors */
+    --secondary: 220 20% 20%;
+    --secondary-foreground: 210 20% 95%;
+    
+    /* Muted Colors */
+    --muted: 220 20% 18%;
+    --muted-foreground: 210 15% 70%;
+    
+    /* Accent Colors */
+    --accent: 220 20% 20%;
+    --accent-foreground: 210 20% 95%;
+    
+    /* Destructive Colors */
+    --destructive: 0 70% 65%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Border & Input */
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 210 70% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    user-select: none;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* 允许输入元素和文本区域的文本选择 */
+  input, textarea, select, [contenteditable="true"] {
+    user-select: text;
+  }
+  
+  /* 允许代码块和预格式化文本的文本选择 */
+  code, pre {
+    user-select: text;
+  }
+  
+  /* Typography System - 法律特质 */
+  h1, h2, h3 {
+    @apply font-serif;
+  }
+}
+
+@layer utilities {
+  /* 金色主题工具类 */
+  .bg-gold-50 {
+    background-color: hsl(var(--gold-50));
+  }
+  .bg-gold-100 {
+    background-color: hsl(var(--gold-100));
+  }
+  .bg-gold-200 {
+    background-color: hsl(var(--gold-200));
+  }
+  .bg-gold-300 {
+    background-color: hsl(var(--gold-300));
+  }
+  .bg-gold-400 {
+    background-color: hsl(var(--gold-400));
+  }
+  .bg-gold-500 {
+    background-color: hsl(var(--gold-500));
+  }
+  .bg-gold-600 {
+    background-color: hsl(var(--gold-600));
+  }
+  .bg-gold-700 {
+    background-color: hsl(var(--gold-700));
+  }
+  .bg-gold-800 {
+    background-color: hsl(var(--gold-800));
+  }
+  .bg-gold-900 {
+    background-color: hsl(var(--gold-900));
+  }
+  
+  .text-gold-50 {
+    color: hsl(var(--gold-50));
+  }
+  .text-gold-100 {
+    color: hsl(var(--gold-100));
+  }
+  .text-gold-200 {
+    color: hsl(var(--gold-200));
+  }
+  .text-gold-300 {
+    color: hsl(var(--gold-300));
+  }
+  .text-gold-400 {
+    color: hsl(var(--gold-400));
+  }
+  .text-gold-500 {
+    color: hsl(var(--gold-500));
+  }
+  .text-gold-600 {
+    color: hsl(var(--gold-600));
+  }
+  .text-gold-700 {
+    color: hsl(var(--gold-700));
+  }
+  .text-gold-800 {
+    color: hsl(var(--gold-800));
+  }
+  .text-gold-900 {
+    color: hsl(var(--gold-900));
+  }
+  
+  .border-gold-50 {
+    border-color: hsl(var(--gold-50));
+  }
+  .border-gold-100 {
+    border-color: hsl(var(--gold-100));
+  }
+  .border-gold-200 {
+    border-color: hsl(var(--gold-200));
+  }
+  .border-gold-300 {
+    border-color: hsl(var(--gold-300));
+  }
+  .border-gold-400 {
+    border-color: hsl(var(--gold-400));
+  }
+  .border-gold-500 {
+    border-color: hsl(var(--gold-500));
+  }
+  .border-gold-600 {
+    border-color: hsl(var(--gold-600));
+  }
+  .border-gold-700 {
+    border-color: hsl(var(--gold-700));
+  }
+  .border-gold-800 {
+    border-color: hsl(var(--gold-800));
+  }
+  .border-gold-900 {
+    border-color: hsl(var(--gold-900));
+  }
+
+  /* 额外的动画效果 */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 20s linear infinite;
+  }
+
+  .animate-spin-reverse {
+    animation: spin 25s linear infinite reverse;
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 1s ease-out;
+  }
+
+  /* 标题闪烁动画 */
+  .animate-shimmer {
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* 文字逐字上浮动画 */
+  .animate-fadeIn-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  h1 {
+    @apply text-2xl font-extrabold tracking-tight lg:text-3xl;
+  }
+  
+  h2 {
+    @apply text-xl font-bold tracking-tight;
+  }
+  
+  h3 {
+    @apply text-lg font-semibold tracking-tight;
+  }
+  
+  p {
+    @apply leading-7 text-sm;
+  }
+  
+  /* 法律文本专用字体 - 正式判决书风格 */
+  .legal-text {
+    font-family: "SimSun", "STSong", "Noto Serif SC", "Times New Roman", serif;
+    @apply leading-relaxed;
+  }
+  
+  /* Markdown 内容字体 */
+  .prose {
+    font-family: "SimSun", "STSong", "Noto Serif SC", "Times New Roman", serif;
+  }
+  
+  /* 字体大小变体 - 完善版 */
+  
+  /* 小字体模式 (12px 基准) */
+  .font-small {
+    font-size: 12px;
+  }
+  
+  .font-small p,
+  .font-small .text-sm {
+    font-size: 11px;
+  }
+  
+  .font-small .text-xs {
+    font-size: 10px;
+  }
+  
+  .font-small .text-base {
+    font-size: 12px;
+  }
+  
+  .font-small .text-lg {
+    font-size: 14px;
+  }
+  
+  .font-small .text-xl {
+    font-size: 16px;
+  }
+  
+  .font-small .text-2xl {
+    font-size: 18px;
+  }
+  
+  .font-small .text-3xl {
+    font-size: 22px;
+  }
+  
+  .font-small h1 {
+    font-size: 18px;
+  }
+  
+  .font-small h2 {
+    font-size: 16px;
+  }
+  
+  .font-small h3 {
+    font-size: 14px;
+  }
+  
+  .font-small button,
+  .font-small input,
+  .font-small textarea,
+  .font-small select {
+    font-size: 11px;
+  }
+  
+  /* 中等字体模式 (14px 基准 - 默认) */
+  .font-medium {
+    font-size: 14px;
+  }
+  
+  .font-medium p,
+  .font-medium .text-sm {
+    font-size: 14px;
+  }
+  
+  .font-medium .text-xs {
+    font-size: 12px;
+  }
+  
+  .font-medium .text-base {
+    font-size: 16px;
+  }
+  
+  .font-medium .text-lg {
+    font-size: 18px;
+  }
+  
+  .font-medium .text-xl {
+    font-size: 20px;
+  }
+  
+  .font-medium .text-2xl {
+    font-size: 24px;
+  }
+  
+  .font-medium .text-3xl {
+    font-size: 30px;
+  }
+  
+  .font-medium h1 {
+    font-size: 24px;
+  }
+  
+  .font-medium h2 {
+    font-size: 20px;
+  }
+  
+  .font-medium h3 {
+    font-size: 18px;
+  }
+  
+  .font-medium button,
+  .font-medium input,
+  .font-medium textarea,
+  .font-medium select {
+    font-size: 14px;
+  }
+  
+  /* 大字体模式 (16px 基准) */
+  .font-large {
+    font-size: 16px;
+  }
+  
+  .font-large p,
+  .font-large .text-sm {
+    font-size: 16px;
+  }
+  
+  .font-large .text-xs {
+    font-size: 14px;
+  }
+  
+  .font-large .text-base {
+    font-size: 18px;
+  }
+  
+  .font-large .text-lg {
+    font-size: 20px;
+  }
+  
+  .font-large .text-xl {
+    font-size: 24px;
+  }
+  
+  .font-large .text-2xl {
+    font-size: 28px;
+  }
+  
+  .font-large .text-3xl {
+    font-size: 36px;
+  }
+  
+  .font-large h1 {
+    font-size: 28px;
+  }
+  
+  .font-large h2 {
+    font-size: 24px;
+  }
+  
+  .font-large h3 {
+    font-size: 20px;
+  }
+  
+  .font-large button,
+  .font-large input,
+  .font-large textarea,
+  .font-large select {
+    font-size: 16px;
+  }
+  
+  /* Markdown 内容字体大小适配 */
+  .font-small .prose {
+    font-size: 11px;
+  }
+  
+  .font-medium .prose {
+    font-size: 14px;
+  }
+  
+  .font-large .prose {
+    font-size: 16px;
+  }
+  
+  /* 界面密度变体 - 完善版 */
+  
+  /* 紧凑模式 */
+  .density-compact {
+    --spacing-unit: 0.5rem;
+  }
+  
+  .density-compact .card,
+  .density-compact .rounded-lg {
+    @apply p-2;
+  }
+  
+  .density-compact button:not(.no-density) {
+    @apply py-1 px-3;
+  }
+  
+  .density-compact input,
+  .density-compact textarea,
+  .density-compact select {
+    @apply py-1 px-2;
+  }
+  
+  .density-compact .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  .density-compact .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+  
+  .density-compact .space-y-3 > * + * {
+    margin-top: 0.5rem !important;
+  }
+  
+  .density-compact .space-y-2 > * + * {
+    margin-top: 0.375rem !important;
+  }
+  
+  .density-compact .gap-6 {
+    gap: 1rem !important;
+  }
+  
+  .density-compact .gap-4 {
+    gap: 0.75rem !important;
+  }
+  
+  .density-compact .gap-3 {
+    gap: 0.5rem !important;
+  }
+  
+  .density-compact .gap-2 {
+    gap: 0.375rem !important;
+  }
+  
+  /* 标准模式 (默认) */
+  .density-standard {
+    --spacing-unit: 1rem;
+  }
+  
+  /* 宽松模式 */
+  .density-relaxed {
+    --spacing-unit: 1.5rem;
+  }
+  
+  .density-relaxed .card,
+  .density-relaxed .rounded-lg {
+    @apply p-6;
+  }
+  
+  .density-relaxed button:not(.no-density) {
+    @apply py-3 px-6;
+  }
+  
+  .density-relaxed input,
+  .density-relaxed textarea,
+  .density-relaxed select {
+    @apply py-3 px-4;
+  }
+  
+  .density-relaxed .space-y-6 > * + * {
+    margin-top: 2rem !important;
+  }
+  
+  .density-relaxed .space-y-4 > * + * {
+    margin-top: 1.5rem !important;
+  }
+  
+  .density-relaxed .space-y-3 > * + * {
+    margin-top: 1.25rem !important;
+  }
+  
+  .density-relaxed .space-y-2 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  .density-relaxed .gap-6 {
+    gap: 2rem !important;
+  }
+  
+  .density-relaxed .gap-4 {
+    gap: 1.5rem !important;
+  }
+  
+  .density-relaxed .gap-3 {
+    gap: 1.25rem !important;
+  }
+  
+  .density-relaxed .gap-2 {
+    gap: 1rem !important;
+  }
+  
+  /* 禁用动画 */
+  .no-animations * {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  /* 禁用火焰效果 */
+  .no-fire-effect .fire-particle,
+  .no-fire-effect .fire-glow {
+    display: none !important;
+  }
+}
+
+@layer utilities {
+  /* Glass Morphism */
+  .glass {
+    @apply bg-background/80 backdrop-blur-md border border-border;
+  }
+  
+  /* Card Variants */
+  .card {
+    @apply bg-card text-card-foreground border border-border shadow-sm rounded-lg;
+  }
+  
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-md hover:border-primary/20;
+  }
+  
+  /* Starry Sky Gradient - 星空渐变色 */
+  .gradient-starry {
+    @apply bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100;
+  }
+  
+  .gradient-starry-strong {
+    @apply bg-gradient-to-br from-sky-200 via-blue-100 to-indigo-200;
+  }
+  
+  .text-gradient-starry {
+    @apply bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-starry-light {
+    @apply bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent;
+  }
+  
+  /* Smooth Transitions */
+  .transition-smooth {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  /* Focus Ring */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/40 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/60;
+}
+
+/* 深色模式下的滚动条优化 */
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/50;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/70;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* 火焰动画 */
+@keyframes fire-float {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-20px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes fire-float-large {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-30px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes fire-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes fire-glow-large {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.fire-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffff00, #ff6b00, #ff0000);
+}
+
+.fire-particle-small {
+  animation: fire-float 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 107, 0, 0.8);
+}
+
+.fire-particle-large {
+  animation: fire-float-large 2.5s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(255, 107, 0, 0.8);
+}
+
+.fire-glow {
+  animation: fire-glow 3s ease-in-out infinite;
+}
+
+/* 首页动画 */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes particle-float {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(50px);
+    opacity: 0;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 15s linear infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.8), transparent);
+  border-radius: 50%;
+  animation: particle-float linear infinite;
+  pointer-events: none;
+}
+
+.animate-pulse-slow {
+  animation: fire-glow 3s ease-in-out infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
