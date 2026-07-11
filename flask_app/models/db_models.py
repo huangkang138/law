@@ -2,7 +2,7 @@
 数据库模型
 """
 
-from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, JSON, Float
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -714,3 +714,45 @@ class AgentUsage(Base):
     tokens_used = Column(Integer)  # 使用的token数
     response_time = Column(Integer)  # 响应时间（毫秒）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class DigitalHumanSession(Base):
+    """数字人会话表"""
+
+    __tablename__ = "digital_human_sessions"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, nullable=False, default="anonymous", index=True)
+    title = Column(String)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )
+
+
+class DigitalHumanMessage(Base):
+    """数字人消息表"""
+
+    __tablename__ = "digital_human_messages"
+
+    id = Column(String, primary_key=True, index=True)
+    session_id = Column(
+        String,
+        ForeignKey("digital_human_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    role = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    intent = Column(String)
+    emotion = Column(String)
+    confidence = Column(Float)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
