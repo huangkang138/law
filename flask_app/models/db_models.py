@@ -772,3 +772,105 @@ class DigitalHumanRequest(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class Matter(Base):
+    """Agent 任务工作区。"""
+
+    __tablename__ = "matters"
+
+    # Matter 是用户法律目标的工作区；阶段 1 只保存最小目标信息。
+    id = Column(String, primary_key=True)
+    client_id = Column(String, nullable=False, index=True)
+    session_id = Column(String, ForeignKey("digital_human_sessions.id", ondelete="SET NULL"), index=True)
+    title = Column(String, nullable=False)
+    goal = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="active", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AgentRun(Base):
+    """一次可暂停和恢复的 Agent 运行。"""
+
+    __tablename__ = "agent_runs"
+
+    id = Column(String, primary_key=True)
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = Column(String, nullable=False, index=True)
+    status = Column(String, nullable=False, index=True)
+    current_step_id = Column(String, index=True)
+    pending_approval_id = Column(String, index=True)
+    # 完整状态快照用于服务重启后的恢复；可查询字段同时单独成列。
+    state_json = Column(JSON, nullable=False, default=dict)
+    error_code = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AgentStep(Base):
+    """Agent 计划中的持久化步骤。"""
+
+    __tablename__ = "agent_steps"
+
+    id = Column(String, primary_key=True)
+    run_id = Column(String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    # sequence 为后续多步骤计划预留稳定排序，阶段 1 固定为单步骤。
+    sequence = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False, index=True)
+    tool_name = Column(String)
+    error_code = Column(String)
+    started_at = Column(DateTime(timezone=True))
+    completed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ToolCall(Base):
+    """受控工具调用及其结构化结果。"""
+
+    __tablename__ = "tool_calls"
+
+    id = Column(String, primary_key=True)
+    run_id = Column(String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(String, ForeignKey("agent_steps.id", ondelete="CASCADE"), nullable=False, index=True)
+    tool_name = Column(String, nullable=False, index=True)
+    status = Column(String, nullable=False, index=True)
+    # 每次重试单独保存一条 ToolCall，避免覆盖失败证据。
+    attempt = Column(Integer, nullable=False, default=1)
+    input_json = Column(JSON, nullable=False, default=dict)
+    result_json = Column(JSON)
+    error_code = Column(String)
+    error_message = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True))
+
+
+class ApprovalRequest(Base):
+    """需要用户明确确认后才能继续的审批。"""
+
+    __tablename__ = "approval_requests"
+
+    id = Column(String, primary_key=True)
+    run_id = Column(String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = Column(String, nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending", index=True)
+    prompt = Column(Text, nullable=False)
+    decision = Column(String)
+    # 审批必须在有效期内且属于当前 client_id 才能恢复任务。
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    decided_at = Column(DateTime(timezone=True))
+
+
+class AgentAuditEvent(Base):
+    """面向审计的状态事件，不记录模型思维链。"""
+
+    __tablename__ = "agent_audit_events"
+
+    id = Column(String, primary_key=True)
+    run_id = Column(String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    # 仅记录状态和动作摘要，不保存模型内部思维链。
+    detail_json = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

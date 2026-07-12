@@ -1,0 +1,218 @@
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Optional
+
+from core.database import SessionLocal
+from models.db_models import (
+    AgentAuditEvent,
+    AgentRun,
+    AgentStep,
+    ApprovalRequest,
+    Matter,
+    ToolCall,
+)
+
+from .enums import ErrorCode, RunStatus, StepStatus
+from .errors import AgentRuntimeError
+from .schemas import AgentState, ToolResult
+
+
+def _id(prefix: str) -> str:
+    """生成带业务前缀的可读主键。"""
+    return f"{prefix}_{uuid.uuid4().hex}"
+
+
+class AgentRepository:
+    """集中管理运行状态、步骤、工具调用、审批和审计记录。"""
+
+    def create_run(self, goal: str, client_id: str, session_id: Optional[str]) -> AgentState:
+        """在同一事务中创建 Matter、AgentRun 和首条审计事件。"""
+        db = SessionLocal()
+        try:
+            matter = Matter(id=_id("matter"), client_id=client_id, session_id=session_id, title=goal[:60], goal=goal)
+            # 显式 flush 保证写入 AgentRun 前 Matter 外键已经存在。
+            db.add(matter)
+            db.flush()
+            run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
+            state = AgentState(run_id=run.id, matter_id=matter.id, client_id=client_id, session_id=session_id, goal=goal)
+            run.state_json = state.model_dump(mode="json")
+            db.add(run)
+            db.flush()
+            self._audit(db, run.id, "run_created", {"goal": goal})
+            db.commit()
+            return state
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def load_state(self, run_id: str, client_id: str) -> AgentState:
+        """按运行 ID 恢复状态，并强制校验匿名客户端归属。"""
+        db = SessionLocal()
+        try:
+            run = db.get(AgentRun, run_id)
+            if run is None:
+                raise AgentRuntimeError("Agent 任务不存在", ErrorCode.RUN_NOT_FOUND.value)
+            if run.client_id != client_id:
+                raise AgentRuntimeError("无权访问该 Agent 任务", ErrorCode.FORBIDDEN.value)
+            return AgentState.model_validate(run.state_json)
+        finally:
+            db.close()
+
+    def save_state(self, state: AgentState, event_type: str, detail: Optional[Dict] = None) -> None:
+        """原子保存运行快照和对应审计事件。"""
+        db = SessionLocal()
+        try:
+            run = db.get(AgentRun, state.run_id)
+            run.status = state.status.value if hasattr(state.status, "value") else state.status
+            run.current_step_id = state.current_step_id
+            run.pending_approval_id = state.pending_approval_id
+            run.error_code = state.error_code
+            run.state_json = state.model_dump(mode="json")
+            self._audit(db, state.run_id, event_type, detail or {})
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def create_step(self, state: AgentState) -> str:
+        """创建阶段 1 的模拟计划步骤。"""
+        db = SessionLocal()
+        try:
+            step_id = _id("step")
+            db.add(AgentStep(
+                id=step_id, run_id=state.run_id, sequence=1, name="生成模拟案件摘要",
+                status=StepStatus.PENDING.value, tool_name="mock_case_summary",
+            ))
+            self._audit(db, state.run_id, "plan_created", {"step_id": step_id})
+            db.commit()
+            return step_id
+        finally:
+            db.close()
+
+    def set_step_status(self, run_id: str, step_id: str, status: StepStatus, error_code: Optional[str] = None) -> None:
+        """更新步骤状态，并维护开始/结束时间。"""
+        db = SessionLocal()
+        try:
+            step = db.get(AgentStep, step_id)
+            step.status = status.value
+            step.error_code = error_code
+            now = datetime.now(timezone.utc)
+            if status == StepStatus.RUNNING:
+                step.started_at = now
+            if status in {StepStatus.COMPLETED, StepStatus.FAILED, StepStatus.CANCELLED}:
+                step.completed_at = now
+            self._audit(db, run_id, "step_status_changed", {"step_id": step_id, "status": status.value})
+            db.commit()
+        finally:
+            db.close()
+
+    def save_tool_call(self, state: AgentState, attempt: int, arguments: Dict, result: ToolResult) -> None:
+        """保存每一次工具尝试；失败重试不会覆盖前一次记录。"""
+        db = SessionLocal()
+        try:
+            db.add(ToolCall(
+                id=result.tool_call_id, run_id=state.run_id, step_id=state.current_step_id,
+                tool_name="mock_case_summary", status="completed" if result.success else "failed",
+                attempt=attempt, input_json=arguments, result_json=result.model_dump(mode="json"),
+                error_code=result.error_code, error_message=result.error_message,
+                completed_at=datetime.now(timezone.utc),
+            ))
+            self._audit(db, state.run_id, "tool_called", {
+                "tool_call_id": result.tool_call_id, "attempt": attempt, "success": result.success,
+                "error_code": result.error_code,
+            })
+            db.commit()
+        finally:
+            db.close()
+
+    def create_approval(self, state: AgentState) -> str:
+        """创建有效期 24 小时的待审批记录。"""
+        db = SessionLocal()
+        try:
+            approval_id = _id("approval")
+            db.add(ApprovalRequest(
+                id=approval_id, run_id=state.run_id, client_id=state.client_id,
+                prompt="模拟案件摘要已生成，是否确认完成该任务？",
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            ))
+            self._audit(db, state.run_id, "approval_requested", {"approval_id": approval_id})
+            db.commit()
+            return approval_id
+        finally:
+            db.close()
+
+    def decide_approval(self, state: AgentState, approved: bool) -> None:
+        """校验归属、状态和有效期后记录用户决定。"""
+        db = SessionLocal()
+        try:
+            approval = db.get(ApprovalRequest, state.pending_approval_id)
+            if approval is None or approval.run_id != state.run_id or approval.client_id != state.client_id:
+                raise AgentRuntimeError("审批不存在或无权操作", ErrorCode.FORBIDDEN.value)
+            now = datetime.now(timezone.utc)
+            if approval.status != "pending":
+                raise AgentRuntimeError("审批已经处理", ErrorCode.INVALID_STATE.value)
+            # 过期审批不得继续驱动状态机，必须由用户重新发起任务。
+            if approval.expires_at < now:
+                approval.status = "expired"
+                db.commit()
+                raise AgentRuntimeError("审批已过期", ErrorCode.APPROVAL_EXPIRED.value)
+            approval.status = "approved" if approved else "rejected"
+            approval.decision = approval.status
+            approval.decided_at = now
+            self._audit(db, state.run_id, "approval_decided", {"approved": approved})
+            db.commit()
+        finally:
+            db.close()
+
+    def cancel(self, state: AgentState) -> AgentState:
+        """将运行及当前步骤统一标记为取消。"""
+        state.status = RunStatus.CANCELLED
+        state.error_code = ErrorCode.RUN_CANCELLED.value
+        if state.current_step_id:
+            self.set_step_status(state.run_id, state.current_step_id, StepStatus.CANCELLED)
+        self.save_state(state, "run_cancelled")
+        return state
+
+    def snapshot(self, run_id: str, client_id: str) -> Dict:
+        """组装前端需要的运行、步骤、审批和结果快照。"""
+        db = SessionLocal()
+        try:
+            run = db.get(AgentRun, run_id)
+            if run is None:
+                raise AgentRuntimeError("Agent 任务不存在", ErrorCode.RUN_NOT_FOUND.value)
+            if run.client_id != client_id:
+                raise AgentRuntimeError("无权访问该 Agent 任务", ErrorCode.FORBIDDEN.value)
+            steps = db.query(AgentStep).filter(AgentStep.run_id == run_id).order_by(AgentStep.sequence).all()
+            approval = db.get(ApprovalRequest, run.pending_approval_id) if run.pending_approval_id else None
+            return {
+                "run_id": run.id, "matter_id": run.matter_id, "status": run.status,
+                "current_step_id": run.current_step_id,
+                "steps": [{"id": s.id, "name": s.name, "status": s.status, "tool_name": s.tool_name} for s in steps],
+                "approval": ({"id": approval.id, "prompt": approval.prompt, "status": approval.status} if approval else None),
+                "final_output": (run.state_json or {}).get("final_output"), "error_code": run.error_code,
+            }
+        finally:
+            db.close()
+
+    def audit_events(self, run_id: str, client_id: str):
+        """按发生顺序读取审计事件，读取前先复用归属校验。"""
+        self.load_state(run_id, client_id)
+        db = SessionLocal()
+        try:
+            events = db.query(AgentAuditEvent).filter(AgentAuditEvent.run_id == run_id).order_by(AgentAuditEvent.created_at, AgentAuditEvent.id).all()
+            return [{"id": e.id, "type": e.event_type, "detail": e.detail_json, "created_at": e.created_at.isoformat() if e.created_at else None} for e in events]
+        finally:
+            db.close()
+
+    @staticmethod
+    def _audit(db, run_id: str, event_type: str, detail: Dict) -> None:
+        """在调用方事务中追加审计事件，保证业务状态与日志一致提交。"""
+        db.add(AgentAuditEvent(id=_id("audit"), run_id=run_id, event_type=event_type, detail_json=detail))
+"""Agent Runtime 的 PostgreSQL 持久化仓储。
+
+所有公开方法自行管理短事务，避免在 LangGraph 节点之间长期持有数据库连接。
+"""

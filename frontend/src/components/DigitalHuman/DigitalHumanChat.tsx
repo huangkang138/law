@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, History, Minus, Plus, RotateCcw, Send, Square, Trash2 } from 'lucide-react';
+import { ArrowRight, Bot, Check, ChevronDown, History, Minus, Plus, RotateCcw, Send, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -27,6 +27,11 @@ export default function DigitalHumanChat() {
     sessions,
     sessionId,
     startNewConversation,
+    agentRun,
+    isAgentLoading,
+    startAgentDemo,
+    decideAgentApproval,
+    cancelAgentRun,
   } = useDigitalHumanStore();
 
   useEffect(() => {
@@ -175,6 +180,40 @@ export default function DigitalHumanChat() {
               <span />
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="dh-agent-card">
+        {/* 阶段 1 最小任务卡片：用于观察步骤、审批和最终结果。 */}
+        {!agentRun ? (
+          <button
+            type="button"
+            className="dh-agent-start"
+            disabled={isAgentLoading}
+            onClick={() => void startAgentDemo('整理一起模拟劳动争议并生成案件摘要')}
+          >
+            <Bot size={16} />{isAgentLoading ? '正在建立任务…' : '体验 Agent 模拟任务'}
+          </button>
+        ) : (
+          <>
+            <div className="dh-agent-card-title">
+              <span><Bot size={15} />任务状态：{agentRun.status}</span>
+              {!['completed', 'cancelled', 'failed'].includes(agentRun.status) && (
+                <button type="button" onClick={() => void cancelAgentRun()} aria-label="取消 Agent 任务"><X size={14} /></button>
+              )}
+            </div>
+            {agentRun.steps.map((step) => <p key={step.id}>• {step.name}：{step.status}</p>)}
+            {agentRun.approval?.status === 'pending' && (
+              <div className="dh-agent-approval">
+                <p>{agentRun.approval.prompt}</p>
+                <div>
+                  <button type="button" disabled={isAgentLoading} onClick={() => void decideAgentApproval(true)}><Check size={14} />确认继续</button>
+                  <button type="button" disabled={isAgentLoading} onClick={() => void decideAgentApproval(false)}><X size={14} />拒绝</button>
+                </div>
+              </div>
+            )}
+            {agentRun.final_output?.summary && agentRun.status === 'completed' && <p className="dh-agent-result">{agentRun.final_output.summary}</p>}
+          </>
         )}
       </div>
 

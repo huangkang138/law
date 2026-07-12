@@ -3,12 +3,16 @@ import { persist } from 'zustand/middleware';
 
 import {
   DigitalHumanEmotion,
+  DigitalHumanAgentRun,
   DigitalHumanSessionSummary,
   deleteDigitalHumanSession,
   getDigitalHumanMessages,
   getDigitalHumanSessions,
   resetDigitalHumanSession,
   sendDigitalHumanMessage,
+  startDigitalHumanAgentRun,
+  resumeDigitalHumanAgentRun,
+  cancelDigitalHumanAgentRun,
 } from '@/services/digitalHumanApi';
 
 export interface DigitalHumanMessage {
@@ -27,6 +31,8 @@ interface DigitalHumanStore {
   sessionId: string | null;
   isLoading: boolean;
   sessions: DigitalHumanSessionSummary[];
+  agentRun: DigitalHumanAgentRun | null;
+  isAgentLoading: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -39,6 +45,9 @@ interface DigitalHumanStore {
   refreshHistory: () => Promise<void>;
   startNewConversation: () => void;
   cancelRequest: () => void;
+  startAgentDemo: (goal: string) => Promise<void>;
+  decideAgentApproval: (approved: boolean) => Promise<void>;
+  cancelAgentRun: () => Promise<void>;
 }
 
 let activeRequest: AbortController | null = null;
@@ -63,6 +72,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       sessionId: null,
       isLoading: false,
       sessions: [],
+      agentRun: null,
+      isAgentLoading: false,
 
       open: () => {
         set((state) => ({
@@ -207,6 +218,39 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         activeRequest?.abort();
         activeRequest = null;
         set({ isLoading: false, emotion: 'idle' });
+      },
+
+      startAgentDemo: async (goal) => {
+        // Agent 任务与普通聊天分别维护 loading，避免阻塞历史消息操作。
+        if (get().isAgentLoading) return;
+        set({ isAgentLoading: true, emotion: 'thinking' });
+        try {
+          const agentRun = await startDigitalHumanAgentRun(goal, get().sessionId);
+          set({ agentRun, isAgentLoading: false, emotion: agentRun.status === 'awaiting_approval' ? 'serious' : 'success' });
+        } catch {
+          set({ isAgentLoading: false, emotion: 'error' });
+        }
+      },
+
+      decideAgentApproval: async (approved) => {
+        // 只对当前待审批任务提交决定，结果以服务端返回快照为准。
+        const run = get().agentRun;
+        if (!run || get().isAgentLoading) return;
+        set({ isAgentLoading: true, emotion: 'thinking' });
+        try {
+          const agentRun = await resumeDigitalHumanAgentRun(run.run_id, approved);
+          set({ agentRun, isAgentLoading: false, emotion: approved ? 'success' : 'idle' });
+        } catch {
+          set({ isAgentLoading: false, emotion: 'error' });
+        }
+      },
+
+      cancelAgentRun: async () => {
+        // 本地不直接伪造 cancelled 状态，等待后端完成持久化后再更新。
+        const run = get().agentRun;
+        if (!run) return;
+        const agentRun = await cancelDigitalHumanAgentRun(run.run_id);
+        set({ agentRun, emotion: 'idle' });
       },
     }),
     {

@@ -199,3 +199,27 @@
 - 实际改动：`frontend/src/store/digitalHumanStore.ts`、`frontend/src/components/DigitalHuman/DigitalHumanChat.tsx`、`frontend/src/components/DigitalHuman/DigitalHumanFloat.tsx`，以及本日志。
 - 验证：前端 TypeScript 全量检查和 Git 差异检查通过；在本地页面实际打开数字人，确认刷新按钮、历史会话按钮、新对话按钮分别存在；展开历史列表不会使用浏览器原生下拉框，空状态和面板布局正常。
 - 风险与后续：历史标题当前仍取首条用户消息前 30 字；后续可增加自动摘要标题，但不影响会话归属和消息正确性。
+
+## 2026-07-12 15:00:16 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；开始前已有未跟踪的 `flask_app/tests/` 和 `raw/多法域数字人法律Agent总体规划.md`，本次保留并增量使用，没有清理、提交或推送用户改动。
+- 用户请求：确认阶段 1 计划并实现 Agent 基础协议与 Runtime，包括状态机、工具协议、模拟工具、失败重试、暂停确认、恢复、审计和前端最小交互。
+- 修改前阅读：`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/数字人智能助手实现方案.md`、`raw/多法域数字人法律Agent总体规划.md`、`newModify/latest-project-analysis.md`、`newModify/modification-log.md`，以及 Flask 入口、Router、数字人 Service、数据库模型、阶段 0 测试和数字人前端源码。
+- 修改思路：遵守总体规划的 `flask_app/legal_agent_system/` 单一总包边界；原数字人问答保持不变，通过独立 Router 和 Facade 接入；以 PostgreSQL 保存运行状态，LangGraph 负责流程编排，权限、重试和审批规则由确定性代码控制。
+- 具体方案：定义 Pydantic 协议、枚举和错误码；新增 Matter、Run、Step、ToolCall、Approval、Audit 六类模型；实现工具注册中心和首次失败后成功的模拟摘要工具；实现规划、执行、审批暂停、跨实例恢复、完成和取消；开放运行创建、查询、恢复、取消和审计 API；前端增加模拟任务步骤与审批卡片。
+- 实际改动：`flask_app/legal_agent_system/`、`flask_app/routers/digital_human_agent.py`、`flask_app/models/db_models.py`、`flask_app/routers/__init__.py`、`flask_app/app.py`、`flask_app/tests/test_digital_human_stage1.py`、数字人前端 API/Store/Chat/全局样式、`newModify/latest-project-analysis.md` 和本日志。
+- 验证：安装 requirements 已声明但当前环境缺失的 LangGraph 1.2.9；Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；使用真实 PostgreSQL 运行阶段 0 与阶段 1 集成测试，共 2 项通过。阶段 1 验证失败重试、暂停审批、新 Facade 实例恢复、跨客户端隔离、完成结果和审计事件。
+- 风险与后续：当前为单步骤模拟工具闭环，不构成真实法律服务；阶段 2 前应补充正式数据库迁移机制，并在阶段 1 后续迭代增加运行列表、API 级测试、步骤/工具预算和过期审批测试。
+
+## 2026-07-12 15:18:57 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；保留阶段 1 的全部未提交改动和此前未跟踪资料，本次只增强注释与可读性。
+- 用户请求：参考项目现有注释风格，为刚实现的阶段 1 代码补充中文注释，降低阅读成本。
+- 修改前阅读：两份项目规则、阶段 1 总体规划、最新项目分析、相关修改日志、现有 `legal_agent.py`/`legal.py` 注释风格，以及本次新增的后端、前端和测试代码。
+- 修改思路：注释重点说明架构边界、状态流转原因、事务一致性、重试计数、暂停恢复、匿名隔离和安全约束；避免对显而易见的语句逐行翻译造成噪声。
+- 具体方案：为 `legal_agent_system` 各模块补充模块说明、类和方法 docstring、关键分支行内注释；为数据模型关键字段、Agent API、前端 API/Store/UI 和集成测试补充中文说明。
+- 实际改动：`flask_app/legal_agent_system/`、`flask_app/models/db_models.py`、`flask_app/routers/digital_human_agent.py`、`flask_app/tests/test_digital_human_stage1.py`、`frontend/src/services/digitalHumanApi.ts`、`frontend/src/store/digitalHumanStore.ts`、`frontend/src/components/DigitalHuman/DigitalHumanChat.tsx` 和本日志。
+- 验证：Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1 集成测试共 2 项通过，确认只增强可读性，没有改变运行行为。
+- 风险与后续：后续新增 Runtime 节点、工具或数据模型时，应同步添加说明职责、输入输出、安全边界和失败策略的中文注释。

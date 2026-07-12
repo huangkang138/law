@@ -38,6 +38,23 @@ export interface DigitalHumanHistoryMessage {
   created_at: string | null;
 }
 
+export type AgentRunStatus =
+  | 'planning' | 'executing' | 'retrying' | 'awaiting_approval'
+  | 'completed' | 'failed' | 'cancelled';
+
+export interface DigitalHumanAgentRun {
+  // 后端持久化任务的完整 UI 快照；刷新后可按 run_id 重新获取。
+  success: boolean;
+  run_id: string;
+  matter_id: string;
+  status: AgentRunStatus;
+  current_step_id: string | null;
+  steps: Array<{ id: string; name: string; status: string; tool_name: string | null }>;
+  approval: { id: string; prompt: string; status: string } | null;
+  final_output: { summary?: string; notice?: string } | null;
+  error_code: string | null;
+}
+
 const CLIENT_ID_KEY = 'yys-law-digital-human-client-id';
 
 function getClientId(): string {
@@ -122,4 +139,27 @@ export async function getDigitalHumanMessages(sessionId: string): Promise<Digita
 export async function deleteDigitalHumanSession(sessionId: string): Promise<void> {
   const response = await request(`/api/digital-human/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   await readJson<{ success: boolean }>(response);
+}
+
+export async function startDigitalHumanAgentRun(goal: string, sessionId: string | null): Promise<DigitalHumanAgentRun> {
+  // 创建后端任务后，接口会同步推进到等待审批或终态。
+  const response = await request('/api/digital-human/agent/runs', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal, ...(sessionId ? { session_id: sessionId } : {}) }),
+  });
+  return readJson<DigitalHumanAgentRun>(response);
+}
+
+export async function resumeDigitalHumanAgentRun(runId: string, approved: boolean): Promise<DigitalHumanAgentRun> {
+  // approved 是显式用户决定，前端不能替用户默认确认。
+  const response = await request(`/api/digital-human/agent/runs/${encodeURIComponent(runId)}/resume`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved }),
+  });
+  return readJson<DigitalHumanAgentRun>(response);
+}
+
+export async function cancelDigitalHumanAgentRun(runId: string): Promise<DigitalHumanAgentRun> {
+  // 取消操作同时终止当前步骤，返回取消后的权威快照。
+  const response = await request(`/api/digital-human/agent/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
+  return readJson<DigitalHumanAgentRun>(response);
 }
