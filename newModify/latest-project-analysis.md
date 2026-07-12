@@ -110,7 +110,10 @@ npm run dev
 - 意图只允许从后端白名单中选择；后端根据意图补充 `route` 与 `route_label`，置信度低于 0.6 时不返回跳转地址。
 - `flask_app/routers/__init__.py` 和 `flask_app/app.py` 已导出并注册数字人 Blueprint。
 - `flask_app/models/db_models.py` 中已有 `DigitalHumanSession` 与 `DigitalHumanMessage` 模型，并补充了 `Float` 类型供 `confidence` 字段使用。
-- 当前 `DigitalHumanService` 仍使用内存字典保存会话上下文，数据库模型尚未接入聊天、查询、重置和删除流程。
+- `DigitalHumanService` 已接入 PostgreSQL：聊天前读取最近 6 条上下文；成功后以事务保存完整一轮；重置、会话列表、历史查询和删除接口均已提供。
+- 阶段 0 已补充浏览器匿名 `client_id` 隔离：聊天、重置、列表、历史和删除接口均按客户端标识校验归属，未引入登录系统。
+- 新增 `digital_human_requests` 幂等记录表；前端每轮生成 `request_id`，已完成请求可复用原响应，处理中请求返回冲突，失败请求清理占位。
+- 已提供会话列表、历史消息读取和删除接口；前端从 PostgreSQL 恢复消息，localStorage 只保留当前会话 ID 和匿名客户端标识，并支持切换、删除、超时和取消等待。
 
 前端：
 
@@ -128,10 +131,10 @@ npm run dev
 2. `flask_app/core/database.py` 存在硬编码数据库连接信息。后续文档和提交不要泄露具体密码，应迁移到环境变量。
 3. 多个业务模块复用 `/document/...` 路径，合同审查、纠纷文书、文书起草之间存在命名混淆风险。
 4. `document.py`、`analysis.py`、`dispute.py`、`legal_tools.py` 文件较大，业务逻辑、LLM 调用、数据库操作混在 router 中，后续维护可以逐步下沉到 service 层。
-5. 状态来源混合使用浏览器 localStorage、后端内存字典和 PostgreSQL。服务重启、多实例部署或历史同步时可能出现不一致。
+5. 数字人后端会话已经以 PostgreSQL 为权威上下文来源，但前端仍通过浏览器 localStorage 保存当前消息；后续增加历史读取接口时，需要明确前端与数据库的同步策略。
 6. `raw` 中旧报告提到当前目录不是 Git 仓库，但现在 `D:\项目\law` 已识别为 Git 仓库，当前分支为 `master`。后续应以当前 Git 状态为准。
-7. 数字人会话目前同时存在后端内存和浏览器 Zustand 两个状态源；数据库模型已经定义但尚未接入，因此后端重启后无法依靠数据库恢复上下文。
-8. 数字人匿名会话尚未实现用户或浏览器级归属隔离；开放后端历史会话列表前必须补充 `user_id`/客户端标识过滤，避免不同匿名用户互相读取记录。
+7. 数字人阶段 0 的代码能力已补齐浏览器级匿名隔离、历史恢复、删除、请求幂等、超时和前端取消；清除浏览器数据后会被视为新匿名用户。
+8. 数字人阶段 0 已通过真实 PostgreSQL 专用集成测试，覆盖匿名隔离、历史读取、请求幂等和删除清理。完整 Flask 应用导入仍受其他旧模块环境影响：图像处理依赖与 NumPy 版本冲突，且模拟法庭 WebSocket 依赖 FastAPI；该问题不属于数字人链路。
 
 ## 后续解析和修改规则
 

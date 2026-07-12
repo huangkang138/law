@@ -756,3 +756,19 @@ class DigitalHumanMessage(Base):
         DateTime(timezone=True),
         server_default=func.now()
     )
+
+
+class DigitalHumanRequest(Base):
+    """数字人请求幂等记录。"""
+
+    __tablename__ = "digital_human_requests"
+
+    request_id = Column(String, primary_key=True)
+    client_id = Column(String, nullable=False, index=True)
+    session_id = Column(String, nullable=False, index=True)
+    status = Column(String, nullable=False, default="processing")
+    response_json = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

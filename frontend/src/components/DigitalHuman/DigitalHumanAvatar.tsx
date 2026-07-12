@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import type { CSSProperties } from 'react';
 
 import type { DigitalHumanEmotion } from '@/services/digitalHumanApi';
 
@@ -25,22 +26,34 @@ export default function DigitalHumanAvatar({
   size = 'large',
 }: DigitalHumanAvatarProps) {
   const isSmall = size === 'small';
+  const pixelSize = isSmall ? 96 : 148;
+  const criticalStyle = {
+    position: 'relative',
+    width: `var(--dh-avatar-size, ${pixelSize}px)`,
+    height: `var(--dh-avatar-size, ${pixelSize}px)`,
+    overflow: 'hidden',
+    flex: 'none',
+    borderRadius: '9999px',
+  } as CSSProperties;
 
   return (
     <div
       className={`dh-avatar ${isSmall ? 'dh-avatar-small' : 'dh-avatar-large'} ${
         emotion === 'thinking' ? 'dh-avatar-thinking' : ''
       }`}
+      style={criticalStyle}
       aria-label={EMOTION_LABELS[emotion]}
     >
       <Image
         key={emotion}
         src={`/digital-human/first-gen/${emotion}.png`}
         alt={`法小助：${EMOTION_LABELS[emotion]}`}
-        fill
+        width={pixelSize}
+        height={pixelSize}
         priority={emotion === 'idle'}
         sizes={isSmall ? '104px' : '148px'}
         className="dh-avatar-image"
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
       <span className="dh-avatar-shine" aria-hidden="true" />
     </div>

@@ -3,11 +3,14 @@
 import json
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from core.database import SessionLocal
 from core.logger import app_logger
+from models.db_models import DigitalHumanMessage, DigitalHumanRequest, DigitalHumanSession
 from services.llm_factory import LLMFactory
 
 
@@ -43,7 +46,6 @@ class DigitalHumanService:
 
     def __init__(self) -> None:
         self.llm = LLMFactory.create_llm()
-        self.sessions: Dict[str, List[Dict[str, str]]] = {}
         self.system_prompt = self._get_system_prompt()
         app_logger.info("数字人智能助手服务初始化完成")
 
@@ -68,18 +70,94 @@ class DigitalHumanService:
 
 confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 general_chat，并通过回复询问用户需要什么帮助。"""
 
-    def _get_session_history(self, session_id: str) -> List[Dict[str, str]]:
-        return self.sessions.setdefault(session_id, [])
+    @staticmethod
+    def _get_session_history(session_id: str, client_id: str) -> List[Dict[str, str]]:
+        """从数据库读取指定会话最近 6 条消息，并恢复为正序。"""
+        db = SessionLocal()
+        try:
+            session = db.get(DigitalHumanSession, session_id)
+            if session is not None and session.user_id != client_id:
+                raise PermissionError("无权访问该数字人会话")
+            messages = (
+                db.query(DigitalHumanMessage)
+                .filter(DigitalHumanMessage.session_id == session_id)
+                .order_by(
+                    DigitalHumanMessage.created_at.desc(),
+                    DigitalHumanMessage.id.desc(),
+                )
+                .limit(6)
+                .all()
+            )
+            return [
+                {"role": message.role, "content": message.content}
+                for message in reversed(messages)
+            ]
+        finally:
+            db.close()
 
-    def _build_messages(self, session_id: str, question: str) -> List:
+    def _build_messages(self, session_id: str, client_id: str, question: str) -> List:
         messages = [SystemMessage(content=self.system_prompt)]
-        for message in self._get_session_history(session_id)[-6:]:
+        for message in self._get_session_history(session_id, client_id):
             if message["role"] == "user":
                 messages.append(HumanMessage(content=message["content"]))
             elif message["role"] == "assistant":
                 messages.append(AIMessage(content=message["content"]))
         messages.append(HumanMessage(content=question))
         return messages
+
+    @staticmethod
+    def _save_exchange(
+        session_id: str,
+        client_id: str,
+        question: str,
+        parsed: Dict,
+    ) -> None:
+        """在同一事务中保存会话、用户消息和助手消息。"""
+        db = SessionLocal()
+        try:
+            session = db.get(DigitalHumanSession, session_id)
+            now = datetime.now(timezone.utc)
+            if session is None:
+                session = DigitalHumanSession(
+                    id=session_id,
+                    user_id=client_id,
+                    title=question[:30],
+                    is_active=True,
+                )
+                db.add(session)
+                # 两个模型没有 ORM relationship，先落父记录以保证外键顺序。
+                db.flush()
+            else:
+                if session.user_id != client_id:
+                    raise PermissionError("无权访问该数字人会话")
+                session.is_active = True
+                session.updated_at = now
+
+            db.add_all([
+                DigitalHumanMessage(
+                    id=uuid.uuid4().hex,
+                    session_id=session_id,
+                    role="user",
+                    content=question,
+                    created_at=now,
+                ),
+                DigitalHumanMessage(
+                    id=uuid.uuid4().hex,
+                    session_id=session_id,
+                    role="assistant",
+                    content=parsed["reply"],
+                    intent=parsed["intent"],
+                    emotion=parsed["emotion"],
+                    confidence=parsed["confidence"],
+                    created_at=now + timedelta(microseconds=1),
+                ),
+            ])
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     @staticmethod
     def _invoke_llm_streaming(messages: List, llm) -> str:
@@ -150,6 +228,8 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
     def chat(
         self,
         question: str,
+        client_id: str,
+        request_id: str,
         session_id: Optional[str] = None,
         custom_config: Optional[Dict[str, str]] = None,
     ) -> Dict:
@@ -169,28 +249,136 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
                 model=custom_config.get("model"),
             )
 
-        messages = self._build_messages(session_id, question)
-        raw_response = self._invoke_llm_streaming(messages, llm)
-        parsed = self._parse_llm_response(raw_response)
+        cached = self._begin_request(request_id, client_id, session_id)
+        if cached is not None:
+            return cached
 
-        history = self._get_session_history(session_id)
-        history.append({"role": "user", "content": question})
-        history.append({"role": "assistant", "content": parsed["reply"]})
+        try:
+            messages = self._build_messages(session_id, client_id, question)
+            raw_response = self._invoke_llm_streaming(messages, llm)
+            parsed = self._parse_llm_response(raw_response)
+            self._save_exchange(session_id, client_id, question, parsed)
 
-        route_info = INTENT_ROUTE_MAP[parsed["intent"]]
-        should_route = parsed["confidence"] >= MIN_ROUTE_CONFIDENCE
+            route_info = INTENT_ROUTE_MAP[parsed["intent"]]
+            should_route = parsed["confidence"] >= MIN_ROUTE_CONFIDENCE
+            result = {
+                **parsed,
+                "route": route_info["route"] if should_route else None,
+                "route_label": route_info["route_label"] if should_route else None,
+                "session_id": session_id,
+            }
+            self._complete_request(request_id, result)
+            return result
+        except Exception:
+            self._discard_request(request_id)
+            raise
 
-        return {
-            **parsed,
-            "route": route_info["route"] if should_route else None,
-            "route_label": route_info["route_label"] if should_route else None,
-            "session_id": session_id,
-        }
+    @staticmethod
+    def _begin_request(request_id: str, client_id: str, session_id: str) -> Optional[Dict]:
+        db = SessionLocal()
+        try:
+            record = db.get(DigitalHumanRequest, request_id)
+            if record is not None:
+                if record.client_id != client_id:
+                    raise PermissionError("无权访问该请求")
+                if record.status == "completed" and record.response_json:
+                    return json.loads(record.response_json)
+                raise RuntimeError("该请求正在处理中")
+            db.add(DigitalHumanRequest(
+                request_id=request_id,
+                client_id=client_id,
+                session_id=session_id,
+                status="processing",
+            ))
+            db.commit()
+            return None
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
-    def reset_session(self, session_id: str) -> bool:
-        self.sessions.pop(session_id, None)
-        app_logger.info(f"数字人会话已重置 [session={session_id}]")
-        return True
+    @staticmethod
+    def _complete_request(request_id: str, result: Dict) -> None:
+        db = SessionLocal()
+        try:
+            record = db.get(DigitalHumanRequest, request_id)
+            if record is not None:
+                record.status = "completed"
+                record.response_json = json.dumps(result, ensure_ascii=False)
+                db.commit()
+        finally:
+            db.close()
+
+    @staticmethod
+    def _discard_request(request_id: str) -> None:
+        db = SessionLocal()
+        try:
+            db.query(DigitalHumanRequest).filter(
+                DigitalHumanRequest.request_id == request_id,
+                DigitalHumanRequest.status == "processing",
+            ).delete(synchronize_session=False)
+            db.commit()
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_sessions(client_id: str) -> List[Dict]:
+        db = SessionLocal()
+        try:
+            sessions = db.query(DigitalHumanSession).filter(
+                DigitalHumanSession.user_id == client_id
+            ).order_by(DigitalHumanSession.updated_at.desc()).all()
+            return [{
+                "id": item.id, "title": item.title or "新对话",
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+            } for item in sessions]
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_messages(session_id: str, client_id: str) -> List[Dict]:
+        db = SessionLocal()
+        try:
+            session = db.get(DigitalHumanSession, session_id)
+            if session is None:
+                raise LookupError("会话不存在")
+            if session.user_id != client_id:
+                raise PermissionError("无权访问该数字人会话")
+            messages = db.query(DigitalHumanMessage).filter(
+                DigitalHumanMessage.session_id == session_id
+            ).order_by(DigitalHumanMessage.created_at, DigitalHumanMessage.id).all()
+            return [{
+                "id": item.id, "role": item.role, "content": item.content,
+                "intent": item.intent, "emotion": item.emotion,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            } for item in messages]
+        finally:
+            db.close()
+
+    def reset_session(self, session_id: str, client_id: str) -> bool:
+        db = SessionLocal()
+        try:
+            session = db.get(DigitalHumanSession, session_id)
+            if session is None:
+                return False
+            if session.user_id != client_id:
+                raise PermissionError("无权访问该数字人会话")
+            db.query(DigitalHumanMessage).filter(
+                DigitalHumanMessage.session_id == session_id
+            ).delete(synchronize_session=False)
+            deleted = db.query(DigitalHumanSession).filter(
+                DigitalHumanSession.id == session_id
+            ).delete(synchronize_session=False)
+            db.commit()
+            app_logger.info(f"数字人会话已重置 [session={session_id}]")
+            return bool(deleted)
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
 
 digital_human_service: Optional[DigitalHumanService] = None

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Minus, RotateCcw, Send } from 'lucide-react';
+import { ArrowRight, ChevronDown, History, Minus, Plus, RotateCcw, Send, Square, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -10,16 +10,23 @@ import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
 
 export default function DigitalHumanChat() {
   const [question, setQuestion] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const {
     close,
+    cancelRequest,
+    deleteSession,
     emotion,
     isLoading,
     messages,
-    reset,
+    loadSession,
+    refreshHistory,
     sendMessage,
     setEmotion,
+    sessions,
+    sessionId,
+    startNewConversation,
   } = useDigitalHumanStore();
 
   useEffect(() => {
@@ -63,7 +70,12 @@ export default function DigitalHumanChat() {
           <p>{EMOTION_LABELS[emotion]}</p>
         </div>
         <div className="dh-header-actions">
-          <button type="button" onClick={() => void reset()} aria-label="重新开始对话" title="重新开始">
+          <button
+            type="button"
+            onClick={() => void refreshHistory()}
+            aria-label="刷新会话记录"
+            title="刷新记录"
+          >
             <RotateCcw size={17} />
           </button>
           <button type="button" onClick={close} aria-label="收起法小助" title="收起">
@@ -71,6 +83,66 @@ export default function DigitalHumanChat() {
           </button>
         </div>
       </header>
+
+      <div className="dh-history-section">
+        <div className="dh-session-bar">
+        <button
+          type="button"
+          className="dh-history-toggle"
+          onClick={() => setHistoryOpen((open) => !open)}
+          aria-expanded={historyOpen}
+        >
+          <History size={15} />
+          <span>历史会话{sessions.length ? `（${sessions.length}）` : ''}</span>
+          <ChevronDown size={15} className={historyOpen ? 'dh-chevron-open' : ''} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            startNewConversation();
+            setHistoryOpen(false);
+          }}
+          aria-label="开始新对话"
+          title="新对话"
+        >
+          <Plus size={16} />
+        </button>
+        </div>
+
+        {historyOpen && (
+          <div className="dh-history-list" role="list" aria-label="历史会话列表">
+          {sessions.length === 0 ? (
+            <p>暂无历史会话</p>
+          ) : sessions.map((session) => (
+            <div
+              key={session.id}
+              className={`dh-history-item ${session.id === sessionId ? 'dh-history-current' : ''}`}
+              role="listitem"
+            >
+              <button
+                type="button"
+                className="dh-history-select"
+                onClick={() => {
+                  void loadSession(session.id);
+                  setHistoryOpen(false);
+                }}
+              >
+                <span>{session.title}</span>
+                <small>{session.id === sessionId ? '当前会话' : '点击切换'}</small>
+              </button>
+              <button
+                type="button"
+                className="dh-history-delete"
+                onClick={() => void deleteSession(session.id)}
+                aria-label={`删除会话：${session.title}`}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          </div>
+        )}
+      </div>
 
       <div className="dh-portrait-stage">
         <div className="dh-portrait-halo" aria-hidden="true" />
@@ -117,14 +189,18 @@ export default function DigitalHumanChat() {
           disabled={isLoading}
           aria-label="输入问题"
         />
-        <button
+        {isLoading ? (
+          <button type="button" className="dh-send-button" onClick={cancelRequest} aria-label="停止等待">
+            <Square size={15} />
+          </button>
+        ) : <button
           type="submit"
           className="dh-send-button"
           disabled={!question.trim() || isLoading}
           aria-label="发送问题"
         >
           <Send size={18} />
-        </button>
+        </button>}
       </form>
       <p className="dh-disclaimer">回答仅供参考，重要法律事项请咨询专业律师</p>
     </section>

@@ -3,6 +3,10 @@ import { persist } from 'zustand/middleware';
 
 import {
   DigitalHumanEmotion,
+  DigitalHumanSessionSummary,
+  deleteDigitalHumanSession,
+  getDigitalHumanMessages,
+  getDigitalHumanSessions,
   resetDigitalHumanSession,
   sendDigitalHumanMessage,
 } from '@/services/digitalHumanApi';
@@ -22,13 +26,22 @@ interface DigitalHumanStore {
   messages: DigitalHumanMessage[];
   sessionId: string | null;
   isLoading: boolean;
+  sessions: DigitalHumanSessionSummary[];
   open: () => void;
   close: () => void;
   toggle: () => void;
   setEmotion: (emotion: DigitalHumanEmotion) => void;
   sendMessage: (question: string) => Promise<void>;
   reset: () => Promise<void>;
+  loadSessions: () => Promise<void>;
+  loadSession: (sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  refreshHistory: () => Promise<void>;
+  startNewConversation: () => void;
+  cancelRequest: () => void;
 }
+
+let activeRequest: AbortController | null = null;
 
 const WELCOME_MESSAGE: DigitalHumanMessage = {
   id: 'digital-human-welcome',
@@ -49,13 +62,17 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       messages: [],
       sessionId: null,
       isLoading: false,
+      sessions: [],
 
-      open: () =>
+      open: () => {
         set((state) => ({
           isOpen: true,
           emotion: state.messages.length === 0 ? 'welcome' : state.emotion,
           messages: state.messages.length === 0 ? [WELCOME_MESSAGE] : state.messages,
-        })),
+        }));
+        void get().loadSessions();
+        if (get().sessionId) void get().loadSession(get().sessionId as string);
+      },
 
       close: () => set({ isOpen: false, emotion: 'idle' }),
 
@@ -87,7 +104,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         }));
 
         try {
-          const response = await sendDigitalHumanMessage(question, get().sessionId);
+          activeRequest = new AbortController();
+          const response = await sendDigitalHumanMessage(
+            question, get().sessionId, `dhr_${crypto.randomUUID()}`, activeRequest.signal,
+          );
           const assistantMessage: DigitalHumanMessage = {
             id: createMessageId('assistant'),
             role: 'assistant',
@@ -103,6 +123,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             emotion: response.emotion,
             isLoading: false,
           }));
+          void get().loadSessions();
         } catch (error) {
           const message = error instanceof Error ? error.message : '数字人服务暂时不可用';
           set((state) => ({
@@ -118,6 +139,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             emotion: 'error',
             isLoading: false,
           }));
+        } finally {
+          activeRequest = null;
         }
       },
 
@@ -136,12 +159,59 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           emotion: 'welcome',
           isLoading: false,
         });
+        void get().loadSessions();
+      },
+
+      loadSessions: async () => {
+        try { set({ sessions: await getDigitalHumanSessions() }); } catch { /* 保留当前界面 */ }
+      },
+
+      loadSession: async (sessionId) => {
+        try {
+          const history = await getDigitalHumanMessages(sessionId);
+          set({
+            sessionId,
+            messages: history.length ? history.map((item) => ({
+              id: item.id, role: item.role, content: item.content,
+              createdAt: item.created_at ? Date.parse(item.created_at) : 0,
+            })) : [WELCOME_MESSAGE],
+            emotion: 'idle',
+          });
+        } catch { /* 会话可能已从其他页面删除 */ }
+      },
+
+      deleteSession: async (sessionId) => {
+        await deleteDigitalHumanSession(sessionId);
+        if (get().sessionId === sessionId) {
+          set({ sessionId: null, messages: [WELCOME_MESSAGE], emotion: 'welcome' });
+        }
+        await get().loadSessions();
+      },
+
+      refreshHistory: async () => {
+        await get().loadSessions();
+        const currentSessionId = get().sessionId;
+        if (currentSessionId) await get().loadSession(currentSessionId);
+      },
+
+      startNewConversation: () => {
+        set({
+          sessionId: null,
+          messages: [WELCOME_MESSAGE],
+          emotion: 'welcome',
+          isLoading: false,
+        });
+      },
+
+      cancelRequest: () => {
+        activeRequest?.abort();
+        activeRequest = null;
+        set({ isLoading: false, emotion: 'idle' });
       },
     }),
     {
       name: 'yys-law-digital-human',
       partialize: (state) => ({
-        messages: state.messages,
         sessionId: state.sessionId,
       }),
     },

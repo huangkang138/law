@@ -106,11 +106,13 @@ export default function DigitalHumanFloat() {
         }
 
         .dh-avatar-small {
+          --dh-avatar-size: 96px;
           width: 96px;
           height: 96px;
         }
 
         .dh-avatar-large {
+          --dh-avatar-size: 148px;
           width: 148px;
           height: 148px;
           border: 1px solid rgba(147, 197, 253, .38);
@@ -211,6 +213,142 @@ export default function DigitalHumanFloat() {
         .dh-header-actions button:hover {
           color: #1d4ed8;
           background: rgba(147, 197, 253, .18);
+        }
+
+        .dh-history-section {
+          position: relative;
+          z-index: 6;
+        }
+
+        .dh-session-bar {
+          display: flex;
+          gap: 8px;
+          padding: 8px 16px;
+          background: rgba(248, 250, 252, .92);
+          border-bottom: 1px solid rgba(147, 197, 253, .2);
+        }
+
+        .dh-history-toggle {
+          flex: 1;
+          display: flex !important;
+          align-items: center;
+          justify-content: flex-start !important;
+          gap: 7px;
+          width: auto !important;
+          padding: 7px 9px !important;
+          color: #334155;
+          background: white;
+          border: 1px solid #dbeafe;
+          border-radius: 8px;
+          font-size: 12px;
+        }
+
+        .dh-history-toggle span {
+          flex: 1;
+          overflow: hidden;
+          text-align: left;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dh-history-toggle svg:last-child {
+          transition: transform 160ms ease;
+        }
+
+        .dh-chevron-open {
+          transform: rotate(180deg);
+        }
+
+        .dh-session-bar button {
+          display: grid;
+          place-items: center;
+          width: 30px;
+          color: #64748b;
+          background: white;
+          border: 1px solid #dbeafe;
+          border-radius: 8px;
+          cursor: pointer;
+        }
+
+        .dh-history-list {
+          position: absolute;
+          top: calc(100% - 1px);
+          right: 12px;
+          left: 12px;
+          max-height: 220px;
+          overflow-y: auto;
+          padding: 7px;
+          background: rgba(255, 255, 255, .98);
+          border: 1px solid #dbeafe;
+          border-radius: 0 0 12px 12px;
+          box-shadow: 0 16px 30px rgba(30, 64, 175, .16);
+        }
+
+        .dh-history-list > p {
+          margin: 0;
+          padding: 12px;
+          color: #7b8da4;
+          font-size: 12px;
+          text-align: center;
+        }
+
+        .dh-history-item {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 4px;
+          border-radius: 8px;
+        }
+
+        .dh-history-item:last-child {
+          margin-bottom: 0;
+        }
+
+        .dh-history-current {
+          background: #eff6ff;
+        }
+
+        .dh-history-select {
+          min-width: 0;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 2px;
+          padding: 8px 9px;
+          color: #294866;
+          background: transparent;
+          border: 0;
+          cursor: pointer;
+        }
+
+        .dh-history-select span {
+          width: 100%;
+          overflow: hidden;
+          font-size: 13px;
+          font-weight: 650;
+          text-align: left;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dh-history-select small {
+          color: #7b8da4;
+          font-size: 10px;
+        }
+
+        .dh-history-delete {
+          flex: none;
+          width: 30px !important;
+          height: 30px !important;
+          color: #94a3b8 !important;
+          background: transparent !important;
+          border: 0 !important;
+        }
+
+        .dh-history-delete:hover {
+          color: #dc2626 !important;
+          background: #fef2f2 !important;
         }
 
         .dh-portrait-stage {
@@ -438,6 +576,7 @@ export default function DigitalHumanFloat() {
 
           .dh-launcher,
           .dh-avatar-small {
+            --dh-avatar-size: 82px;
             width: 82px;
             height: 82px;
           }
@@ -453,6 +592,7 @@ export default function DigitalHumanFloat() {
           }
 
           .dh-avatar-large {
+            --dh-avatar-size: 120px;
             width: 120px;
             height: 120px;
           }
