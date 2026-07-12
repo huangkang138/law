@@ -1,4 +1,6 @@
-"""数字人 Agent Runtime API。"""
+"""数字人 Agent Runtime、材料和法律来源 API。"""
+
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -24,6 +26,8 @@ def _response(action):
     except AgentRuntimeError as exc:
         status = 403 if exc.code == "FORBIDDEN" else 404 if exc.code == "RUN_NOT_FOUND" else 409 if exc.code == "INVALID_STATE" else 400
         return jsonify({"success": False, "error": str(exc), "code": exc.code}), status
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "请求参数格式错误", "code": "INVALID_INPUT"}), 400
 
 
 @router.route("/digital-human/agent/runs", methods=["POST"])
@@ -62,3 +66,98 @@ def cancel_run(run_id):
 def get_audit(run_id):
     """查询任务的结构化审计事件。"""
     return _response(lambda: {"events": get_legal_agent_facade().get_audit(run_id, _client_id())})
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/materials", methods=["POST"])
+def add_material(matter_id):
+    """保存当前 Matter 已授权的文本材料并建立位置分片。"""
+    def action():
+        data = request.get_json(silent=True) or {}
+        return get_legal_agent_facade().add_material(
+            matter_id, _client_id(), data.get("filename"), data.get("text"), data.get("media_type", "text/plain"),
+        )
+    return _response(action)
+
+
+@router.route("/digital-human/agent/matters", methods=["POST"])
+def create_matter():
+    """创建阶段 2 材料工作区。"""
+    return _response(lambda: get_legal_agent_facade().create_matter(
+        _client_id(), (request.get_json(silent=True) or {}).get("goal"),
+    ))
+
+
+@router.route("/digital-human/agent/matters", methods=["GET"])
+def list_matters():
+    """列出当前客户端的案件工作区。"""
+    return _response(lambda: {"matters": get_legal_agent_facade().list_matters(_client_id())})
+
+
+@router.route("/digital-human/agent/matters/<matter_id>", methods=["DELETE"])
+def delete_matter(matter_id):
+    """删除 Matter 及其全部阶段 2 衍生数据。"""
+    return _response(lambda: get_legal_agent_facade().delete_matter(matter_id, _client_id()))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>", methods=["GET"])
+def get_matter(matter_id):
+    """读取 Matter 详情和已确认法域。"""
+    return _response(lambda: get_legal_agent_facade().get_matter(matter_id, _client_id()))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/tools/labor-compensation", methods=["POST"])
+def calculate_matter_labor_compensation(matter_id):
+    """通过 Agent 工具注册中心执行劳动补偿估算。"""
+    return _response(lambda: get_legal_agent_facade().calculate_labor_compensation(
+        matter_id, _client_id(), request.get_json(silent=True) or {},
+    ))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/materials/<document_id>/facts", methods=["POST"])
+def extract_material_facts(matter_id, document_id):
+    """从材料中提取带字符偏移引用的候选事实。"""
+    return _response(lambda: {"facts": get_legal_agent_facade().extract_material_facts(matter_id, _client_id(), document_id)})
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/timeline", methods=["GET"])
+def get_timeline(matter_id):
+    """读取当前 Matter 的可追溯时间线。"""
+    return _response(lambda: {"timeline": get_legal_agent_facade().build_matter_timeline(matter_id, _client_id())})
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/evidence-checklist", methods=["GET"])
+def get_evidence_checklist(matter_id):
+    """读取已有材料、事实数量和显式证据缺口。"""
+    return _response(lambda: get_legal_agent_facade().get_evidence_checklist(matter_id, _client_id()))
+
+
+@router.route("/digital-human/agent/jurisdictions", methods=["GET"])
+def list_jurisdictions():
+    """列出 Runtime 当前支持的法域包。"""
+    return _response(lambda: {"jurisdictions": get_legal_agent_facade().list_jurisdictions()})
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/jurisdiction", methods=["POST"])
+def confirm_jurisdiction(matter_id):
+    """保存用户明确确认的 Matter 法域上下文。"""
+    return _response(lambda: get_legal_agent_facade().confirm_jurisdiction(
+        matter_id, _client_id(), request.get_json(silent=True) or {},
+    ))
+
+
+@router.route("/digital-human/agent/legal-authorities", methods=["POST"])
+def register_authority():
+    """登记结构化法律来源；阶段 2 不在该接口中执行联网检索。"""
+    return _response(lambda: get_legal_agent_facade().register_authority(request.get_json(silent=True) or {}))
+
+
+@router.route("/digital-human/agent/legal-authorities/<authority_id>/verify", methods=["POST"])
+def verify_authority(authority_id):
+    """按法域和适用日期验证法律引用。"""
+    def action():
+        data = request.get_json(silent=True) or {}
+        effective_at = datetime.fromisoformat(str(data.get("effective_at", "")).replace("Z", "+00:00"))
+        if effective_at.tzinfo is None:
+            effective_at = effective_at.replace(tzinfo=timezone.utc)
+        return get_legal_agent_facade().verify_authority(authority_id, effective_at, str(data.get("country_code", "")).upper())
+    return _response(action)

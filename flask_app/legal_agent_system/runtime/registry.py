@@ -1,3 +1,5 @@
+"""受控工具注册中心。"""
+
 from typing import Any, Callable, Dict, Tuple
 
 from .enums import ErrorCode
@@ -25,4 +27,3 @@ class ToolRegistry:
             return self._tools[name]
         except KeyError as exc:
             raise AgentRuntimeError(f"工具不存在: {name}", ErrorCode.TOOL_NOT_FOUND.value) from exc
-"""受控工具注册中心。"""

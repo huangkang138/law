@@ -874,3 +874,98 @@ class AgentAuditEvent(Base):
     # 仅记录状态和动作摘要，不保存模型内部思维链。
     detail_json = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class MatterJurisdiction(Base):
+    """Matter 的候选或已确认法域。"""
+
+    __tablename__ = "matter_jurisdictions"
+
+    id = Column(String, primary_key=True)
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    country_code = Column(String(2), nullable=False, index=True)
+    subdivision_code = Column(String)
+    legal_system = Column(String, nullable=False)
+    governing_law = Column(String)
+    forum = Column(String)
+    language = Column(String, nullable=False)
+    effective_at = Column(DateTime(timezone=True), nullable=False)
+    confidence = Column(Float, nullable=False)
+    confirmed_by_user = Column(Boolean, nullable=False, default=False)
+    status = Column(String, nullable=False, default="candidate", index=True)
+    basis_json = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AgentDocument(Base):
+    """Agent 工作区内的授权材料元数据和受控文本。"""
+
+    __tablename__ = "agent_documents"
+
+    id = Column(String, primary_key=True)
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = Column(String, nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    media_type = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    content_hash = Column(String, nullable=False, index=True)
+    character_count = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default="parsed", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DocumentFragment(Base):
+    """可定位到页码或字符偏移的材料片段。"""
+
+    __tablename__ = "document_fragments"
+
+    id = Column(String, primary_key=True)
+    document_id = Column(String, ForeignKey("agent_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    page_number = Column(Integer)
+    start_offset = Column(Integer, nullable=False)
+    end_offset = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    content_hash = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LegalFact(Base):
+    """从材料中提取、且必须带出处的结构化事实。"""
+
+    __tablename__ = "legal_facts"
+
+    id = Column(String, primary_key=True)
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id = Column(String, ForeignKey("agent_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    fragment_id = Column(String, ForeignKey("document_fragments.id", ondelete="CASCADE"), nullable=False, index=True)
+    fact_type = Column(String, nullable=False, index=True)
+    fact_text = Column(Text, nullable=False)
+    confidence = Column(Float, nullable=False)
+    start_offset = Column(Integer, nullable=False)
+    end_offset = Column(Integer, nullable=False)
+    confirmed_by_user = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LegalAuthority(Base):
+    """带法域、版本、有效期和内容哈希的法律来源。"""
+
+    __tablename__ = "legal_authorities"
+
+    id = Column(String, primary_key=True)
+    country_code = Column(String(2), nullable=False, index=True)
+    subdivision_code = Column(String)
+    authority_type = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    provision = Column(String)
+    text = Column(Text, nullable=False)
+    source_url = Column(Text, nullable=False)
+    issuing_body = Column(String, nullable=False)
+    published_at = Column(DateTime(timezone=True))
+    effective_from = Column(DateTime(timezone=True))
+    effective_to = Column(DateTime(timezone=True))
+    status = Column(String, nullable=False, index=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False)
+    content_hash = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

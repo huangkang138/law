@@ -223,3 +223,51 @@
 - 实际改动：`flask_app/legal_agent_system/`、`flask_app/models/db_models.py`、`flask_app/routers/digital_human_agent.py`、`flask_app/tests/test_digital_human_stage1.py`、`frontend/src/services/digitalHumanApi.ts`、`frontend/src/store/digitalHumanStore.ts`、`frontend/src/components/DigitalHuman/DigitalHumanChat.tsx` 和本日志。
 - 验证：Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1 集成测试共 2 项通过，确认只增强可读性，没有改变运行行为。
 - 风险与后续：后续新增 Runtime 节点、工具或数据模型时，应同步添加说明职责、输入输出、安全边界和失败策略的中文注释。
+
+## 2026-07-12 15:50:46 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；工作树包含阶段 1 未提交改动和此前资料，本次在其上增量实现阶段 2，没有清理、提交或覆盖用户文件。
+- 用户请求：阶段 1 没问题后进入阶段 2。
+- 修改前阅读：两份项目规则、数字人总体规划中阶段 2/法域/来源/工具章节、最新项目分析和相关修改日志；并盘点现有 `document_parser.py`、`rag_service.py`、文档 Router、数据模型及阶段 1 Runtime。
+- 修改思路：不直接复用现有仅支持 UTF-8 读取的早期 DocumentParser 和内存模拟 RAG 作为权威层；先在 `legal_agent_system` 内建立材料、事实、法域和法律来源的可追溯数据基础，并继续维持 Router→Facade→领域层边界。
+- 具体方案：新增材料/片段/事实/法域/法律来源模型；实现 Matter+client_id 访问控制、文本切片、候选事实定位、时间线和证据清单；建立 CN 法域包和显式确认机制；实现来源登记、有效期/状态/法域/哈希校验及无法验证时降级；包装统一材料和来源工具并开放 API。
+- 实际改动：`flask_app/legal_agent_system/matters/`、`flask_app/legal_agent_system/jurisdictions/`、阶段 2 工具适配器、Runtime Schema、Facade、`flask_app/models/db_models.py`、`flask_app/routers/digital_human_agent.py`、`flask_app/tests/test_digital_human_stage2.py`、最新项目分析和本日志。
+- 验证：Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1/2 集成测试共 3 项通过。阶段 2 验证材料位置引用、匿名隔离、时间线、证据清单、法域确认、未知来源降级和不支持法域拒绝。
+- 风险与后续：当前只完成阶段 2 的文本材料与来源协议闭环；后续仍需接入 PDF/DOCX/图片 OCR 解析器、真实权威法律来源连接器、结构化 LLM 事实提取及重复事实去重。测试来源使用 `.invalid` 域名和明确测试文本，不包含或冒充真实法律内容。
+
+## 2026-07-12 19:30:02 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；保留阶段 1/2 的未提交改动和用户资料，本次继续增量修改数字人前端与独立 Matter 创建链路。
+- 用户请求：按已确认方案实现阶段 2 前端，使用户能在现有数字人面板直接验证材料事实出处，而不是继续看到阶段 1 模拟任务。
+- 修改前阅读：项目规则、阶段 2 规划、最新项目分析与修改历史，以及数字人 Chat、Store、API、样式和阶段 2 后端材料接口。
+- 修改思路：保留头像、聊天、历史会话和输入框；将阶段 1 模拟卡替换为独立小组件，按“创建案件→确认法域→添加材料→查看分析”组织流程，避免继续膨胀 Chat 组件。
+- 具体方案：新增不触发模拟 Runtime 的 Matter 创建接口；新增前端阶段 2 API 类型与聚合调用；新增 `DigitalHumanMatterWorkspace.tsx`，支持目标输入、中国法域确认、省市、TXT 选择/文本粘贴、事实出处展开、时间线和证据提示；明确显示法律来源为 0 和尚未连接权威检索。
+- 实际改动：`legal_agent_system/matters/materials.py`、Facade、Agent Router、阶段 2 测试、`frontend/src/services/digitalHumanApi.ts`、`frontend/src/components/DigitalHuman/DigitalHumanMatterWorkspace.tsx`、`DigitalHumanChat.tsx`、`digitalHumanStore.ts`、`globals.css`、最新项目分析和本日志。
+- 验证：Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1/2 集成测试共 3 项通过，阶段 2 测试已改为使用与前端一致的独立 Matter 创建链路。
+- 风险与后续：当前前端仅支持 TXT/粘贴文本；关闭并重新挂载数字人面板后，尚未完成的本地表单不会恢复，但已提交到 PostgreSQL 的 Matter 和材料仍存在。后续应增加案件列表/恢复接口，并接入 PDF、DOCX、OCR 和权威法律来源。
+
+## 2026-07-12 20:02:16 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；保留此前阶段 1/2 改动和用户资料，本次增量实现阶段 2.5 与首个真实工具。
+- 用户请求：理清并执行下一步方案，完善当前 Agent，代码参考项目风格添加中文注释。
+- 修改前阅读：项目规则、总体规划阶段 2/3 与工具边界、最新项目分析和修改历史；盘点 `legal_tools.py`、劳动补偿模型、法律计算器前端、阶段 2 Matter/材料服务和工具注册中心。
+- 修改思路：先解决当前 Agent 的案件恢复、删除和重复数据问题，再将项目已有劳动补偿能力下沉为共享 Service，Agent 仅作为受控工具调用方，不复制计算公式或重写计算器。
+- 具体方案：增加 Matter 列表/删除；材料按内容哈希去重，事实提取幂等复用；新增带中文注释的劳动补偿 Service；原 Router 改为调用 Service；注册 `calculate_labor_compensation` 工具并要求用户确认 CN 法域；前端增加案件继续/删除与劳动补偿估算区。
+- 实际改动：Matter/材料 Service、Agent Facade/Router/工具注册、`services/labor_compensation_service.py`、`routers/legal_tools.py`、数字人 API/材料工作区/样式、`tests/test_digital_human_stage25.py`、最新项目分析和本日志。
+- 验证：Python compileall、前端 TypeScript、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1/2/2.5 集成测试共 4 项通过。2.5 验证案件恢复/删除、材料和事实去重、Agent 与原工具共用公式。
+- 风险与后续：劳动补偿仍是项目既有简化估算公式，不是完整法律规则引擎；正式数据库迁移框架、案件详情完整恢复、ToolCall 持久化审计和工资封顶/解除原因等规则仍需继续补齐。前端法律计算器自己拼装的“总月份数”展示逻辑与后端既有公式存在历史不一致，后续应统一改为直接展示 Service 返回的 calculation。
+
+## 2026-07-12 20:22:45 +08:00
+
+- 会话 ID：`019f550e-f809-7d63-9c7d-cb1ad0e1173d`
+- 分支/Git 状态：当前分支 `master`；保留此前阶段 1-2.5 未提交改动和用户文件，本次只增量修改 Matter 详情及数字人布局。
+- 用户请求：修复法域反复要求确认的问题，并扩大当前 Agent 操作画面。
+- 修改前阅读：项目规则、总体规划、最新分析和修改历史；检查 Matter/法域后端、数字人 Float/Chat/材料工作区、全局样式和当前 Git 状态。
+- 修改思路：根因是恢复案件只读取列表摘要并直接跳到材料步骤，未查询已确认法域；布局问题来自 384px 面板同时承载聊天和完整工作区，并叠加内部滚动。通过 Matter 详情恢复权威状态，并将 UI 拆成普通聊天和展开工作台双模式。
+- 具体方案：新增 Matter 详情 API 返回已确认法域；恢复案件时按后端状态决定是否需要确认；显示绿色法域状态和一次性确认说明；普通模式只保留工作台入口；桌面展开为约 920px 左右双栏，移动端近全屏上下布局；移除材料工作区自身高度限制和内部滚动。
+- 实际改动：Matter MaterialService、Agent Facade/Router、阶段 2.5 测试、数字人 API、`DigitalHumanMatterWorkspace.tsx`、`DigitalHumanChat.tsx`、`DigitalHumanFloat.tsx`、全局样式、最新项目分析和本日志。
+- 验证：Python compileall、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 0/1/2/2.5 回归测试 4 项全部通过，包含 Matter 法域恢复断言。
+- 风险与后续：当前展开状态只保存在组件内，关闭数字人后会回到普通模式；这是界面偏好而非业务状态，不影响 Matter、法域和材料持久化。后续可增加聊天/工作台移动端页签，进一步减少上下布局滚动。

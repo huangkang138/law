@@ -141,7 +141,7 @@ export default function DigitalHumanFloat() {
           width: min(384px, calc(100vw - 32px));
           height: min(650px, calc(100vh - 112px));
           display: grid;
-          grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+          grid-template-rows: auto auto minmax(0, 1fr);
           overflow: hidden;
           color: #18324f;
           background: rgba(249, 252, 255, .97);
@@ -150,6 +150,48 @@ export default function DigitalHumanFloat() {
           box-shadow: 0 26px 70px rgba(30, 64, 175, .22), 0 4px 18px rgba(15, 23, 42, .1);
           backdrop-filter: blur(18px);
           animation: dh-panel-in 320ms cubic-bezier(.2,.8,.2,1) both;
+        }
+
+        .dh-panel-body {
+          min-height: 0;
+          display: grid;
+          grid-template-rows: minmax(0, 1fr) auto;
+        }
+
+        .dh-chat-column {
+          min-width: 0;
+          min-height: 0;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr) auto auto;
+        }
+
+        .dh-workspace-column {
+          min-width: 0;
+          min-height: 0;
+        }
+
+        .dh-panel-expanded {
+          width: min(920px, calc(100vw - 48px));
+          height: min(760px, calc(100vh - 64px));
+        }
+
+        .dh-panel-expanded .dh-panel-body {
+          grid-template-columns: 340px minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr);
+        }
+
+        .dh-panel-expanded .dh-chat-column {
+          border-right: 1px solid rgba(147, 197, 253, .35);
+        }
+
+        .dh-panel-expanded .dh-portrait-stage {
+          height: 126px;
+        }
+
+        .dh-panel-expanded .dh-workspace-column {
+          overflow-y: auto;
+          padding: 16px;
+          background: rgba(248, 251, 255, .86);
         }
 
         .dh-panel-header {
@@ -585,6 +627,25 @@ export default function DigitalHumanFloat() {
             width: calc(100vw - 24px);
             height: min(650px, calc(100dvh - 92px));
             border-radius: 18px;
+          }
+
+          .dh-panel-expanded {
+            width: calc(100vw - 24px);
+            height: calc(100dvh - 24px);
+          }
+
+          .dh-panel-expanded .dh-panel-body {
+            grid-template-columns: 1fr;
+            grid-template-rows: minmax(230px, 38%) minmax(0, 1fr);
+          }
+
+          .dh-panel-expanded .dh-chat-column {
+            border-right: 0;
+            border-bottom: 1px solid rgba(147, 197, 253, .35);
+          }
+
+          .dh-panel-expanded .dh-portrait-stage {
+            display: none;
           }
 
           .dh-portrait-stage {

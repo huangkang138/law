@@ -105,6 +105,63 @@
 .dh-agent-approval div { display: flex; gap: 7px; margin-top: 7px; }
 .dh-agent-approval button { padding: 5px 8px; border-radius: 7px; background: white; color: #1d4ed8; }
 .dh-agent-result { margin-top: 7px; color: #166534; }
+.dh-matter-workspace { padding: 14px; border: 1px solid #bfdbfe; border-radius: 14px; background: #f8fbff; color: #334155; font-size: 12px; }
+.dh-matter-compact { margin: 0 14px 10px; padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a8a; }
+.dh-matter-compact > div { display: flex; align-items: center; gap: 7px; }
+.dh-matter-compact span { display: flex; flex-direction: column; }
+.dh-matter-compact small { color: #64748b; font-weight: 400; }
+.dh-matter-compact button { flex: 0 0 auto; padding: 7px 9px; border: 0; border-radius: 8px; background: #2563eb; color: white; font-weight: 700; cursor: pointer; }
+.dh-matter-heading { display: flex; align-items: center; gap: 8px; color: #1e3a8a; }
+.dh-matter-heading div { display: flex; flex-direction: column; }
+.dh-matter-heading strong { font-size: 14px; }
+.dh-matter-heading small { color: #64748b; font-weight: 400; }
+.dh-matter-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 11px 0; }
+.dh-matter-steps span { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #94a3b8; font-weight: 700; }
+.dh-matter-steps span::before { content: ''; position: absolute; }
+.dh-matter-steps span.active { color: #2563eb; }
+.dh-matter-steps em { font-size: 10px; font-style: normal; font-weight: 500; white-space: nowrap; }
+.dh-matter-form { display: flex; flex-direction: column; gap: 8px; }
+.dh-matter-form label { display: flex; align-items: center; gap: 5px; font-weight: 650; color: #334155; }
+.dh-matter-form input:not([type='checkbox']), .dh-matter-form textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 9px; background: white; padding: 8px 9px; color: #1e293b; font: inherit; resize: vertical; }
+.dh-matter-form > button, .dh-secondary-button { border: 0; border-radius: 9px; padding: 8px 10px; background: #2563eb; color: white; font-weight: 700; cursor: pointer; }
+.dh-matter-form > button:disabled { opacity: .5; cursor: not-allowed; }
+.dh-jurisdiction-row { display: grid; grid-template-columns: 72px 1fr; gap: 7px; align-items: center; }
+.dh-jurisdiction-row > span { padding: 8px; border-radius: 9px; background: #dbeafe; color: #1d4ed8; text-align: center; font-weight: 700; }
+.dh-confirm-check { font-weight: 500 !important; color: #475569 !important; }
+.dh-jurisdiction-help { margin: 0; padding: 7px; border-radius: 8px; background: #eff6ff; color: #475569; }
+.dh-jurisdiction-status { display: flex; align-items: center; gap: 5px; margin: 9px 0 0; padding: 7px 9px; border-radius: 8px; background: #ecfdf5; color: #166534; font-weight: 700; }
+.dh-file-picker { justify-content: center; padding: 9px; border: 1px dashed #60a5fa; border-radius: 9px; color: #2563eb !important; cursor: pointer; }
+.dh-file-picker input { display: none; }
+.dh-result-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.dh-result-summary span { padding: 7px 4px; border-radius: 8px; background: #dbeafe; text-align: center; color: #475569; }
+.dh-result-summary b { display: block; color: #1d4ed8; font-size: 16px; }
+.dh-analysis-result h4 { margin: 10px 0 6px; color: #1e3a8a; }
+.dh-fact-item { margin-bottom: 6px; border: 1px solid #dbeafe; border-radius: 9px; background: white; overflow: hidden; }
+.dh-fact-item > button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; background: transparent; padding: 8px; color: #334155; text-align: left; cursor: pointer; }
+.dh-fact-item > button span { display: flex; align-items: flex-start; gap: 5px; }
+.dh-fact-item > div { padding: 0 8px 8px; color: #64748b; }
+.dh-fact-item blockquote { margin: 5px 0 0; padding: 6px 8px; border-left: 2px solid #60a5fa; background: #eff6ff; color: #334155; }
+.dh-timeline-item { display: grid; grid-template-columns: 76px 1fr; gap: 6px; padding: 5px 0; border-bottom: 1px solid #e2e8f0; }
+.dh-timeline-item time { color: #2563eb; font-weight: 700; }
+.dh-result-warning { margin: 9px 0; color: #92400e; }
+.dh-source-notice { margin-top: 9px; padding: 7px; border-radius: 8px; background: #fefce8; color: #854d0e; }
+.dh-result-empty, .dh-matter-error { color: #b91c1c; }
+.dh-secondary-button { width: 100%; background: white; color: #2563eb; border: 1px solid #93c5fd; }
+.dh-matter-history { margin-top: 5px; padding-top: 8px; border-top: 1px solid #dbeafe; }
+.dh-matter-history > strong { display: block; margin-bottom: 5px; color: #475569; }
+.dh-matter-history > div { display: grid; grid-template-columns: 1fr 30px; gap: 5px; margin-top: 5px; }
+.dh-matter-history button { border: 1px solid #dbeafe; border-radius: 8px; background: white; color: #334155; cursor: pointer; }
+.dh-matter-history > div > button:first-child { display: flex; justify-content: space-between; gap: 8px; padding: 7px; text-align: left; }
+.dh-matter-history small { color: #2563eb; white-space: nowrap; }
+.dh-labor-tool { margin-top: 10px; padding: 9px; border: 1px solid #bfdbfe; border-radius: 10px; background: white; }
+.dh-labor-tool h4 { display: flex; align-items: center; gap: 5px; margin-top: 0; }
+.dh-labor-tool > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.dh-labor-tool input { min-width: 0; width: 100%; padding: 7px 5px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; }
+.dh-labor-tool > button { width: 100%; margin-top: 7px; padding: 7px; border: 0; border-radius: 8px; background: #2563eb; color: white; font-weight: 700; cursor: pointer; }
+.dh-labor-tool > button:disabled { opacity: .5; }
+.dh-labor-tool section { margin-top: 8px; padding: 8px; border-radius: 8px; background: #ecfdf5; color: #166534; }
+.dh-labor-tool section p { margin: 4px 0; color: #334155; }
+.dh-labor-tool section small { color: #92400e; }
 
 @layer base {
   * {

@@ -24,6 +24,7 @@ from models.db_models import (
 )
 import uuid
 from datetime import datetime, timedelta
+from services.labor_compensation_service import get_labor_compensation_service
 
 router = Blueprint('legal_tools', __name__)
 
@@ -140,28 +141,10 @@ def calculate_labor_compensation():
     """计算劳动补偿金"""
     try:
         data = request.get_json()
-        monthly_salary = float(data.get('monthly_salary', 0))
-        years = int(data.get('years', 0))
-        months = int(data.get('months', 0))
-        
-        total_years = years + months / 12
-        compensation = monthly_salary * total_years
-        
-        db = next(get_db())
-        record = LaborCompensation(
-            id=str(uuid.uuid4()),
-            monthly_salary=f"{monthly_salary:.2f}",
-            years=years,
-            months=months,
-            compensation=f"{compensation:.2f}"
+        result = get_labor_compensation_service().calculate(
+            data.get('monthly_salary', 0), data.get('years', 0), data.get('months', 0),
         )
-        db.add(record)
-        db.commit()
-        
-        return jsonify({
-            'success': True,
-            'data': {**serialize_record(record), 'compensation': round(compensation, 2)}
-        })
+        return jsonify({'success': True, 'data': result})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
