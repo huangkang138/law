@@ -820,6 +820,8 @@ class AgentStep(Base):
     name = Column(String, nullable=False)
     status = Column(String, nullable=False, index=True)
     tool_name = Column(String)
+    plan_id = Column(String, index=True)
+    plan_version = Column(Integer, nullable=False, default=1)
     error_code = Column(String)
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
@@ -968,6 +970,14 @@ class LegalAuthority(Base):
     status = Column(String, nullable=False, index=True)
     retrieved_at = Column(DateTime(timezone=True), nullable=False)
     content_hash = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, default="legacy", index=True)
+    external_id = Column(String, index=True)
+    canonical_url = Column(Text)
+    trust_level = Column(String, nullable=False, default="untrusted", index=True)
+    version = Column(String, nullable=False, default="1")
+    supersedes_id = Column(String, index=True)
+    last_verified_at = Column(DateTime(timezone=True))
+    retrieval_status = Column(String, nullable=False, default="stored", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -983,6 +993,8 @@ class LaborDisputeProfile(Base):
     plan_json = Column(JSON, nullable=False, default=list)
     status = Column(String, nullable=False, default="awaiting_information", index=True)
     draft_approved = Column(Boolean, nullable=False, default=False)
+    facts_version = Column(Integer, nullable=False, default=0)
+    rule_version = Column(String, nullable=False, default="labor-rules-1")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
@@ -1000,4 +1012,6 @@ class AgentArtifact(Base):
     status = Column(String, nullable=False, default="draft")
     evidence_refs_json = Column(JSON, nullable=False, default=list)
     authority_refs_json = Column(JSON, nullable=False, default=list)
+    input_fingerprint = Column(String, index=True)
+    version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

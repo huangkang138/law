@@ -5,6 +5,7 @@ Flask Router 只依赖本模块，不直接感知 LangGraph 节点、仓储或�
 """
 
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from .runtime.graph import AgentGraph
@@ -14,30 +15,36 @@ from .runtime.runtime import AgentRuntime
 from .runtime.labor_graph import LaborDisputeGraph
 from .runtime.labor_runtime import LaborDisputeRuntime
 from .tools import (
-    register_authority_tools, register_labor_dispute_tools, register_labor_tools,
+    register_authority_verification_tools, register_labor_dispute_tools, register_labor_tools,
     register_material_tools, register_mock_tools,
 )
 from .matters import MaterialService
 from .jurisdictions.authorities import LegalAuthorityService
+from .jurisdictions.authority_importer import TrustedAuthorityImporter
+from .jurisdictions.authority_provider import OfficialCnLaborProvider
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
 from .labor_disputes import LaborDisputeService, LaborFactSuggestionService
+from . import models as _agent_models  # noqa: F401，注册新增 Agent 表元数据
 
 
 class LegalAgentFacade:
     """组装 Agent Runtime，并向外提供稳定的任务用例。"""
 
-    def __init__(self) -> None:
+    def __init__(self, llm_fact_extractor=None, auto_sync_authorities: bool = False) -> None:
         # 每个门面实例都使用无状态仓储；运行状态统一从 PostgreSQL 恢复。
         self.repository = AgentRepository()
         self.materials = MaterialService()
         self.authorities = LegalAuthorityService()
+        self.authority_importer = TrustedAuthorityImporter(self.authorities)
+        # 生产门面开启自动同步；测试可显式关闭，继续验证“无来源必须阻断”的安全边界。
+        self.auto_sync_authorities = auto_sync_authorities
         self.jurisdictions = MatterJurisdictionService()
         self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
-        self.labor_suggestions = LaborFactSuggestionService(self.materials)
+        self.labor_suggestions = LaborFactSuggestionService(self.materials, llm_fact_extractor)
         self.registry = ToolRegistry()
         register_mock_tools(self.registry)
         register_material_tools(self.registry, self.materials)
-        register_authority_tools(self.registry, self.authorities)
+        register_authority_verification_tools(self.registry, self.authorities)
         register_labor_tools(self.registry)
         register_labor_dispute_tools(self.registry, self.labor_disputes)
         self.runtime = AgentRuntime(self.repository, AgentGraph(self.repository, self.registry))
@@ -45,6 +52,7 @@ class LegalAgentFacade:
             self.repository,
             LaborDisputeGraph(self.repository, self.registry, self.materials, self.labor_disputes),
             self.labor_disputes, self.jurisdictions,
+            self.import_official_labor_authorities if auto_sync_authorities else None,
         )
 
     def start_run(self, goal: str, client_id: str, session_id: Optional[str] = None):
@@ -89,13 +97,24 @@ class LegalAgentFacade:
         """生成当前 Matter 的材料/证据概览。"""
         return self.materials.evidence_checklist(matter_id, client_id)
 
-    def register_authority(self, data):
-        """登记来源适配器提供的结构化法律来源。"""
-        return self.authorities.register(data)
+    def register_test_authority(self, data):
+        """为集成测试注入保留域名来源；不暴露为 HTTP 或 Agent 工具。"""
+        return self.authorities.register_test(data)
 
     def verify_authority(self, authority_id: str, effective_at, country_code: str):
         """验证引用在指定法域和日期是否可作为确定依据。"""
         return self.authorities.verify(authority_id, effective_at, country_code)
+
+    def import_official_labor_authorities(self):
+        """由内部可信 Provider 同步官方法源；不提供公开写入接口。"""
+        return self.authority_importer.import_all(OfficialCnLaborProvider())
+
+    def get_labor_authority_catalog(self):
+        """返回劳动纠纷当前可用的官方来源，让用户在运行前也能看到依据。"""
+        if self.auto_sync_authorities:
+            self.import_official_labor_authorities()
+        authorities = self.authorities.search("CN", datetime.now(timezone.utc), [])
+        return {"status": "ready" if authorities else "unavailable", "count": len(authorities), "authorities": authorities}
 
     @staticmethod
     def list_jurisdictions():
@@ -147,15 +166,17 @@ class LegalAgentFacade:
 
     def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None):
         """启动或复用当前 Matter 的劳动纠纷 LangGraph 任务。"""
+        if self.auto_sync_authorities:
+            self.import_official_labor_authorities()
         return self.labor_runtime.start(matter_id, client_id, facts)
 
     def suggest_labor_dispute_facts(self, matter_id: str, client_id: str):
         """从已授权材料生成带出处候选值，不自动确认或写入案件事实。"""
         return self.labor_suggestions.suggest(matter_id, client_id)
 
-    def continue_labor_dispute_run(self, run_id: str, client_id: str, action: str, payload=None):
+    def continue_labor_dispute_run(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
         """以补充事实、确认法域、审批或来源重试继续暂停任务。"""
-        return self.labor_runtime.continue_run(run_id, client_id, action, payload)
+        return self.labor_runtime.continue_run(run_id, client_id, action, payload, idempotency_key)
 
 
 _facade = None
@@ -165,5 +186,6 @@ def get_legal_agent_facade() -> LegalAgentFacade:
     """获取进程内共享门面；真实任务状态不依赖该单例存活。"""
     global _facade
     if _facade is None:
-        _facade = LegalAgentFacade()
+        # HTTP 生产入口默认准备可信官方法源；重复调用按 provider/external_id/version 幂等复用。
+        _facade = LegalAgentFacade(auto_sync_authorities=True)
     return _facade

@@ -19,6 +19,9 @@ class LaborDisputeFacts(BaseModel):
     claim_types: List[str] = Field(default_factory=list)
     demands: Optional[str] = None
     termination_reason: Optional[str] = None
+    employment_active: Optional[bool] = None
+    limitation_interruption_dates: List[date] = Field(default_factory=list)
+    limitation_suspension_days: int = Field(default=0, ge=0, le=3650)
 
 
 FIELD_QUESTIONS = {

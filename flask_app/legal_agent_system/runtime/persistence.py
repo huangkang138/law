@@ -1,3 +1,5 @@
+import hashlib
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
@@ -15,6 +17,7 @@ from models.db_models import (
 from .enums import ErrorCode, RunStatus, StepStatus
 from .errors import AgentRuntimeError
 from .schemas import AgentState, ToolResult
+from legal_agent_system.models import AgentEventOutbox, AgentPlan, AgentRunAction
 
 """数据库仓储层。它让Agent能够暂停、恢复和审计。"""
 
@@ -136,15 +139,18 @@ class AgentRepository:
         finally:
             db.close()
 
-    def create_plan_steps(self, state: AgentState, steps: List[Dict]) -> List[str]:
-        """把动态计划写入 AgentStep；同一 Run 仅创建一次当前版本计划。"""
+    def create_plan_steps(self, state: AgentState, steps: List[Dict], input_fingerprint: str) -> List[str]:
+        """把不可变计划版本与对应步骤写入数据库。"""
         db = SessionLocal()
         try:
-            existing = db.query(AgentStep).filter(AgentStep.run_id == state.run_id).count()
+            existing = db.query(AgentPlan).filter(AgentPlan.run_id == state.run_id, AgentPlan.input_fingerprint == input_fingerprint).order_by(AgentPlan.version.desc()).first()
             if existing:
                 return [row.id for row in db.query(AgentStep).filter(
-                    AgentStep.run_id == state.run_id,
+                    AgentStep.run_id == state.run_id, AgentStep.plan_id == existing.id,
                 ).order_by(AgentStep.sequence).all()]
+            state.plan_version = (db.query(AgentPlan).filter(AgentPlan.run_id == state.run_id).count() + 1)
+            plan_id = _id("plan")
+            db.add(AgentPlan(id=plan_id, run_id=state.run_id, version=state.plan_version, task_type=state.task_type, input_fingerprint=input_fingerprint, plan_json=steps))
             ids = []
             for sequence, item in enumerate(steps, start=1):
                 step_id = _id("step")
@@ -152,7 +158,7 @@ class AgentRepository:
                 db.add(AgentStep(
                     id=step_id, run_id=state.run_id, sequence=sequence,
                     name=item["name"], status=StepStatus.PENDING.value,
-                    tool_name=item.get("tool_name"),
+                    tool_name=item.get("tool_name"), plan_id=plan_id, plan_version=state.plan_version,
                 ))
             self._audit(db, state.run_id, "plan_created", {
                 "plan_version": state.plan_version, "step_ids": ids,
@@ -165,13 +171,12 @@ class AgentRepository:
         finally:
             db.close()
 
-    def get_step(self, run_id: str, sequence: int) -> AgentStep:
+    def get_step(self, run_id: str, sequence: int, plan_version: Optional[int] = None) -> AgentStep:
         """按稳定序号读取当前计划步骤。"""
         db = SessionLocal()
         try:
-            step = db.query(AgentStep).filter(
-                AgentStep.run_id == run_id, AgentStep.sequence == sequence,
-            ).first()
+            query = db.query(AgentStep).filter(AgentStep.run_id == run_id, AgentStep.sequence == sequence)
+            step = query.filter(AgentStep.plan_version == plan_version).first() if plan_version else query.order_by(AgentStep.plan_version.desc()).first()
             if step is None:
                 raise AgentRuntimeError("Agent 计划步骤不存在", ErrorCode.INVALID_STATE.value)
             db.expunge(step)
@@ -283,7 +288,11 @@ class AgentRepository:
                 raise AgentRuntimeError("Agent 任务不存在", ErrorCode.RUN_NOT_FOUND.value)
             if run.client_id != client_id:
                 raise AgentRuntimeError("无权访问该 Agent 任务", ErrorCode.FORBIDDEN.value)
-            steps = db.query(AgentStep).filter(AgentStep.run_id == run_id).order_by(AgentStep.sequence).all()
+            plan_version = (run.state_json or {}).get("plan_version", 0)
+            step_query = db.query(AgentStep).filter(AgentStep.run_id == run_id)
+            if plan_version:
+                step_query = step_query.filter(AgentStep.plan_version == plan_version)
+            steps = step_query.order_by(AgentStep.sequence).all()
             approval = db.get(ApprovalRequest, run.pending_approval_id) if run.pending_approval_id else None
             return {
                 "run_id": run.id, "matter_id": run.matter_id, "status": run.status,
@@ -299,6 +308,11 @@ class AgentRepository:
                 "max_steps": (run.state_json or {}).get("max_steps", 6),
                 "max_tool_calls": (run.state_json or {}).get("max_tool_calls", 8),
                 "tool_call_count": (run.state_json or {}).get("tool_call_count", 0),
+                "budget_wallclock_seconds": (run.state_json or {}).get("budget_wallclock_seconds", 300),
+                "budget_tokens": (run.state_json or {}).get("budget_tokens", 12000),
+                "token_usage": (run.state_json or {}).get("token_usage", 0),
+                "budget_cost_cents": (run.state_json or {}).get("budget_cost_cents", 100),
+                "cost_cents": (run.state_json or {}).get("cost_cents", 0),
                 "final_output": (run.state_json or {}).get("final_output"), "error_code": run.error_code,
             }
         finally:
@@ -314,10 +328,37 @@ class AgentRepository:
         finally:
             db.close()
 
+    def begin_action(self, run_id: str, key: str, action: str, payload: Dict):
+        payload_hash = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        db = SessionLocal()
+        try:
+            existing = db.query(AgentRunAction).filter(AgentRunAction.run_id == run_id, AgentRunAction.idempotency_key == key).first()
+            if existing:
+                if existing.payload_hash != payload_hash or existing.action != action:
+                    raise AgentRuntimeError("幂等键已用于不同请求", "IDEMPOTENCY_CONFLICT")
+                if existing.response_json is None:
+                    raise AgentRuntimeError("同一请求正在处理中", "ACTION_IN_PROGRESS")
+                return existing.response_json
+            db.add(AgentRunAction(id=_id("action"), run_id=run_id, idempotency_key=key, action=action, payload_hash=payload_hash))
+            db.commit()
+            return None
+        finally:
+            db.close()
+
+    def finish_action(self, run_id: str, key: str, response: Dict):
+        db = SessionLocal()
+        try:
+            row = db.query(AgentRunAction).filter(AgentRunAction.run_id == run_id, AgentRunAction.idempotency_key == key).one()
+            row.response_json = response
+            db.commit()
+        finally:
+            db.close()
+
     @staticmethod
     def _audit(db, run_id: str, event_type: str, detail: Dict) -> None:
         """在调用方事务中追加审计事件，保证业务状态与日志一致提交。"""
         db.add(AgentAuditEvent(id=_id("audit"), run_id=run_id, event_type=event_type, detail_json=detail))
+        db.add(AgentEventOutbox(id=_id("event"), run_id=run_id, event_type=event_type, payload_json=detail))
 """Agent Runtime 的 PostgreSQL 持久化仓储。
 
 所有公开方法自行管理短事务，避免在 LangGraph 节点之间长期持有数据库连接。

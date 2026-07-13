@@ -17,7 +17,7 @@ def register_labor_dispute_tools(registry, service) -> None:
         return ToolResult(
             tool_call_id=call_id, success=True, data=result,
             authority_refs=[item["authority_id"] for item in result.get("authorities", [])],
-            assumptions=[result["deadline"]["assumption"]] if result.get("deadline") else [],
+            assumptions=list(result.get("deadline", {}).get("assumptions", [])),
         )
 
     def draft(call_id, arguments, _attempt):

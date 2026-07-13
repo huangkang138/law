@@ -2,7 +2,7 @@
 定义统一数据结构:
     （AgentState、AgentTool、ToolResult）"""
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -111,3 +111,9 @@ class AgentState(BaseModel):
     approved: Optional[bool] = None
     final_output: Optional[Dict[str, Any]] = None
     error_code: Optional[str] = None
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    budget_wallclock_seconds: int = Field(default=300, ge=1, le=3600)
+    budget_tokens: int = Field(default=12000, ge=0)
+    token_usage: int = Field(default=0, ge=0)
+    budget_cost_cents: int = Field(default=100, ge=0)
+    cost_cents: int = Field(default=0, ge=0)

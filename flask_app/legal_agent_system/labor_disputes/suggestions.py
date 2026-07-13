@@ -27,8 +27,9 @@ class LaborFactSuggestionService:
 
     DATE_PATTERN = re.compile(r"(20\d{2})[年/-](\d{1,2})[月/-](\d{1,2})日?")
 
-    def __init__(self, materials) -> None:
+    def __init__(self, materials, llm_extractor=None) -> None:
         self.materials = materials
+        self.llm_extractor = llm_extractor
 
     def suggest(self, matter_id: str, client_id: str) -> Dict:
         self.materials.get_matter(matter_id, client_id)
@@ -62,11 +63,17 @@ class LaborFactSuggestionService:
                             "value": merged, "confidence": 0.8,
                             "sources": list((current or {}).get("sources", [])) + [source],
                         }
+                if self.llm_extractor:
+                    extracted = self.llm_extractor.extract(document.content)
+                    for candidate in extracted["candidates"]:
+                        if candidate["field"] not in suggestions:
+                            source = {"document_id": document.id, "fact_id": None, "quote": candidate["quote"], "start_offset": candidate["start_offset"], "end_offset": candidate["end_offset"]}
+                            self._put(suggestions, candidate["field"], candidate["value"], candidate["confidence"], source)
             return {
                 "matter_id": matter_id,
                 "suggested_facts": {name: item["value"] for name, item in suggestions.items()},
                 "fields": list(suggestions.values()),
-                "warning": "以上内容由材料规则提取，仅作为候选值；请核对来源原文后采用或修改。",
+                "warning": "以上内容仅是带原文定位的候选值；采用前必须由用户确认。",
             }
         finally:
             db.close()

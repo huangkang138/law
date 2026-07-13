@@ -145,6 +145,7 @@ def continue_labor_dispute_run(run_id):
             raise AgentRuntimeError("缺少继续动作", "INVALID_INPUT")
         return get_legal_agent_facade().continue_labor_dispute_run(
             run_id, _client_id(), action_name, data.get("payload") or {},
+            request.headers.get("Idempotency-Key") or data.get("idempotency_key"),
         )
     return _response(action)
 
@@ -208,12 +209,6 @@ def confirm_jurisdiction(matter_id):
     ))
 
 
-@router.route("/digital-human/agent/legal-authorities", methods=["POST"])
-def register_authority():
-    """登记结构化法律来源；阶段 2 不在该接口中执行联网检索。"""
-    return _response(lambda: get_legal_agent_facade().register_authority(request.get_json(silent=True) or {}))
-
-
 @router.route("/digital-human/agent/legal-authorities/<authority_id>/verify", methods=["POST"])
 def verify_authority(authority_id):
     """按法域和适用日期验证法律引用。"""
@@ -224,3 +219,10 @@ def verify_authority(authority_id):
             effective_at = effective_at.replace(tzinfo=timezone.utc)
         return get_legal_agent_facade().verify_authority(authority_id, effective_at, str(data.get("country_code", "")).upper())
     return _response(action)
+
+
+@router.route("/digital-human/agent/legal-authorities/labor", methods=["GET"])
+def list_labor_authorities():
+    """只读返回劳动纠纷闭环当前可用的官方来源及同步状态。"""
+    _client_id()
+    return _response(lambda: get_legal_agent_facade().get_labor_authority_catalog())

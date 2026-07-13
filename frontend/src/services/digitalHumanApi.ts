@@ -62,6 +62,11 @@ export interface DigitalHumanAgentRun {
   max_steps: number;
   max_tool_calls: number;
   tool_call_count: number;
+  budget_wallclock_seconds: number;
+  budget_tokens: number;
+  token_usage: number;
+  budget_cost_cents: number;
+  cost_cents: number;
   final_output: Record<string, unknown> | null;
   error_code: string | null;
 }
@@ -139,8 +144,23 @@ export interface LaborDisputeWorkflow {
   questions: string[];
   plan: Array<{ name: string; status: string; questions?: string[] }>;
   warning?: string;
-  deadline?: { start_date: string; estimated_deadline: string; assumption: string };
-  authorities?: Array<{ authority_id: string; title: string; provision: string | null; source_url: string }>;
+  deadline?: {
+    rule_version: string;
+    start_date: string;
+    estimated_deadline: string | null;
+    assumptions: string[];
+    warnings: string[];
+    manual_review_required: boolean;
+  };
+  authorities?: Array<{
+    authority_id: string;
+    title: string;
+    provision: string | null;
+    source_url: string;
+    issuing_body: string;
+    trust_level: string;
+    version: string;
+  }>;
   approval_prompt?: string;
 }
 
@@ -163,6 +183,16 @@ export interface LaborFactSuggestions {
     sources: Array<{ document_id: string; fact_id: string | null; quote: string }>;
   }>;
   warning: string;
+}
+
+export interface LaborAuthorityCatalog {
+  status: 'ready' | 'unavailable';
+  count: number;
+  authorities: Array<{
+    authority_id: string; title: string; provision: string | null;
+    source_url: string; issuing_body: string; trust_level: string;
+    version: string; last_verified_at: string | null;
+  }>;
 }
 
 const CLIENT_ID_KEY = 'yys-law-digital-human-client-id';
@@ -376,7 +406,7 @@ export async function continueLaborDisputeAgentRun(
   payload: Record<string, unknown> = {},
 ): Promise<DigitalHumanAgentRun> {
   const response = await request(`/api/digital-human/agent/runs/${encodeURIComponent(runId)}/continue`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
     body: JSON.stringify({ action, payload }),
   });
   return readJson(response);
@@ -384,5 +414,10 @@ export async function continueLaborDisputeAgentRun(
 
 export async function getLaborDisputeFactSuggestions(matterId: string): Promise<LaborFactSuggestions> {
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/suggestions`);
+  return readJson(response);
+}
+
+export async function getLaborAuthorityCatalog(): Promise<LaborAuthorityCatalog> {
+  const response = await request('/api/digital-human/agent/legal-authorities/labor');
   return readJson(response);
 }

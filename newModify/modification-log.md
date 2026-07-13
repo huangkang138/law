@@ -331,3 +331,47 @@
 - 实际改动：`labor_disputes/suggestions.py`、劳动纠纷导出、Facade、Agent Router、前端 API/案件工作台/全局样式、`tests/test_digital_human_stage33_suggestions.py`、最新项目分析和本日志。
 - 验证：Python `compileall`、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 1-3.3 共 7 个测试模块、11 个用例全部通过。3.3 验证测试材料字段、来源原文、读取不落库和跨客户端拒绝。
 - 风险与后续：当前采用确定性文本规则，适合格式清晰的 TXT；复杂自然语言、表格、PDF/DOCX 和图片仍可能缺字段或误识别，因此 UI 始终要求用户核对。后续可接入结构化 LLM 提取，但必须继续要求出处、Schema 校验和用户确认。
+
+## 2026-07-13 16:34:05 +08:00
+
+- 会话 ID：`019f5a67-dce1-7691-913c-80a112528e9d`
+- 分支/Git 状态：当前分支 `master`；开始前只有 `flask_app/tests/`、用户上传 DOCX、前端工作台和 `outputs/` 等未跟踪内容，本次全部保留，不删除、不覆盖用户文件。
+- 用户请求：绘制当前 Agent 和最终目标架构图到 `raw/`，确认采用方案 B，更新总体规划，并继续完善 Agent。
+- 修改前阅读：`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/多法域数字人法律Agent总体规划.md`、`newModify/latest-project-analysis.md`、相关修改历史，以及当前 Router、Facade、来源服务、工具注册、Runtime、模型、测试和数据库入口。
+- 修改思路：先把当前实现与目标边界固化为可编辑图件，再把方案 B 写回唯一总体规划；代码先实施 3.4A 保护网，不在来源、迁移和评测未稳定时提前增加 Planner 或 LLM 自主性。
+- 具体方案：生成两套 Mermaid/Excalidraw/SVG/PNG 架构图；总体规划增加当前基线、方案 B、3.4A～3.4E 和新的依赖顺序；移除公开来源登记 API 与 Agent 来源登记工具；测试来源限制为 `.invalid`；建立 Alembic 非破坏性接管基线；新增 30 个劳动纠纷离线案例、Schema、Runner 和基础测试。
+- 实际改动：`raw/当前Agent架构图.*`、`raw/目标Agent架构图.*`、总体规划；来源 Service、Facade、来源工具注册、Agent Router；`requirements.txt`；`flask_app/alembic.ini`、`flask_app/migrations/`、`flask_app/evals/`、阶段 2/3/3.1/3.2 测试调用及新增 `test_digital_human_stage34a_foundation.py`；最新项目分析和本日志。
+- 验证：架构图离线渲染成功并完成视觉检查；Python compileall 通过；3.4A 基础测试 4/4 通过；阶段 1～3.4A 共 8 个模块、15 个用例全部通过；Alembic head/history/离线升级 SQL 通过；未对现有数据库执行 stamp 或结构写入。
+- 风险与后续：当前 Alembic revision 是接管已有结构的空操作基线，启动时 `create_all` 暂保留兼容；下一阶段 3.4B 必须建立可信 Provider、来源版本和信任等级，之后才适合完善劳动规则和动态 Planner。数据库连接配置仍存在历史硬编码敏感信息，本次未读取 `.env`、未在新文档复制该值，后续应单独迁移到环境变量。
+
+## 2026-07-13 阶段 3.4B～3.4E 完成
+
+- 用户请求：完成阶段 3.4 的全部剩余内容。
+- 修改范围：可信法源 Provider/导入与检索、来源元数据、事实断言与规则版本、草稿输入指纹、动态计划与计划版本、统一工具执行器、操作幂等、事件 Outbox、受控 LLM 候选抽取、预算字段、迁移、测试和规划文档。
+- 数据库：将现有本地库非破坏性 stamp 到 `20260713_0001`，执行 `20260713_0002` 升级到 head；首次验证发现 ORM 曾预建新表，迁移已改为检测并跳过已有结构，不删除现有数据。
+- 安全边界：官方来源只能通过可信 Provider 内部导入；模型候选必须通过 Schema 和原文 quote/offset 校验，且不会自动成为确认事实；继续动作支持幂等键冲突和处理中保护。
+- 验证：Python compileall 通过；Alembic current 为 `20260713_0002 (head)`；阶段 1～3.4 共 9 个相关测试模块、19 个用例全部通过。
+- 保留内容：未修改或删除用户已有未跟踪前端工作台、上传文档和 outputs 文件。
+
+## 2026-07-13 20:26:57 +08:00
+
+- 会话 ID：`019f5a67-dce1-7691-913c-80a112528e9d`
+- 分支/Git 状态：当前分支 `master`；保留既有 Agent 改动、未跟踪上传文档、前端工作台、测试和 outputs，本次仅增量修复法源闭环与前后端契约。
+- 用户请求：确认数字人是否只有 3 张数据库表，检查前后端 Agent 功能是否同步，并修复上一轮分析指出的半成品问题。
+- 修改前阅读：项目上下文/修改规则、总体规划、最新分析、相关修改历史、数据库实表、Alembic 状态、Facade、Runtime、Router、前端 API 和案件工作台。
+- 根因：截图中的 3 张表只属于聊天层；Agent 数据实际分散在 Matter/Run/Step 等表。官方 Provider 只被测试调用，生产启动与来源重试均未同步；前端来源数量与提示写死，重试按钮重复调用启动流程，期限和预算类型落后于后端。
+- 具体方案：生产共享 Facade 开启可信法源自动同步；任务开始前和来源重试时幂等同步；前端调用真实 `retry_authority`，展示实际来源，更新期限/预算契约和幂等请求头；补生产门面空法源端到端测试。
+- 实际改动：`facade.py`、`labor_runtime.py`、`app.py`、`digitalHumanApi.ts`、`DigitalHumanMatterWorkspace.tsx`、阶段 3.4 完成测试、总体规划、最新分析和本日志。
+- 数据库：实库共 75 张表，其中按数字人/Agent职责核对为 20 张；Alembic 为 `20260713_0002 (head)`；当前库已导入 2 条 `official_cn_labor` 可信来源。
+- 验证：Python compileall、前端 `npx tsc --noEmit`、阶段 3.4 专项 5/5、阶段 1～3.4 相关回归 20/20 全部通过；新增用例从空法源开始，自动同步后到达 `awaiting_approval` 并返回可信来源。
+- 风险与后续：当前官方 Provider 是经过白名单约束的内置权威条款清单，不是定时联网采集器；生产级仍需定时复核任务、同步失败监控和更多劳动实体规则。旧服务进程需要重启后才能加载本次代码。
+
+## 2026-07-13 20:46:06 +08:00
+
+- 会话 ID：`019f5a67-dce1-7691-913c-80a112528e9d`
+- 用户请求：说明官方法源同步实际做什么、为什么界面看不到法律，并解释第二个功能；根据截图继续修复体验。
+- 排查结果：最近失败 Run 的错误为 `BUDGET_EXCEEDED`，同一 Run 已累计 8 次工具调用；其中 4 次分析均发生在旧法源链路，反复返回 `AUTHORITY_REQUIRED`。当前 2 条官方来源本身为 effective/trusted/verified，按该案件法域日期可正常检索。
+- 修改方案：新增只读法源目录接口，前端展开工作台时直接显示法源库状态和官方链接；把两个劳动功能改为明确的“快速金额估算”和“生成仲裁申请书”；翻译 Agent 状态和预算错误；来源阻断时禁用主流程重复执行，只保留专用同步重试。
+- 实际改动：Agent Facade、Agent Router、前端数字人 API、案件工作台、阶段 3.4 测试、最新项目分析和本日志。
+- 验证：前端 `npx tsc --noEmit` 通过；Python compileall 通过；阶段 1～3.4 相关测试 20/20 通过；法源目录测试确认 ready 且至少返回 2 条来源。
+- 后续：需要重启后端加载新增目录接口。旧的 failed Run 不会复用，点击“重新开始新的分析任务”将创建新 Run；案件材料和确认事实保持不变。

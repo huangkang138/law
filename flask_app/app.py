@@ -23,7 +23,7 @@ from routers import courtroom_websocket, agent_bp, digital_human_bp, digital_hum
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 确保JSON中的中文不被转义为Unicode
 app.url_map.strict_slashes = False  # 禁用严格斜杠模式
-CORS(app, origins=settings.CORS_ORIGINS, supports_credentials=True, allow_headers=['Content-Type', 'Authorization', 'X-API-Key', 'X-API-Base-URL', 'X-API-Model', 'X-Digital-Human-Client-ID'], expose_headers=['Content-Type', 'X-Accel-Buffering'])
+CORS(app, origins=settings.CORS_ORIGINS, supports_credentials=True, allow_headers=['Content-Type', 'Authorization', 'X-API-Key', 'X-API-Base-URL', 'X-API-Model', 'X-Digital-Human-Client-ID', 'Idempotency-Key'], expose_headers=['Content-Type', 'X-Accel-Buffering'])
 
 # 初始化 WebSocket 支持
 sock = Sock(app)

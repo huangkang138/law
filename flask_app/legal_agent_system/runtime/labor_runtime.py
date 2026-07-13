@@ -17,11 +17,12 @@ from .errors import AgentRuntimeError
 class LaborDisputeRuntime:
     TASK_TYPE = "cn_labor_dispute"
 
-    def __init__(self, repository, graph, labor_disputes, jurisdictions) -> None:
+    def __init__(self, repository, graph, labor_disputes, jurisdictions, authority_sync=None) -> None:
         self.repository = repository
         self.graph = graph
         self.labor_disputes = labor_disputes
         self.jurisdictions = jurisdictions
+        self.authority_sync = authority_sync
 
     def start(self, matter_id: str, client_id: str, facts=None):
         """
@@ -66,9 +67,13 @@ class LaborDisputeRuntime:
     # 返回案件处理流程的快照信息
         return self.repository.snapshot(state.run_id, client_id)
 
-    def continue_run(self, run_id: str, client_id: str, action: str, payload=None):
+    def continue_run(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
         state = self.repository.load_state(run_id, client_id)
         payload = payload or {}
+        if idempotency_key:
+            cached = self.repository.begin_action(run_id, idempotency_key, action, payload)
+            if cached is not None:
+                return cached
         if state.task_type != self.TASK_TYPE:
             raise AgentRuntimeError("该接口只处理劳动纠纷任务", ErrorCode.INVALID_STATE.value)
         if action == "provide_information":
@@ -87,11 +92,17 @@ class LaborDisputeRuntime:
             self.repository.decide_approval(state, payload["approved"])
             if not payload["approved"]:
                 self.repository.cancel(state)
-                return self.repository.snapshot(run_id, client_id)
+                response = self.repository.snapshot(run_id, client_id)
+                if idempotency_key:
+                    self.repository.finish_action(run_id, idempotency_key, response)
+                return response
             state.approved = True
         elif action == "retry_authority":
             if state.status != RunStatus.BLOCKED_AUTHORITY.value:
                 raise AgentRuntimeError("任务当前不需要重试法律来源", ErrorCode.INVALID_STATE.value)
+            # “重新验证”必须先刷新可信来源，不能只把同一失败计划再跑一次。
+            if self.authority_sync is not None:
+                self.authority_sync()
             state.status = RunStatus.REPLANNING
             state.blocked_reason = None
         else:
@@ -100,4 +111,7 @@ class LaborDisputeRuntime:
         state.questions = []
         self.repository.save_state(state, "run_resumed", {"action": action})
         self.graph.invoke(state)
-        return self.repository.snapshot(run_id, client_id)
+        response = self.repository.snapshot(run_id, client_id)
+        if idempotency_key:
+            self.repository.finish_action(run_id, idempotency_key, response)
+        return response

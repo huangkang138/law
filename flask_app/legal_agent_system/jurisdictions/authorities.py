@@ -4,6 +4,7 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 from core.database import SessionLocal
 from models.db_models import LegalAuthority
@@ -17,8 +18,21 @@ class LegalAuthorityService:
 
     VALID_STATUSES = {"effective", "repealed", "amended", "unknown"}
 
-    def register(self, data: Dict) -> Dict:
-        """登记外部适配器提供的来源元数据和内容哈希。"""
+    def register_test(self, data: Dict) -> Dict:
+        """仅为自动化测试登记 `.invalid` 来源，禁止承载真实法律内容。"""
+        hostname = (urlparse(str(data.get("source_url", ""))).hostname or "").lower()
+        if not hostname.endswith(".invalid"):
+            raise AgentRuntimeError("测试来源必须使用 .invalid 保留域名", "TEST_AUTHORITY_ONLY")
+        payload = {**data, "provider": "test_fixture", "external_id": data.get("external_id") or f"test-{uuid.uuid4().hex}", "canonical_url": data.get("source_url"), "trust_level": "test", "version": data.get("version", "1"), "retrieval_status": "verified"}
+        return self._register(payload)
+
+    def register_provider(self, data: Dict, provider: str) -> Dict:
+        """可信 Provider 的唯一生产写入口，按 external_id + version 幂等。"""
+        payload = {**data, "provider": provider, "source_url": str(data.get("canonical_url")), "canonical_url": str(data.get("canonical_url")), "trust_level": "trusted", "retrieval_status": "verified"}
+        return self._register(payload)
+
+    def _register(self, data: Dict) -> Dict:
+        """内部持久化入口；生产来源后续只能由可信 Provider 调用。"""
         country_code = str(data.get("country_code", "")).upper()
         package = get_jurisdiction_registry().get(country_code)
         authority_type = data.get("authority_type")
@@ -34,6 +48,10 @@ class LegalAuthorityService:
         text = data["text"].strip()
         db = SessionLocal()
         try:
+            if data.get("external_id"):
+                existing = db.query(LegalAuthority).filter(LegalAuthority.provider == data.get("provider"), LegalAuthority.external_id == data.get("external_id"), LegalAuthority.version == str(data.get("version", "1"))).first()
+                if existing:
+                    return self._dict(existing)
             authority = LegalAuthority(
                 id=f"authority_{uuid.uuid4().hex}", country_code=country_code,
                 subdivision_code=data.get("subdivision_code"), authority_type=authority_type,
@@ -44,6 +62,10 @@ class LegalAuthorityService:
                 effective_to=self._datetime(data.get("effective_to")), status=status,
                 retrieved_at=datetime.now(timezone.utc),
                 content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                provider=data.get("provider", "legacy"), external_id=data.get("external_id"),
+                canonical_url=data.get("canonical_url") or data["source_url"], trust_level=data.get("trust_level", "untrusted"),
+                version=str(data.get("version", "1")), supersedes_id=data.get("supersedes_id"),
+                last_verified_at=datetime.now(timezone.utc), retrieval_status=data.get("retrieval_status", "stored"),
             )
             db.add(authority)
             db.commit()
@@ -69,6 +91,12 @@ class LegalAuthorityService:
             if authority.status != "effective":
                 valid = False
                 warnings.append(f"来源状态为 {authority.status}，不能作为确定依据")
+            if authority.trust_level not in {"trusted", "test"}:
+                valid = False
+                warnings.append("来源未通过可信 Provider 验证")
+            if authority.retrieval_status != "verified":
+                valid = False
+                warnings.append("来源同步状态不是 verified")
             if authority.effective_from and effective_at < authority.effective_from:
                 valid = False
                 warnings.append("查询日期早于来源生效日期")
@@ -100,4 +128,25 @@ class LegalAuthorityService:
             "effective_from": authority.effective_from.isoformat() if authority.effective_from else None,
             "effective_to": authority.effective_to.isoformat() if authority.effective_to else None,
             "retrieved_at": authority.retrieved_at.isoformat(), "content_hash": authority.content_hash,
+            "provider": authority.provider, "external_id": authority.external_id,
+            "canonical_url": authority.canonical_url, "trust_level": authority.trust_level,
+            "version": authority.version, "last_verified_at": authority.last_verified_at.isoformat() if authority.last_verified_at else None,
+            "retrieval_status": authority.retrieval_status,
         }
+
+    def search(self, country_code: str, effective_at: datetime, terms) -> list:
+        """小语料使用结构化过滤和关键词匹配，返回已验证来源。"""
+        db = SessionLocal()
+        try:
+            rows = db.query(LegalAuthority).filter(LegalAuthority.country_code == country_code, LegalAuthority.status == "effective", LegalAuthority.trust_level.in_(["trusted", "test"]), LegalAuthority.retrieval_status == "verified").order_by(LegalAuthority.retrieved_at.desc()).all()
+            results = []
+            for row in rows:
+                haystack = f"{row.title} {row.provision or ''} {row.text}"
+                if terms and not all(term in haystack for term in terms):
+                    continue
+                verified = self.verify(row.id, effective_at, country_code)
+                if verified["valid"]:
+                    results.append(self._dict(row))
+            return results
+        finally:
+            db.close()

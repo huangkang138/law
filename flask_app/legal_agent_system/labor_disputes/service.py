@@ -5,15 +5,19 @@
         真正的劳动纠纷业务规则。
 """
 
+import hashlib
+import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Dict, List
 
 from core.database import SessionLocal
-from models.db_models import AgentArtifact, LegalAuthority, LegalFact, LaborDisputeProfile
+from models.db_models import AgentArtifact, LegalFact, LaborDisputeProfile
+from legal_agent_system.models import MatterFactAssertion
 
 from legal_agent_system.runtime.errors import AgentRuntimeError
 from .schemas import FIELD_QUESTIONS, LaborDisputeFacts
+from .rules import LaborRuleEngine, RULE_VERSION
 
 
 def _id(prefix: str) -> str:
@@ -28,6 +32,7 @@ class LaborDisputeService:
     def __init__(self, materials, authorities) -> None:
         self.materials = materials
         self.authorities = authorities
+        self.rules = LaborRuleEngine()
 
     def update_facts(self, matter_id: str, client_id: str, patch: Dict) -> Dict:
         """合并用户确认事实，并按当前目标动态生成下一轮追问。"""
@@ -46,10 +51,17 @@ class LaborDisputeService:
                 db.add(profile)
             elif profile.client_id != client_id:
                 raise AgentRuntimeError("无权访问该劳动纠纷任务", "FORBIDDEN")
+            changed = normalized != dict(profile.facts_json or {})
+            if changed:
+                profile.facts_version = int(profile.facts_version or 0) + 1
+                for key, value in patch.items():
+                    if value not in (None, "", []):
+                        db.add(MatterFactAssertion(id=_id("factassert"), matter_id=matter_id, client_id=client_id, fact_key=key, value_json=normalized.get(key), source_type="user_input", confirmed_by_user=True, version=profile.facts_version))
             profile.facts_json = normalized
             profile.missing_facts_json = missing
             profile.plan_json = plan
             profile.status = "awaiting_information" if missing else "ready"
+            profile.rule_version = RULE_VERSION
             db.commit()
             return self._snapshot(profile)
         except Exception:
@@ -83,12 +95,12 @@ class LaborDisputeService:
         authorities = self._verified_authorities(jurisdiction["effective_at"])
         if not authorities:
             return {**workflow, "status": "blocked_authority", "warning": "未找到可验证且当前有效的劳动法律来源，已阻止确定性结论和文书生成。"}
-        start = datetime.fromisoformat(facts["limitation_start_date"]).date()
-        deadline = start + timedelta(days=365)
+        fact_refs = self._fact_refs(matter_id)
+        deadline = self.rules.limitation(facts, authorities, fact_refs)
         checklist = self.materials.evidence_checklist(matter_id, client_id)
         return {
             **workflow, "status": "awaiting_draft_approval",
-            "deadline": {"start_date": start.isoformat(), "estimated_deadline": deadline.isoformat(), "assumption": "按已验证来源所示的一年期间作初步日期推算；中止、中断等情形需人工复核。"},
+            "deadline": deadline,
             "evidence_checklist": checklist,
             "authorities": authorities,
             "approval_prompt": "事实、期限和来源已整理。是否确认基于这些信息生成劳动仲裁申请书草稿？",
@@ -104,13 +116,14 @@ class LaborDisputeService:
         facts = analysis["facts"]
         authority_ids = [item["authority_id"] for item in analysis["authorities"]]
         content = self._draft_text(facts, analysis["deadline"], analysis["authorities"])
+        fingerprint = hashlib.sha256(json.dumps({"facts": facts, "authorities": [(a["authority_id"], a.get("version")) for a in analysis["authorities"]], "rule": analysis["deadline"]["rule_version"], "type": "labor_arbitration_application"}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
         db = SessionLocal()
         try:
             existing = db.query(AgentArtifact).filter(
                 AgentArtifact.matter_id == matter_id,
                 AgentArtifact.client_id == client_id,
                 AgentArtifact.artifact_type == "labor_arbitration_application",
-                AgentArtifact.status == "draft",
+                AgentArtifact.input_fingerprint == fingerprint,
             ).order_by(AgentArtifact.created_at.desc()).first()
             if existing:
                 return {
@@ -119,12 +132,14 @@ class LaborDisputeService:
                     "authority_refs": list(existing.authority_refs_json or []),
                     "deduplicated": True,
                 }
-            evidence_ids = [row.id for row in db.query(LegalFact.id).filter(LegalFact.matter_id == matter_id).all()]
+            evidence_ids = analysis["deadline"]["fact_refs"] or [row.id for row in db.query(LegalFact.id).filter(LegalFact.matter_id == matter_id).all()]
+            latest = db.query(AgentArtifact).filter(AgentArtifact.matter_id == matter_id, AgentArtifact.artifact_type == "labor_arbitration_application").order_by(AgentArtifact.version.desc()).first()
             artifact = AgentArtifact(
                 id=_id("artifact"), matter_id=matter_id, client_id=client_id,
                 artifact_type="labor_arbitration_application", title="劳动仲裁申请书（草稿）",
                 content=content, status="draft", evidence_refs_json=evidence_ids,
-                authority_refs_json=authority_ids,
+                authority_refs_json=authority_ids, input_fingerprint=fingerprint,
+                version=(latest.version + 1 if latest else 1),
             )
             db.add(artifact)
             profile = db.get(LaborDisputeProfile, matter_id)
@@ -155,19 +170,13 @@ class LaborDisputeService:
         return steps
 
     def _verified_authorities(self, effective_at: datetime) -> List[Dict]:
+        return self.authorities.search("CN", effective_at, ["仲裁时效", "一年"])
+
+    @staticmethod
+    def _fact_refs(matter_id: str) -> List[str]:
         db = SessionLocal()
         try:
-            rows = db.query(LegalAuthority).filter(LegalAuthority.country_code == "CN").order_by(LegalAuthority.retrieved_at.desc()).all()
-            verified = []
-            for row in rows:
-                text = f"{row.title} {row.provision or ''} {row.text}"
-                # 当前期限工具只实现“一年”规则，因此来源必须同时明确主题和期间。
-                if "仲裁时效" not in text or "一年" not in text:
-                    continue
-                result = self.authorities.verify(row.id, effective_at, "CN")
-                if result["valid"]:
-                    verified.append({"authority_id": row.id, "title": row.title, "provision": row.provision, "source_url": row.source_url})
-            return verified
+            return [row.id for row in db.query(MatterFactAssertion).filter(MatterFactAssertion.matter_id == matter_id, MatterFactAssertion.confirmed_by_user.is_(True)).all()]
         finally:
             db.close()
 
@@ -179,6 +188,7 @@ class LaborDisputeService:
             "facts": dict(profile.facts_json or {}), "missing_facts": missing,
             "questions": [FIELD_QUESTIONS[name] for name in missing],
             "plan": list(profile.plan_json or []),
+            "facts_version": profile.facts_version, "rule_version": profile.rule_version,
         }
 
     @staticmethod
@@ -197,7 +207,7 @@ class LaborDisputeService:
 事实与理由：
 申请人与被申请人自 {facts['employment_start_date']} 起建立劳动关系，争议类型为{claims}。月工资基数暂按 {facts['monthly_salary']} 元记录。以上内容均待申请人结合原始证据复核。
 
-期限提示：自 {deadline['start_date']} 起初步推算至 {deadline['estimated_deadline']}；该日期不考虑中止、中断等特殊情形。
+期限提示：自 {deadline['start_date']} 起初步推算至 {deadline['estimated_deadline'] or '劳动关系终止后另行起算'}；具体以规则假设和人工复核为准。
 
 已验证来源：
 {citations}

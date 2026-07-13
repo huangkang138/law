@@ -1,6 +1,7 @@
 """阶段 3.1 中国劳动纠纷 LangGraph 状态机。"""
 
 import uuid
+from datetime import datetime, timezone
 from typing import Dict
 
 from langgraph.graph import END, StateGraph
@@ -9,6 +10,8 @@ from .enums import RunStatus, StepStatus
 from .errors import AgentRuntimeError
 from .schemas import AgentState
 from .verifier import AgentResultVerifier
+from .planner import LaborPlanBuilder
+from .executor import PolicyToolExecutor
 
 
 class LaborDisputeGraph:
@@ -39,6 +42,8 @@ class LaborDisputeGraph:
         self.materials = materials  # 初始化材料属性
         self.labor_disputes = labor_disputes  # 初始化劳务纠纷属性
         self.verifier = AgentResultVerifier()  # 创建结果验证器实例
+        self.planner = LaborPlanBuilder()
+        self.executor = PolicyToolExecutor()
 
 
     # 创建状态图并配置节点和边
@@ -107,14 +112,14 @@ class LaborDisputeGraph:
             self.repository.save_state(state, "run_waiting_for_information", {"missing_facts": state.missing_facts})
             return state.model_dump(mode="json")
 
-        state.plan_version = max(1, state.plan_version)
-        if len(self.PLAN) > state.max_steps:
+        plan, fingerprint = self.planner.build(workflow)
+        if len(plan) > state.max_steps:
             state.status = RunStatus.FAILED
             state.error_code = "BUDGET_EXCEEDED"
             state.blocked_reason = "动态计划超过最大步骤预算"
             self.repository.save_state(state, "run_budget_exceeded", {"budget": "steps"})
             return state.model_dump(mode="json")
-        step_ids = self.repository.create_plan_steps(state, self.PLAN)
+        step_ids = self.repository.create_plan_steps(state, plan, fingerprint)
         state.current_step_index = 0
         state.current_step_id = step_ids[0]
         state.missing_facts = []
@@ -126,20 +131,21 @@ class LaborDisputeGraph:
 
     def _execute(self, raw: Dict) -> Dict:
         state = AgentState.model_validate(raw)
-        if state.tool_call_count >= state.max_tool_calls:
+        if self._over_budget(state) or state.tool_call_count >= state.max_tool_calls:
             state.status = RunStatus.FAILED
             state.error_code = "BUDGET_EXCEEDED"
             state.blocked_reason = "工具调用次数达到预算上限"
             self.repository.save_state(state, "run_budget_exceeded", {"budget": "tool_calls"})
             return state.model_dump(mode="json")
-        step = self.repository.get_step(state.run_id, state.current_step_index + 1)
+        step = self.repository.get_step(state.run_id, state.current_step_index + 1, state.plan_version)
         state.current_step_id = step.id
         self.repository.set_step_status(state.run_id, step.id, StepStatus.RUNNING)
         definition, handler = self.registry.get(step.tool_name)
         arguments = {"matter_id": state.matter_id, "client_id": state.client_id}
-        call_id = f"tool_{uuid.uuid4().hex}"
-        result = handler(call_id, arguments, 1)
+        result = self.executor.execute(definition, handler, arguments, "CN", state.approved is True)
+        call_id = result.tool_call_id
         state.tool_call_count += 1
+        self._record_usage(state, result)
         result = self._verify_result(state, step.tool_name, result)
         self.repository.save_tool_call(state, 1, arguments, result, step.tool_name)
         state.tool_result_ids.append(call_id)
@@ -162,27 +168,28 @@ class LaborDisputeGraph:
             state.status = RunStatus.AWAITING_APPROVAL
             self.repository.save_state(state, "run_paused_for_approval")
             return state.model_dump(mode="json")
-        next_step = self.repository.get_step(state.run_id, state.current_step_index + 1)
+        next_step = self.repository.get_step(state.run_id, state.current_step_index + 1, state.plan_version)
         state.current_step_id = next_step.id
         self.repository.save_state(state, "run_step_advanced", {"next_step_id": next_step.id})
         return state.model_dump(mode="json")
 
     def _draft(self, raw: Dict) -> Dict:
         state = AgentState.model_validate(raw)
-        if state.tool_call_count >= state.max_tool_calls:
+        if self._over_budget(state) or state.tool_call_count >= state.max_tool_calls:
             state.status = RunStatus.FAILED
             state.error_code = "BUDGET_EXCEEDED"
             state.blocked_reason = "工具调用次数达到预算上限"
             self.repository.save_state(state, "run_budget_exceeded", {"budget": "tool_calls"})
             return state.model_dump(mode="json")
-        step = self.repository.get_step(state.run_id, 3)
+        step = self.repository.get_step(state.run_id, 3, state.plan_version)
         state.current_step_id = step.id
         self.repository.set_step_status(state.run_id, step.id, StepStatus.RUNNING)
-        _definition, handler = self.registry.get(step.tool_name)
+        definition, handler = self.registry.get(step.tool_name)
         arguments = {"matter_id": state.matter_id, "client_id": state.client_id}
-        call_id = f"tool_{uuid.uuid4().hex}"
-        result = handler(call_id, arguments, 1)
+        result = self.executor.execute(definition, handler, arguments, "CN", True)
+        call_id = result.tool_call_id
         state.tool_call_count += 1
+        self._record_usage(state, result)
         result = self._verify_result(state, step.tool_name, result)
         self.repository.save_tool_call(state, 1, arguments, result, step.tool_name)
         state.tool_result_ids.append(call_id)
@@ -217,3 +224,15 @@ class LaborDisputeGraph:
         result.error_message = "；".join(report.errors)
         result.retryable = False
         return result
+
+    @staticmethod
+    def _record_usage(state: AgentState, result) -> None:
+        usage = (result.data or {}).get("_usage", {}) if result.data else {}
+        state.token_usage += int(usage.get("tokens", 0))
+        state.cost_cents += int(usage.get("cost_cents", 0))
+
+    @staticmethod
+    def _over_budget(state: AgentState) -> bool:
+        started = state.started_at if state.started_at.tzinfo else state.started_at.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        return elapsed >= state.budget_wallclock_seconds or state.token_usage >= state.budget_tokens or state.cost_cents >= state.budget_cost_cents
