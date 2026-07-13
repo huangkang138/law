@@ -969,3 +969,35 @@ class LegalAuthority(Base):
     retrieved_at = Column(DateTime(timezone=True), nullable=False)
     content_hash = Column(String, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LaborDisputeProfile(Base):
+    """阶段 3 劳动纠纷结构化事实与流程状态。"""
+
+    __tablename__ = "labor_dispute_profiles"
+
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), primary_key=True)
+    client_id = Column(String, nullable=False, index=True)
+    facts_json = Column(JSON, nullable=False, default=dict)
+    missing_facts_json = Column(JSON, nullable=False, default=list)
+    plan_json = Column(JSON, nullable=False, default=list)
+    status = Column(String, nullable=False, default="awaiting_information", index=True)
+    draft_approved = Column(Boolean, nullable=False, default=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AgentArtifact(Base):
+    """Agent 生成的可审阅交付物；正式提交动作不在本表职责内。"""
+
+    __tablename__ = "agent_artifacts"
+
+    id = Column(String, primary_key=True)
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = Column(String, nullable=False, index=True)
+    artifact_type = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="draft")
+    evidence_refs_json = Column(JSON, nullable=False, default=list)
+    authority_refs_json = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

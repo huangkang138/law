@@ -173,6 +173,22 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
 
     @staticmethod
     def _parse_llm_response(raw_response: str) -> Dict:
+        """
+        解析大语言模型(LLM)的原始响应，并将其转换为结构化的字典格式。
+        该方法会尝试从原始响应中提取有效JSON数据，并进行必要的验证和规范化处理。
+        如果解析失败或数据不符合要求，将返回默认的回退响应。
+        Args:
+            raw_response (str): 从大语言模型获取的原始响应字符串
+        Returns:
+            Dict: 包含解析后的回复内容、意图、情感和置信度的字典，格式如下：
+                {
+                    "reply": str,      # 回复内容
+                    "intent": str,     # 意图类别
+                    "emotion": str,    # 情感类别
+                    "confidence": float # 置信度(0.0-1.0)
+                }
+        """
+        # 定义默认的回退响应，当解析失败时使用
         fallback = {
             "reply": "我还不太确定你的需求，可以换一种简单的说法告诉我吗？",
             "intent": "general_chat",
@@ -180,44 +196,54 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
             "confidence": 0.0,
         }
 
+        # 清理原始响应，移除可能的代码块标记
         cleaned = raw_response.strip()
-        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s*```$", "", cleaned)
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)  # 移除开始的代码块标记
+        cleaned = re.sub(r"\s*```$", "", cleaned)  # 移除结束的代码块标记
 
         try:
+            # 尝试直接解析JSON
             result = json.loads(cleaned)
         except (json.JSONDecodeError, TypeError):
+            # 如果直接解析失败，尝试提取可能存在的JSON部分
             start = cleaned.find("{")
             end = cleaned.rfind("}")
             if start < 0 or end <= start:
                 app_logger.warning("数字人响应不是有效 JSON")
                 return fallback
             try:
+                # 尝试解析提取出的JSON部分
                 result = json.loads(cleaned[start:end + 1])
             except json.JSONDecodeError:
                 app_logger.warning("数字人响应 JSON 解析失败")
                 return fallback
 
+        # 验证解析结果是否为字典类型
         if not isinstance(result, dict):
             return fallback
 
+        # 处理回复内容，确保是有效的非空字符串
         reply = result.get("reply")
         if not isinstance(reply, str) or not reply.strip():
             reply = fallback["reply"]
 
+        # 处理意图，确保是有效的意图类别
         intent = result.get("intent", "general_chat")
         if intent not in INTENT_ROUTE_MAP:
             intent = "general_chat"
 
+        # 处理情感，确保是有效的情感类别
         emotion = result.get("emotion", "talk_normal")
         if emotion not in VALID_EMOTIONS:
             emotion = "talk_normal"
 
+        # 处理置信度，确保在0.0到1.0范围内
         try:
             confidence = max(0.0, min(1.0, float(result.get("confidence", 0.0))))
         except (TypeError, ValueError):
             confidence = 0.0
 
+        # 返回处理后的结果
         return {
             "reply": reply.strip(),
             "intent": intent,

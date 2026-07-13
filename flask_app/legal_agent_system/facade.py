@@ -15,6 +15,7 @@ from .tools import register_authority_tools, register_labor_tools, register_mate
 from .matters import MaterialService
 from .jurisdictions.authorities import LegalAuthorityService
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
+from .labor_disputes import LaborDisputeService
 
 
 class LegalAgentFacade:
@@ -26,6 +27,7 @@ class LegalAgentFacade:
         self.materials = MaterialService()
         self.authorities = LegalAuthorityService()
         self.jurisdictions = MatterJurisdictionService()
+        self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
         self.registry = ToolRegistry()
         register_mock_tools(self.registry)
         register_material_tools(self.registry, self.materials)
@@ -114,6 +116,22 @@ class LegalAgentFacade:
         _definition, handler = self.registry.get("calculate_labor_compensation")
         result = handler(f"tool_{uuid.uuid4().hex}", data, 1)
         return result.model_dump(mode="json")
+
+    def update_labor_dispute_facts(self, matter_id: str, client_id: str, data):
+        """保存劳动纠纷事实并返回动态计划与追问。"""
+        return self.labor_disputes.update_facts(matter_id, client_id, data)
+
+    def get_labor_dispute_workflow(self, matter_id: str, client_id: str):
+        """恢复劳动纠纷闭环状态。"""
+        return self.labor_disputes.get_workflow(matter_id, client_id)
+
+    def analyze_labor_dispute(self, matter_id: str, client_id: str):
+        """校验事实、期限、证据和法律来源。"""
+        return self.labor_disputes.analyze(matter_id, client_id)
+
+    def create_labor_dispute_draft(self, matter_id: str, client_id: str, approved: bool):
+        """经用户确认生成劳动仲裁申请书草稿。"""
+        return self.labor_disputes.create_draft(matter_id, client_id, approved)
 
 
 _facade = None

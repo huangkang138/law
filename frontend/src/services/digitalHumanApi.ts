@@ -120,6 +120,27 @@ export interface LaborCompensationResult {
   warning: string;
 }
 
+export interface LaborDisputeWorkflow {
+  matter_id: string;
+  status: 'awaiting_information' | 'ready' | 'blocked_authority' | 'awaiting_draft_approval' | 'completed';
+  facts: Record<string, unknown>;
+  missing_facts: string[];
+  questions: string[];
+  plan: Array<{ name: string; status: string; questions?: string[] }>;
+  warning?: string;
+  deadline?: { start_date: string; estimated_deadline: string; assumption: string };
+  authorities?: Array<{ authority_id: string; title: string; provision: string | null; source_url: string }>;
+  approval_prompt?: string;
+}
+
+export interface LaborDisputeDraft {
+  artifact_id: string;
+  title: string;
+  status: 'draft';
+  content: string;
+  authority_refs: string[];
+}
+
 const CLIENT_ID_KEY = 'yys-law-digital-human-client-id';
 
 function getClientId(): string {
@@ -294,4 +315,25 @@ export async function calculateMatterLaborCompensation(
     body: JSON.stringify({ monthly_salary: monthlySalary, years, months }),
   });
   return (await readJson<{ data: LaborCompensationResult }>(response)).data;
+}
+
+export async function updateLaborDisputeFacts(
+  matterId: string, facts: Record<string, unknown>,
+): Promise<LaborDisputeWorkflow> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/facts`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(facts),
+  });
+  return readJson(response);
+}
+
+export async function analyzeLaborDispute(matterId: string): Promise<LaborDisputeWorkflow> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/analyze`, { method: 'POST' });
+  return readJson(response);
+}
+
+export async function createLaborDisputeDraft(matterId: string): Promise<LaborDisputeDraft> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/draft`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: true }),
+  });
+  return readJson(response);
 }

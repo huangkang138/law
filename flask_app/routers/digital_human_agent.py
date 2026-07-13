@@ -113,6 +113,39 @@ def calculate_matter_labor_compensation(matter_id):
     ))
 
 
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute", methods=["GET"])
+def get_labor_dispute_workflow(matter_id):
+    """恢复劳动纠纷动态计划及缺失事实。"""
+    return _response(lambda: get_legal_agent_facade().get_labor_dispute_workflow(matter_id, _client_id()))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/facts", methods=["PATCH"])
+def update_labor_dispute_facts(matter_id):
+    """合并用户确认事实并生成下一轮追问。"""
+    return _response(lambda: get_legal_agent_facade().update_labor_dispute_facts(
+        matter_id, _client_id(), request.get_json(silent=True) or {},
+    ))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/analyze", methods=["POST"])
+def analyze_labor_dispute(matter_id):
+    """运行期限、证据和来源验证，前置条件不足时保持暂停。"""
+    return _response(lambda: get_legal_agent_facade().analyze_labor_dispute(matter_id, _client_id()))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/draft", methods=["POST"])
+def create_labor_dispute_draft(matter_id):
+    """仅在用户明确审批后生成仲裁申请书草稿。"""
+    def action():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data.get("approved"), bool):
+            raise AgentRuntimeError("approved 必须是布尔值", "INVALID_INPUT")
+        return get_legal_agent_facade().create_labor_dispute_draft(
+            matter_id, _client_id(), data["approved"],
+        )
+    return _response(action)
+
+
 @router.route("/digital-human/agent/matters/<matter_id>/materials/<document_id>/facts", methods=["POST"])
 def extract_material_facts(matter_id, document_id):
     """从材料中提取带字符偏移引用的候选事实。"""

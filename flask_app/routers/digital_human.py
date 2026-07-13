@@ -10,16 +10,33 @@ router = Blueprint("digital_human", __name__)
 
 
 def _get_client_id():
+    """
+    从请求头中获取并验证数字人客户端标识
+    Returns:
+        str: 验证通过的客户端标识
+    Raises:
+        ValueError: 当缺少或无效的客户端标识时抛出异常
+    """
+    # 从请求头中获取X-Digital-Human-Client-ID字段，去除前后空格
     client_id = request.headers.get("X-Digital-Human-Client-ID", "").strip()
+    # 验证客户端标识是否以"dhc_"开头且长度不超过100
     if not client_id.startswith("dhc_") or len(client_id) > 100:
         raise ValueError("缺少或无效的数字人客户端标识")
     return client_id
 
 
 def _get_custom_llm_config():
+    """
+    从请求头中获取自定义大语言模型配置信息
+    Returns:
+        dict or None: 包含API配置的字典，如果缺少API密钥则返回None
+    """
+    # 从请求头中获取API密钥
     api_key = request.headers.get("X-API-Key")
+    # 如果没有提供API密钥，则返回None
     if not api_key:
         return None
+    # 返回包含API密钥、基础URL和模型名称的配置字典
     return {
         "api_key": api_key,
         "base_url": request.headers.get("X-API-Base-URL"),
