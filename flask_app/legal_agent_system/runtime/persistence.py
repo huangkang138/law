@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from core.database import SessionLocal
 from models.db_models import (
@@ -16,6 +16,7 @@ from .enums import ErrorCode, RunStatus, StepStatus
 from .errors import AgentRuntimeError
 from .schemas import AgentState, ToolResult
 
+"""数据库仓储层。它让Agent能够暂停、恢复和审计。"""
 
 def _id(prefix: str) -> str:
     """生成带业务前缀的可读主键。"""
@@ -44,6 +45,48 @@ class AgentRepository:
         except Exception:
             db.rollback()
             raise
+        finally:
+            db.close()
+
+    def create_run_for_matter(self, matter_id: str, client_id: str, task_type: str) -> AgentState:
+        """为已有 Matter 创建真实业务 Run，不重复创建案件工作区。"""
+        db = SessionLocal()
+        try:
+            matter = db.get(Matter, matter_id)
+            if matter is None:
+                raise AgentRuntimeError("Matter 不存在", "MATTER_NOT_FOUND")
+            if matter.client_id != client_id:
+                raise AgentRuntimeError("无权访问该 Matter", ErrorCode.FORBIDDEN.value)
+            run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
+            state = AgentState(
+                run_id=run.id, matter_id=matter.id, client_id=client_id,
+                session_id=matter.session_id, goal=matter.goal, task_type=task_type,
+            )
+            run.state_json = state.model_dump(mode="json")
+            db.add(run)
+            db.flush()
+            self._audit(db, run.id, "run_created", {"goal": matter.goal, "task_type": task_type})
+            db.commit()
+            return state
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def find_active_run(self, matter_id: str, client_id: str, task_type: str) -> Optional[AgentState]:
+        """复用同一案件尚未结束的 Run，避免重复点击产生多个任务。"""
+        terminal = {RunStatus.COMPLETED.value, RunStatus.FAILED.value, RunStatus.CANCELLED.value}
+        db = SessionLocal()
+        try:
+            runs = db.query(AgentRun).filter(
+                AgentRun.matter_id == matter_id, AgentRun.client_id == client_id,
+            ).order_by(AgentRun.created_at.desc()).all()
+            for run in runs:
+                raw = run.state_json or {}
+                if raw.get("task_type") == task_type and run.status not in terminal:
+                    return AgentState.model_validate(raw)
+            return None
         finally:
             db.close()
 
@@ -93,6 +136,49 @@ class AgentRepository:
         finally:
             db.close()
 
+    def create_plan_steps(self, state: AgentState, steps: List[Dict]) -> List[str]:
+        """把动态计划写入 AgentStep；同一 Run 仅创建一次当前版本计划。"""
+        db = SessionLocal()
+        try:
+            existing = db.query(AgentStep).filter(AgentStep.run_id == state.run_id).count()
+            if existing:
+                return [row.id for row in db.query(AgentStep).filter(
+                    AgentStep.run_id == state.run_id,
+                ).order_by(AgentStep.sequence).all()]
+            ids = []
+            for sequence, item in enumerate(steps, start=1):
+                step_id = _id("step")
+                ids.append(step_id)
+                db.add(AgentStep(
+                    id=step_id, run_id=state.run_id, sequence=sequence,
+                    name=item["name"], status=StepStatus.PENDING.value,
+                    tool_name=item.get("tool_name"),
+                ))
+            self._audit(db, state.run_id, "plan_created", {
+                "plan_version": state.plan_version, "step_ids": ids,
+            })
+            db.commit()
+            return ids
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def get_step(self, run_id: str, sequence: int) -> AgentStep:
+        """按稳定序号读取当前计划步骤。"""
+        db = SessionLocal()
+        try:
+            step = db.query(AgentStep).filter(
+                AgentStep.run_id == run_id, AgentStep.sequence == sequence,
+            ).first()
+            if step is None:
+                raise AgentRuntimeError("Agent 计划步骤不存在", ErrorCode.INVALID_STATE.value)
+            db.expunge(step)
+            return step
+        finally:
+            db.close()
+
     def set_step_status(self, run_id: str, step_id: str, status: StepStatus, error_code: Optional[str] = None) -> None:
         """更新步骤状态，并维护开始/结束时间。"""
         db = SessionLocal()
@@ -110,33 +196,34 @@ class AgentRepository:
         finally:
             db.close()
 
-    def save_tool_call(self, state: AgentState, attempt: int, arguments: Dict, result: ToolResult) -> None:
+    def save_tool_call(self, state: AgentState, attempt: int, arguments: Dict, result: ToolResult, tool_name: str = "mock_case_summary") -> None:
         """保存每一次工具尝试；失败重试不会覆盖前一次记录。"""
         db = SessionLocal()
         try:
             db.add(ToolCall(
                 id=result.tool_call_id, run_id=state.run_id, step_id=state.current_step_id,
-                tool_name="mock_case_summary", status="completed" if result.success else "failed",
+                tool_name=tool_name, status="completed" if result.success else "failed",
                 attempt=attempt, input_json=arguments, result_json=result.model_dump(mode="json"),
                 error_code=result.error_code, error_message=result.error_message,
                 completed_at=datetime.now(timezone.utc),
             ))
             self._audit(db, state.run_id, "tool_called", {
-                "tool_call_id": result.tool_call_id, "attempt": attempt, "success": result.success,
+                "tool_call_id": result.tool_call_id, "tool_name": tool_name,
+                "attempt": attempt, "success": result.success,
                 "error_code": result.error_code,
             })
             db.commit()
         finally:
             db.close()
 
-    def create_approval(self, state: AgentState) -> str:
+    def create_approval(self, state: AgentState, prompt: str = "模拟案件摘要已生成，是否确认完成该任务？") -> str:
         """创建有效期 24 小时的待审批记录。"""
         db = SessionLocal()
         try:
             approval_id = _id("approval")
             db.add(ApprovalRequest(
                 id=approval_id, run_id=state.run_id, client_id=state.client_id,
-                prompt="模拟案件摘要已生成，是否确认完成该任务？",
+                prompt=prompt,
                 expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
             ))
             self._audit(db, state.run_id, "approval_requested", {"approval_id": approval_id})
@@ -173,7 +260,17 @@ class AgentRepository:
         state.status = RunStatus.CANCELLED
         state.error_code = ErrorCode.RUN_CANCELLED.value
         if state.current_step_id:
-            self.set_step_status(state.run_id, state.current_step_id, StepStatus.CANCELLED)
+            db = SessionLocal()
+            try:
+                step = db.get(AgentStep, state.current_step_id)
+                should_cancel = step is not None and step.status not in {
+                    StepStatus.COMPLETED.value, StepStatus.FAILED.value, StepStatus.CANCELLED.value,
+                }
+            finally:
+                db.close()
+            # 劳动纠纷审批发生在分析步骤完成后，拒绝草稿不能回写污染已完成步骤。
+            if should_cancel:
+                self.set_step_status(state.run_id, state.current_step_id, StepStatus.CANCELLED)
         self.save_state(state, "run_cancelled")
         return state
 
@@ -193,6 +290,15 @@ class AgentRepository:
                 "current_step_id": run.current_step_id,
                 "steps": [{"id": s.id, "name": s.name, "status": s.status, "tool_name": s.tool_name} for s in steps],
                 "approval": ({"id": approval.id, "prompt": approval.prompt, "status": approval.status} if approval else None),
+                "task_type": (run.state_json or {}).get("task_type", "mock_case_summary"),
+                "plan_version": (run.state_json or {}).get("plan_version", 0),
+                "missing_facts": (run.state_json or {}).get("missing_facts", []),
+                "questions": (run.state_json or {}).get("questions", []),
+                "blocked_reason": (run.state_json or {}).get("blocked_reason"),
+                "final_artifact_ids": (run.state_json or {}).get("final_artifact_ids", []),
+                "max_steps": (run.state_json or {}).get("max_steps", 6),
+                "max_tool_calls": (run.state_json or {}).get("max_tool_calls", 8),
+                "tool_call_count": (run.state_json or {}).get("tool_call_count", 0),
                 "final_output": (run.state_json or {}).get("final_output"), "error_code": run.error_code,
             }
         finally:

@@ -15,7 +15,7 @@ class AgentRuntime:
             raise AgentRuntimeError("任务目标不能为空", ErrorCode.INVALID_INPUT.value)
         state = self.repository.create_run(goal, client_id, session_id)
         # 图执行结果会在每个关键节点写回数据库，因此这里只需读取最终快照。
-        self.graph.invoke(state)
+        self.graph.invoke(state)#
         return self.repository.snapshot(state.run_id, client_id)
 
     def resume(self, run_id: str, client_id: str, approved: bool):

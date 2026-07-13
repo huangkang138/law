@@ -190,6 +190,35 @@ npm run dev
 
 当前法律来源仍来自已登记的结构化来源，尚未连接真实权威法律数据库；阶段 3 因此具备可验证的闭环协议和安全降级，但生产环境必须接入可信来源适配器后才能输出有依据的草稿。数据库仍使用 `create_all`，正式迁移框架尚待补齐。
 
+### 阶段 3.1：劳动纠纷 Runtime 融合
+
+- 新增 `runtime/labor_graph.py` 与 `runtime/labor_runtime.py`，现有阶段 1 模拟 `AgentGraph` 保持兼容；劳动纠纷任务使用独立 `task_type=cn_labor_dispute`，但共享统一 Repository、ToolRegistry 和审计模型。
+- `AgentState` 已增加任务类型、风险级别、计划版本、当前步骤序号、缺失事实、用户问题、阻断原因和最终交付物 ID；运行状态增加等待法域、等待信息、验证、来源阻断、重新规划和人工接管。
+- LangGraph 现会确定性执行法域检查、事实完整性检查、动态计划落库、证据清单工具、劳动纠纷分析工具、来源阻断、用户审批和草稿工具；三步计划真实写入 `AgentStep`，每次工具执行写入 `ToolCall`。
+- 新增劳动纠纷统一继续动作：`confirm_jurisdiction`、`provide_information`、`retry_authority`、`approve`。等待节点和来源阻断均从 PostgreSQL 恢复，不依赖进程内 Graph 实例。
+- 新增 `POST /api/digital-human/agent/matters/{matter_id}/labor-dispute/run` 和 `POST /api/digital-human/agent/runs/{run_id}/continue`；旧阶段 3 直接 Service API 暂时保留用于兼容和领域测试，当前前端主流程已经切换到 Runtime API。
+- 数字人案件工作台现在显示权威 Agent 状态、真实步骤状态、动态追问、来源阻断、期限提示和审批内容；审批完成后从 Runtime 最终输出读取持久化草稿。
+- 阶段 1/2/2.5/3/3.1 PostgreSQL 集成测试共 5 个模块、6 个用例通过。3.1 测试覆盖等待法域、等待事实、计划落库、真实 ToolCall、来源阻断与重试、跨 Facade 恢复、审批通过、审批拒绝和完成。
+
+阶段 3.1 解决了劳动纠纷业务绕过 LangGraph 的主要架构缺口。
+
+### 阶段 3.2：验证、预算和幂等安全边界
+
+- 新增 `runtime/verifier.py`，对工具结果执行结构、事实、法律来源和风险四类确定性验证；验证失败统一转为 `VERIFICATION_FAILED`，并与原始工具结果一起写入 ToolCall，不记录模型思维链。
+- 证据清单必须包含材料、缺口、定位事实数和警告；劳动分析必须进入审批状态、包含起算日/预计期限并关联已验证来源；草稿必须有 Artifact、`draft` 状态、来源引用和“未正式提交”声明。
+- `AgentState` 增加最大步骤数、最大工具调用数和已调用计数；Graph 在生成计划和每次工具调用前检查预算，超过后以 `BUDGET_EXCEEDED` 停止并记录审计事件。
+- 劳动仲裁草稿按案件、客户端、交付物类型和草稿状态幂等复用；重复请求返回原 Artifact 并标记 `deduplicated=true`，不会生成重复草稿。
+- 新增阶段 3.2 安全测试，覆盖审批过期、零工具预算、草稿幂等和不可追溯分析验证失败。阶段 1/2/2.5/3/3.1/3.2 共 6 个测试模块、10 个用例通过。
+
+当前统一 Runtime 的真实业务仍仅覆盖中国劳动纠纷；普通数字人可问答和导航到合同、模拟法庭、文书及其他旧模块，但这些模块尚未具备统一 Agent 的规划、工具审计、暂停恢复和验证闭环。后续仍需真实权威来源连接器、复杂劳动规则、独立计划版本表、总时长/费用预算、正式数据库迁移和更完整离线评测。
+
+### 阶段 3.3：材料候选事实与用户确认
+
+- 新增 `labor_disputes/suggestions.py`，从当前客户端已授权 TXT 材料和已定位事实生成劳动纠纷表单候选值；支持申请人、用人单位、入职日期、权利受损知悉日期、月工资、工作地点、争议类型和仲裁请求。
+- 每个候选字段返回置信度、材料 ID、可选 fact ID 和来源原文；建议接口只读，不会自动写入 `LaborDisputeProfile`，用户明确采用或编辑后才作为确认事实提交 Runtime。
+- 新增 `GET /api/digital-human/agent/matters/{matter_id}/labor-dispute/suggestions`。材料分析完成后前端自动读取建议并展示核对卡，用户可“采用材料建议”或“暂不采用，我自己填写”；采用后字段仍可修改。
+- 阶段 3.3 测试验证字段提取、来源原文、匿名隔离和“读取建议不落确认事实”。阶段 1-3.3 共 7 个测试模块、11 个用例通过。
+
 ## 当前重要风险点
 
 1. `requirements.txt` 标题和部分依赖仍偏 FastAPI，但当前主入口是 Flask。依赖清单需要与真实后端同步。

@@ -119,6 +119,36 @@ def get_labor_dispute_workflow(matter_id):
     return _response(lambda: get_legal_agent_facade().get_labor_dispute_workflow(matter_id, _client_id()))
 
 
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/run", methods=["POST"])
+def start_labor_dispute_run(matter_id):
+    """启动劳动纠纷 LangGraph，并推进到等待、阻断、审批或完成状态。"""
+    return _response(lambda: get_legal_agent_facade().start_labor_dispute_run(
+        matter_id, _client_id(), (request.get_json(silent=True) or {}).get("facts"),
+    ))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/suggestions", methods=["GET"])
+def suggest_labor_dispute_facts(matter_id):
+    """读取材料候选值供用户采用或编辑，不直接写入确认事实。"""
+    return _response(lambda: get_legal_agent_facade().suggest_labor_dispute_facts(
+        matter_id, _client_id(),
+    ))
+
+
+@router.route("/digital-human/agent/runs/<run_id>/continue", methods=["POST"])
+def continue_labor_dispute_run(run_id):
+    """使用结构化动作继续劳动纠纷任务，不再把恢复限制为布尔审批。"""
+    def action():
+        data = request.get_json(silent=True) or {}
+        action_name = str(data.get("action", "")).strip()
+        if not action_name:
+            raise AgentRuntimeError("缺少继续动作", "INVALID_INPUT")
+        return get_legal_agent_facade().continue_labor_dispute_run(
+            run_id, _client_id(), action_name, data.get("payload") or {},
+        )
+    return _response(action)
+
+
 @router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/facts", methods=["PATCH"])
 def update_labor_dispute_facts(matter_id):
     """合并用户确认事实并生成下一轮追问。"""

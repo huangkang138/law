@@ -1,6 +1,8 @@
 """阶段 3 劳动纠纷编排服务。
 
 使用确定性规则控制缺失事实、法域、来源验证和草稿审批；不让模型绕过安全边界。
+
+        真正的劳动纠纷业务规则。
 """
 
 import uuid
@@ -104,6 +106,19 @@ class LaborDisputeService:
         content = self._draft_text(facts, analysis["deadline"], analysis["authorities"])
         db = SessionLocal()
         try:
+            existing = db.query(AgentArtifact).filter(
+                AgentArtifact.matter_id == matter_id,
+                AgentArtifact.client_id == client_id,
+                AgentArtifact.artifact_type == "labor_arbitration_application",
+                AgentArtifact.status == "draft",
+            ).order_by(AgentArtifact.created_at.desc()).first()
+            if existing:
+                return {
+                    "artifact_id": existing.id, "title": existing.title,
+                    "status": existing.status, "content": existing.content,
+                    "authority_refs": list(existing.authority_refs_json or []),
+                    "deduplicated": True,
+                }
             evidence_ids = [row.id for row in db.query(LegalFact.id).filter(LegalFact.matter_id == matter_id).all()]
             artifact = AgentArtifact(
                 id=_id("artifact"), matter_id=matter_id, client_id=client_id,
@@ -116,7 +131,10 @@ class LaborDisputeService:
             profile.status = "completed"
             profile.draft_approved = True
             db.commit()
-            return {"artifact_id": artifact.id, "title": artifact.title, "status": artifact.status, "content": content, "authority_refs": authority_ids}
+            return {
+                "artifact_id": artifact.id, "title": artifact.title, "status": artifact.status,
+                "content": content, "authority_refs": authority_ids, "deduplicated": False,
+            }
         except Exception:
             db.rollback()
             raise

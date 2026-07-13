@@ -1,4 +1,6 @@
-"""Agent、工具和运行状态的 Pydantic 数据契约。（AgentState、AgentTool、ToolResult）"""
+"""Agent、工具和运行状态的 Pydantic 数据契约。
+定义统一数据结构:
+    （AgentState、AgentTool、ToolResult）"""
 
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -90,11 +92,22 @@ class AgentState(BaseModel):
     matter_id: str
     client_id: str
     goal: str
+    task_type: str = "mock_case_summary"
+    risk_level: str = "L1"
     status: RunStatus = RunStatus.PLANNING
     current_step_id: Optional[str] = None
     pending_approval_id: Optional[str] = None
     tool_result_ids: List[str] = Field(default_factory=list)
     retry_count: int = 0
+    plan_version: int = 0
+    current_step_index: int = 0
+    missing_facts: List[str] = Field(default_factory=list)
+    questions: List[str] = Field(default_factory=list)
+    final_artifact_ids: List[str] = Field(default_factory=list)
+    blocked_reason: Optional[str] = None
+    max_steps: int = Field(default=6, ge=1, le=30)
+    max_tool_calls: int = Field(default=8, ge=0, le=100)
+    tool_call_count: int = Field(default=0, ge=0)
     approved: Optional[bool] = None
     final_output: Optional[Dict[str, Any]] = None
     error_code: Optional[str] = None

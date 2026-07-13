@@ -11,11 +11,16 @@ from .runtime.graph import AgentGraph
 from .runtime.persistence import AgentRepository
 from .runtime.registry import ToolRegistry
 from .runtime.runtime import AgentRuntime
-from .tools import register_authority_tools, register_labor_tools, register_material_tools, register_mock_tools
+from .runtime.labor_graph import LaborDisputeGraph
+from .runtime.labor_runtime import LaborDisputeRuntime
+from .tools import (
+    register_authority_tools, register_labor_dispute_tools, register_labor_tools,
+    register_material_tools, register_mock_tools,
+)
 from .matters import MaterialService
 from .jurisdictions.authorities import LegalAuthorityService
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
-from .labor_disputes import LaborDisputeService
+from .labor_disputes import LaborDisputeService, LaborFactSuggestionService
 
 
 class LegalAgentFacade:
@@ -28,12 +33,19 @@ class LegalAgentFacade:
         self.authorities = LegalAuthorityService()
         self.jurisdictions = MatterJurisdictionService()
         self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
+        self.labor_suggestions = LaborFactSuggestionService(self.materials)
         self.registry = ToolRegistry()
         register_mock_tools(self.registry)
         register_material_tools(self.registry, self.materials)
         register_authority_tools(self.registry, self.authorities)
         register_labor_tools(self.registry)
+        register_labor_dispute_tools(self.registry, self.labor_disputes)
         self.runtime = AgentRuntime(self.repository, AgentGraph(self.repository, self.registry))
+        self.labor_runtime = LaborDisputeRuntime(
+            self.repository,
+            LaborDisputeGraph(self.repository, self.registry, self.materials, self.labor_disputes),
+            self.labor_disputes, self.jurisdictions,
+        )
 
     def start_run(self, goal: str, client_id: str, session_id: Optional[str] = None):
         """创建并执行任务，直到完成、失败或进入等待用户状态。"""
@@ -132,6 +144,18 @@ class LegalAgentFacade:
     def create_labor_dispute_draft(self, matter_id: str, client_id: str, approved: bool):
         """经用户确认生成劳动仲裁申请书草稿。"""
         return self.labor_disputes.create_draft(matter_id, client_id, approved)
+
+    def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None):
+        """启动或复用当前 Matter 的劳动纠纷 LangGraph 任务。"""
+        return self.labor_runtime.start(matter_id, client_id, facts)
+
+    def suggest_labor_dispute_facts(self, matter_id: str, client_id: str):
+        """从已授权材料生成带出处候选值，不自动确认或写入案件事实。"""
+        return self.labor_suggestions.suggest(matter_id, client_id)
+
+    def continue_labor_dispute_run(self, run_id: str, client_id: str, action: str, payload=None):
+        """以补充事实、确认法域、审批或来源重试继续暂停任务。"""
+        return self.labor_runtime.continue_run(run_id, client_id, action, payload)
 
 
 _facade = None

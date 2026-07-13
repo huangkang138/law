@@ -1,4 +1,6 @@
-"""劳动纠纷事实契约；字段保持通用，法域由 Matter 单独管理。"""
+"""劳动纠纷事实契约；字段保持通用，法域由 Matter 单独管理。
+定义劳动纠纷事实字段：
+"""
 
 from datetime import date
 from typing import List, Optional

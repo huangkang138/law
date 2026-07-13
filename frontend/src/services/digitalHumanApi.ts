@@ -39,7 +39,9 @@ export interface DigitalHumanHistoryMessage {
 }
 
 export type AgentRunStatus =
-  | 'planning' | 'executing' | 'retrying' | 'awaiting_approval'
+  | 'planning' | 'awaiting_jurisdiction' | 'awaiting_information'
+  | 'executing' | 'verifying' | 'retrying' | 'awaiting_approval'
+  | 'blocked_authority' | 'replanning' | 'human_handoff'
   | 'completed' | 'failed' | 'cancelled';
 
 export interface DigitalHumanAgentRun {
@@ -51,7 +53,16 @@ export interface DigitalHumanAgentRun {
   current_step_id: string | null;
   steps: Array<{ id: string; name: string; status: string; tool_name: string | null }>;
   approval: { id: string; prompt: string; status: string } | null;
-  final_output: { summary?: string; notice?: string } | null;
+  task_type: string;
+  plan_version: number;
+  missing_facts: string[];
+  questions: string[];
+  blocked_reason: string | null;
+  final_artifact_ids: string[];
+  max_steps: number;
+  max_tool_calls: number;
+  tool_call_count: number;
+  final_output: Record<string, unknown> | null;
   error_code: string | null;
 }
 
@@ -139,6 +150,19 @@ export interface LaborDisputeDraft {
   status: 'draft';
   content: string;
   authority_refs: string[];
+}
+
+export interface LaborFactSuggestions {
+  matter_id: string;
+  suggested_facts: Record<string, string | number | string[]>;
+  fields: Array<{
+    field: string;
+    label: string;
+    value: string | number | string[];
+    confidence: number;
+    sources: Array<{ document_id: string; fact_id: string | null; quote: string }>;
+  }>;
+  warning: string;
 }
 
 const CLIENT_ID_KEY = 'yys-law-digital-human-client-id';
@@ -335,5 +359,30 @@ export async function createLaborDisputeDraft(matterId: string): Promise<LaborDi
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/draft`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: true }),
   });
+  return readJson(response);
+}
+
+export async function startLaborDisputeAgentRun(
+  matterId: string, facts: Record<string, unknown>,
+): Promise<DigitalHumanAgentRun> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/run`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facts }),
+  });
+  return readJson(response);
+}
+
+export async function continueLaborDisputeAgentRun(
+  runId: string, action: 'provide_information' | 'confirm_jurisdiction' | 'approve' | 'retry_authority',
+  payload: Record<string, unknown> = {},
+): Promise<DigitalHumanAgentRun> {
+  const response = await request(`/api/digital-human/agent/runs/${encodeURIComponent(runId)}/continue`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, payload }),
+  });
+  return readJson(response);
+}
+
+export async function getLaborDisputeFactSuggestions(matterId: string): Promise<LaborFactSuggestions> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/suggestions`);
   return readJson(response);
 }

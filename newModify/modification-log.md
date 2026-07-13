@@ -295,3 +295,39 @@
 - 实际改动：`outputs/stage3-demo-case/01-测试案件材料.txt`、`outputs/stage3-demo-case/02-测试输入与预期结果.md` 和本日志。
 - 验证：检查测试材料包含可提取日期、金额和“事实：”标记；阶段 3 PostgreSQL 集成测试单项通过；`git diff --check` 通过。
 - 风险与后续：手工测试在没有权威来源适配器时应停在 `blocked_authority`，这是预期安全行为；完整草稿链路由自动化测试使用 `.invalid` 测试来源验证，不得用于真实法律结论。
+
+## 2026-07-13 09:54:04 +08:00
+
+- 会话 ID：`019f564d-4e3b-7061-a54c-48bf13da647e`
+- 分支/Git 状态：当前分支 `master`；开始前存在用户已加入索引的 Agent 文件，以及未跟踪的测试目录、上传 DOCX、前端工作台、输出资料和总体规划，本次全部保留并在现有阶段 1-3 改动上增量实现。
+- 用户请求：规划 Agent 完善方案，并直接执行完善。
+- 修改前阅读：项目上下文与修改规则、原始项目解析、数字人实现方案、多法域 Agent 总体规划、最新项目分析、相关修改历史、新增 `legal_agent_system/analyse-agents.md`，以及当前 Runtime、Repository、工具、Facade、Router、劳动纠纷服务、前端 API/工作台和阶段测试。
+- 修改思路：消除“阶段 1 LangGraph 只跑模拟工具、阶段 3 真实业务绕过 Runtime”的双轨架构；保留现有模拟 Runtime 兼容性，新增劳动纠纷专用 Graph 和用例层，领域规则继续由 `LaborDisputeService` 维护，Graph 只负责编排和安全状态。
+- 具体方案：扩展 AgentState 和运行枚举；为已有 Matter 创建/复用劳动纠纷 Run；将动态计划写入 AgentStep；把证据清单、劳动分析、草稿生成包装为受控工具并持久化 ToolCall；支持法域/事实/来源/审批四类暂停恢复；增加 Runtime API；前端切换到真实 Run/Step；新增跨实例恢复集成测试。
+- 实际改动：`runtime/enums.py`、`schemas.py`、`persistence.py`、`labor_graph.py`、`labor_runtime.py`、Runtime 导出、`tools/labor_dispute_tools.py`、工具导出、Facade、Agent Router、数字人前端 API/案件工作台、`tests/test_digital_human_stage31_runtime.py`、最新项目分析和本日志。
+- 验证：Anaconda Python `compileall` 通过；前端 `npx tsc --noEmit` 通过；`git diff --check` 通过；真实 PostgreSQL 阶段 1/2/2.5/3/3.1 集成测试共 5 个模块、6 个用例全部通过。3.1 验证等待法域、等待事实、三步计划、真实 ToolCall、来源阻断、来源重试、审批通过/拒绝、跨 Facade 恢复和草稿完成；拒绝草稿不会污染已完成分析步骤。
+- 风险与后续：当前真实来源仍仅来自已登记数据库记录，测试来源为 `.invalid`；劳动期限和补偿规则仍是初步版本。旧阶段 3 直接 Service API 为兼容暂时保留，后续稳定后可标记弃用。正式上线前仍需权威来源连接器、通用四类 Verifier、步骤/工具/时长预算、计划版本表、过期审批与幂等草稿测试、Alembic 迁移和更完整离线评测集。
+
+## 2026-07-13 10:34:12 +08:00
+
+- 会话 ID：`019f564d-4e3b-7061-a54c-48bf13da647e`
+- 分支/Git 状态：当前分支 `master`；保留阶段 1-3.1 全部现有改动和未跟踪用户文件，本次只增量实施阶段 3.2。
+- 用户请求：继续完善未完成的 Agent，并确认当前是否只能处理劳动纠纷。
+- 修改前阅读：项目上下文与修改规则、多法域 Agent 规划、Agent 分析文档、最新项目分析、阶段 3.1 修改历史和当前 Git 状态。
+- 修改思路：当前统一 Runtime 的业务闭环确实只支持中国劳动纠纷；本轮先补可被后续合同/民事领域复用的安全基础，不在没有权威数据源的情况下伪造来源连接器或扩张法律结论。
+- 具体方案：新增结构/事实/来源/风险四类验证器；在 Graph 每次工具结果后验证；增加最大计划步骤和工具调用预算；重复劳动仲裁草稿幂等复用；增加审批过期、预算、幂等和验证失败专项测试。
+- 实际改动：`runtime/verifier.py`、Runtime 枚举/状态/Graph/Repository、劳动纠纷 Service、前端 AgentRun 类型、`tests/test_digital_human_stage32_safety.py`、最新项目分析和本日志。
+- 验证：Python `compileall`、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 1/2/2.5/3/3.1/3.2 共 6 个测试模块、10 个用例全部通过。
+- 风险与后续：当前只实现步骤和工具次数预算，尚未实现总时长与模型费用预算；验证器覆盖当前劳动工具契约，后续每接入一个领域需增加对应验证规则。统一 Agent 尚不能执行合同、一般民事、模拟法庭等旧模块；下一阶段应选择一个领域，将 Router 逻辑下沉 Service 后按同一工具/验证/评测协议接入。
+
+## 2026-07-13 10:54:33 +08:00
+
+- 会话 ID：`019f564d-4e3b-7061-a54c-48bf13da647e`
+- 分支/Git 状态：当前分支 `master`；保留阶段 1-3.2 改动和全部未跟踪用户文件，本次增量修改材料建议链路。
+- 用户请求：劳动纠纷字段每次手动输入过于繁琐，希望从已上传 TXT 材料默认提取，用户可选择采用或自行填写。
+- 修改前阅读：项目规则、多法域规划、最新项目分析与修改历史；检查用户截图、当前材料分片/事实提取、劳动事实 Schema、Facade/Router、前端 API 和案件工作台表单。
+- 修改思路：材料提取结果只能作为候选，不能未经用户确认直接成为法律事实；建议必须保留来源原文并与确认事实写入分离。前端先展示建议卡，用户显式采用后再填表，且保留编辑能力。
+- 具体方案：新增独立劳动事实建议提取器；从授权材料确定性识别姓名、单位、日期、工资、地点、争议和请求；开放只读建议 API；材料分析后自动获取建议；增加采用/拒绝和来源展开交互。
+- 实际改动：`labor_disputes/suggestions.py`、劳动纠纷导出、Facade、Agent Router、前端 API/案件工作台/全局样式、`tests/test_digital_human_stage33_suggestions.py`、最新项目分析和本日志。
+- 验证：Python `compileall`、前端 `npx tsc --noEmit`、`git diff --check` 通过；真实 PostgreSQL 阶段 1-3.3 共 7 个测试模块、11 个用例全部通过。3.3 验证测试材料字段、来源原文、读取不落库和跨客户端拒绝。
+- 风险与后续：当前采用确定性文本规则，适合格式清晰的 TXT；复杂自然语言、表格、PDF/DOCX 和图片仍可能缺字段或误识别，因此 UI 始终要求用户核对。后续可接入结构化 LLM 提取，但必须继续要求出处、Schema 校验和用户确认。
