@@ -27,6 +27,7 @@ interface DigitalHumanStore {
   sessionId: string | null;
   isLoading: boolean;
   sessions: DigitalHumanSessionSummary[];
+  historyError: string;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -63,6 +64,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       sessionId: null,
       isLoading: false,
       sessions: [],
+      historyError: '',
 
       open: () => {
         set((state) => ({
@@ -163,7 +165,15 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       },
 
       loadSessions: async () => {
-        try { set({ sessions: await getDigitalHumanSessions() }); } catch { /* 保留当前界面 */ }
+        try {
+          set({ sessions: await getDigitalHumanSessions(), historyError: '' });
+        } catch (error) {
+          set({
+            historyError: error instanceof Error
+              ? `历史会话读取失败：${error.message}`
+              : '历史会话读取失败，请稍后重试',
+          });
+        }
       },
 
       loadSession: async (sessionId) => {

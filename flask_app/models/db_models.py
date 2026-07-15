@@ -977,7 +977,10 @@ class LegalAuthority(Base):
     version = Column(String, nullable=False, default="1")
     supersedes_id = Column(String, index=True)
     last_verified_at = Column(DateTime(timezone=True))
+    fresh_until = Column(DateTime(timezone=True), index=True)
     retrieval_status = Column(String, nullable=False, default="stored", index=True)
+    source_snapshot_id = Column(String, index=True)
+    verification_method = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

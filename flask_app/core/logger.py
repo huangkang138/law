@@ -22,7 +22,7 @@ logger.add(
     level=settings.LOG_LEVEL,
     enqueue=True,
     backtrace=True,
-    diagnose=True
+    diagnose=False
 )
 
 # 添加控制台输出
@@ -31,7 +31,7 @@ logger.add(
     level=settings.LOG_LEVEL,
     enqueue=True,
     backtrace=True,
-    diagnose=True
+    diagnose=False
 )
 
 # 应用日志实例

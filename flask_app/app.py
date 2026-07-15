@@ -28,15 +28,15 @@ CORS(app, origins=settings.CORS_ORIGINS, supports_credentials=True, allow_header
 # 初始化 WebSocket 支持
 sock = Sock(app)
 
-# 创建数据库表
-try:
-    # 只创建不存在的表，不删除已有表
-    Base.metadata.create_all(bind=engine)
-    app_logger.info("✅ 数据库表检查完成")
-except Exception as e:
-    app_logger.error(f"❌ 数据库表创建失败: {e}")
-    import traceback
-    traceback.print_exc()
+# 正式结构只由 Alembic 管理；仅在显式本地初始化开关下兼容空库。
+if settings.AUTO_CREATE_DB_TABLES:
+    try:
+        Base.metadata.create_all(bind=engine)
+        app_logger.warning("⚠️ 已启用 AUTO_CREATE_DB_TABLES，仅建议本地空库使用")
+    except Exception as e:
+        app_logger.error(f"❌ 数据库表创建失败: {e}")
+        import traceback
+        traceback.print_exc()
 
 # 初始化服务
 legal_agent = None

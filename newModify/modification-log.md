@@ -375,3 +375,26 @@
 - 实际改动：Agent Facade、Agent Router、前端数字人 API、案件工作台、阶段 3.4 测试、最新项目分析和本日志。
 - 验证：前端 `npx tsc --noEmit` 通过；Python compileall 通过；阶段 1～3.4 相关测试 20/20 通过；法源目录测试确认 ready 且至少返回 2 条来源。
 - 后续：需要重启后端加载新增目录接口。旧的 failed Run 不会复用，点击“重新开始新的分析任务”将创建新 Run；案件材料和确认事实保持不变。
+
+## 2026-07-13 21:56:55 +08:00
+
+- 会话 ID：`019f5b92-52ca-7e82-be56-03aafa11c425`
+- 分支/Git 状态：当前分支 `master`；修改前已跟踪文件无未提交变化，保留 `flask_app/evals/`、`migrations/`、`tests/`、用户上传 DOCX、前端工作台、outputs 和架构图等既有未跟踪内容。
+- 用户请求：在 Agent 框架基本完成后，继续完善生产级法律内容和运行保障。
+- 修改前阅读：`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/多法域数字人法律Agent总体规划.md`、最新项目分析、阶段 3.4 相关历史，以及当前 Provider/Importer/Authority Service、Facade、Runtime、ToolExecutor、Verifier、数据库模型、迁移和测试。
+- 修改思路：保留现有 LangGraph 确定性工作流，不增加自主性；先消除“内置摘要被标成官网已验证”的信任缺口，再补来源变更阻断、Run 并发租约、超时不确定性和数据库配置治理。
+- 具体方案：官方 HTTPS HTML/PDF 下载与条款精确抽取；同步批次和原始快照；首次/同内容/变更三种版本状态；七天新鲜度；失败关闭；Matter 创建锁和 Run 执行锁；工具超时禁止自动重试；自然年时效；`DATABASE_URL` 与 Alembic 单一结构管理。
+- 实际改动：`.env.example`、`flask_app/app.py`、`core/config.py`、`core/database.py`、Agent Facade、法源 Provider/Importer/Service、劳动规则、Runtime persistence/locks/executor/labor_runtime/verifier、Agent/法源模型、`20260713_0003` 迁移、阶段 3.4/3.5 测试、总体规划和最新项目分析。
+- 验证：Anaconda Python compileall 通过；无数据库专项 6/6 通过；Alembic head 为 `20260713_0003`；`20260713_0002:head --sql` 通过；`git diff --check` 通过。真实官网访问确认官方站点在当前代理/TLS环境存在间歇性连接失败，系统按设计失败关闭。
+- 风险与后续：源码凭据已移除后，必须先在本地 `.env` 配置 `DATABASE_URL`，再执行实库 `alembic upgrade head` 和完整 PostgreSQL 回归；首批新官网版本若与旧内置版本不同会进入 `review_required`，需内部人工复核后启用。完整欠薪/解除/补偿规则、真实脱敏金标、定时任务/告警、Outbox 消费、身份权限和长期压测仍属于阶段 3.5 后续批次。
+
+## 2026-07-14 01:04:20 +08:00
+
+- 会话 ID：`019f5bcb-109a-7561-ad48-016e11c95730`
+- 用户请求：分析数字人聊天编解码错误、案件“请求参数格式错误”和历史记录消失，并完成修复。
+- 修改前检查：重新阅读项目上下文、修改规则、数字人方案、多法域规划、最新分析和相关历史；检查当前 Git 状态并完整保留阶段 3.5、测试、迁移、上传文档、工作台与 outputs 等既有改动。
+- 根因：`DATABASE_URL` 指向的专用 PostgreSQL 运行账号不存在；数据库返回的本地化认证错误又被驱动按 UTF-8 解码，形成 `UnicodeDecodeError`。该异常继承 `ValueError`，Agent Router 因捕获顺序将其误报为参数错误；前端列表加载同时静默吞错，造成记录像被删除。
+- 数据恢复：记录实际未丢失。为现有配置补建非超级用户运行账号并授予业务运行权限，不修改、不输出 `.env`；实库从 `20260713_0002` 非破坏升级到 `20260713_0003`。当前匿名客户端核对为 4 条会话、20 条消息、7 条案件记录。
+- 代码修复：数字人及 Agent Router 将数据库异常统一转换为安全的 `503 DATABASE_UNAVAILABLE`；修正重置会话异常分支；前端历史与案件列表区分“加载失败”和“空记录”并支持重试；Loguru 关闭 `diagnose`，避免后续异常日志展开局部敏感变量。没有修改数字人窗口尺寸或双栏布局。
+- 验证：配置运行账号连接成功；会话 API 返回 4 条、案件 API 返回 7 条；临时会话聊天成功并已清理；实库 Alembic 为 `20260713_0003`；前端 `npx tsc --noEmit` 通过；数字人故障回归及阶段 0/2/3.5 回归共 12 项通过。
+- 风险与后续：旧日志可能已含历史异常上下文，后续应轮换数据库凭据并按运维策略清理受控日志；生产环境继续使用独立迁移账号执行 DDL，运行账号只保留业务运行权限。

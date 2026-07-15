@@ -12,6 +12,7 @@
 
 from .enums import ErrorCode, RunStatus
 from .errors import AgentRuntimeError
+from .locks import RunExecutionLock
 
 
 class LaborDisputeRuntime:
@@ -23,6 +24,7 @@ class LaborDisputeRuntime:
         self.labor_disputes = labor_disputes
         self.jurisdictions = jurisdictions
         self.authority_sync = authority_sync
+        self.execution_lock = RunExecutionLock()
 
     def start(self, matter_id: str, client_id: str, facts=None):
         """
@@ -37,12 +39,9 @@ class LaborDisputeRuntime:
     # 如果提供了facts信息，则更新案件事实
         updated = self.labor_disputes.update_facts(matter_id, client_id, facts) if facts else None
     # 查找当前案件的活动运行状态
-        state = self.repository.find_active_run(matter_id, client_id, self.TASK_TYPE)
-    # 如果没有找到活动运行状态，则创建一个新的运行状态
-        if state is None:
-            state = self.repository.create_run_for_matter(matter_id, client_id, self.TASK_TYPE)
+        state = self.repository.find_or_create_active_run(matter_id, client_id, self.TASK_TYPE)
     # 如果状态为等待信息状态且提供了更新的事实信息
-        elif state.status == RunStatus.AWAITING_INFORMATION.value and updated is not None:
+        if state.status == RunStatus.AWAITING_INFORMATION.value and updated is not None:
         # 将状态更新为重新规划状态
             state.status = RunStatus.REPLANNING
         # 清空问题和缺失事实列表
@@ -63,11 +62,20 @@ class LaborDisputeRuntime:
         # 保存状态变更，记录为"run_retry_requested"操作
             self.repository.save_state(state, "run_retry_requested")
     # 调用图处理流程
-        self.graph.invoke(state)
+        try:
+            with self.execution_lock.acquire(state.run_id):
+                self.graph.invoke(state)
+        except AgentRuntimeError as exc:
+            if exc.code != "RUN_BUSY":
+                raise
     # 返回案件处理流程的快照信息
         return self.repository.snapshot(state.run_id, client_id)
 
     def continue_run(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
+        with self.execution_lock.acquire(run_id):
+            return self._continue_run_locked(run_id, client_id, action, payload, idempotency_key)
+
+    def _continue_run_locked(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
         state = self.repository.load_state(run_id, client_id)
         payload = payload or {}
         if idempotency_key:
@@ -102,7 +110,15 @@ class LaborDisputeRuntime:
                 raise AgentRuntimeError("任务当前不需要重试法律来源", ErrorCode.INVALID_STATE.value)
             # “重新验证”必须先刷新可信来源，不能只把同一失败计划再跑一次。
             if self.authority_sync is not None:
-                self.authority_sync()
+                sync_result = self.authority_sync()
+                if isinstance(sync_result, dict) and not sync_result.get("ok", True):
+                    state.blocked_reason = "官方法源同步失败，请稍后重试或转人工复核"
+                    state.error_code = "AUTHORITY_SYNC_FAILED"
+                    self.repository.save_state(state, "authority_sync_failed", {"error_code": sync_result.get("error_code")})
+                    response = self.repository.snapshot(run_id, client_id)
+                    if idempotency_key:
+                        self.repository.finish_action(run_id, idempotency_key, response)
+                    return response
             state.status = RunStatus.REPLANNING
             state.blocked_reason = None
         else:

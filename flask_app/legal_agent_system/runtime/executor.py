@@ -20,7 +20,14 @@ class PolicyToolExecutor:
             try:
                 result = pool.submit(handler, call_id, arguments, attempt).result(definition.timeout_seconds)
             except TimeoutError:
-                result = ToolResult(tool_call_id=call_id, success=False, error_code="TOOL_TIMEOUT", retryable=True)
+                # Python 线程无法安全强杀；超时后执行结果不确定，禁止自动重试造成重复副作用。
+                result = ToolResult(
+                    tool_call_id=call_id, success=False,
+                    error_code="TOOL_TIMEOUT_UNCERTAIN",
+                    error_message="工具超时，后台执行状态未知，需核对审计记录后再决定是否重试",
+                    retryable=False,
+                    warnings=["工具线程可能仍在结束过程中，已禁止自动重复调用。"],
+                )
                 pool.shutdown(wait=False, cancel_futures=True)
             else:
                 pool.shutdown(wait=True)

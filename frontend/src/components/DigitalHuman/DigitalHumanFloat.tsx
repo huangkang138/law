@@ -334,6 +334,29 @@ export default function DigitalHumanFloat() {
           text-align: center;
         }
 
+        .dh-history-error {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 10px;
+          color: #9a3412;
+          background: #fff7ed;
+          border-radius: 8px;
+          font-size: 11px;
+        }
+
+        .dh-history-error button {
+          flex: none;
+          width: auto;
+          padding: 5px 7px;
+          color: #9a3412;
+          background: #fff;
+          border: 1px solid #fed7aa;
+          border-radius: 7px;
+          cursor: pointer;
+        }
+
         .dh-history-item {
           display: flex;
           align-items: center;

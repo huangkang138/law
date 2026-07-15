@@ -2,7 +2,7 @@
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
@@ -26,9 +26,16 @@ class LegalAuthorityService:
         payload = {**data, "provider": "test_fixture", "external_id": data.get("external_id") or f"test-{uuid.uuid4().hex}", "canonical_url": data.get("source_url"), "trust_level": "test", "version": data.get("version", "1"), "retrieval_status": "verified"}
         return self._register(payload)
 
+    FRESHNESS_DAYS = 7
+
     def register_provider(self, data: Dict, provider: str) -> Dict:
-        """可信 Provider 的唯一生产写入口，按 external_id + version 幂等。"""
-        payload = {**data, "provider": provider, "source_url": str(data.get("canonical_url")), "canonical_url": str(data.get("canonical_url")), "trust_level": "trusted", "retrieval_status": "verified"}
+        """写入官方快照解析结果；正文变化必须人工复核后才能使用。"""
+        payload = {
+            **data, "provider": provider,
+            "source_url": str(data.get("canonical_url")),
+            "canonical_url": str(data.get("canonical_url")),
+            "trust_level": "trusted",
+        }
         return self._register(payload)
 
     def _register(self, data: Dict) -> Dict:
@@ -48,10 +55,25 @@ class LegalAuthorityService:
         text = data["text"].strip()
         db = SessionLocal()
         try:
+            latest = None
             if data.get("external_id"):
-                existing = db.query(LegalAuthority).filter(LegalAuthority.provider == data.get("provider"), LegalAuthority.external_id == data.get("external_id"), LegalAuthority.version == str(data.get("version", "1"))).first()
-                if existing:
-                    return self._dict(existing)
+                latest = db.query(LegalAuthority).filter(
+                    LegalAuthority.provider == data.get("provider"),
+                    LegalAuthority.external_id == data.get("external_id"),
+                ).order_by(LegalAuthority.retrieved_at.desc()).first()
+                if latest and latest.version == str(data.get("version", "1")):
+                    latest.retrieved_at = self._datetime(data.get("retrieved_at")) or datetime.now(timezone.utc)
+                    latest.last_verified_at = latest.retrieved_at
+                    latest.source_snapshot_id = data.get("source_snapshot_id") or latest.source_snapshot_id
+                    latest.verification_method = data.get("verification_method") or latest.verification_method
+                    if latest.retrieval_status == "verified":
+                        latest.fresh_until = latest.last_verified_at + timedelta(days=self.FRESHNESS_DAYS)
+                    db.commit()
+                    result = self._dict(latest)
+                    result["_change_type"] = "unchanged"
+                    return result
+            retrieved_at = self._datetime(data.get("retrieved_at")) or datetime.now(timezone.utc)
+            changed = latest is not None
             authority = LegalAuthority(
                 id=f"authority_{uuid.uuid4().hex}", country_code=country_code,
                 subdivision_code=data.get("subdivision_code"), authority_type=authority_type,
@@ -60,16 +82,25 @@ class LegalAuthorityService:
                 published_at=self._datetime(data.get("published_at")),
                 effective_from=self._datetime(data.get("effective_from")),
                 effective_to=self._datetime(data.get("effective_to")), status=status,
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=retrieved_at,
                 content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 provider=data.get("provider", "legacy"), external_id=data.get("external_id"),
                 canonical_url=data.get("canonical_url") or data["source_url"], trust_level=data.get("trust_level", "untrusted"),
-                version=str(data.get("version", "1")), supersedes_id=data.get("supersedes_id"),
-                last_verified_at=datetime.now(timezone.utc), retrieval_status=data.get("retrieval_status", "stored"),
+                version=str(data.get("version", "1")), supersedes_id=latest.id if changed else data.get("supersedes_id"),
+                last_verified_at=retrieved_at,
+                fresh_until=None if changed else retrieved_at + timedelta(days=self.FRESHNESS_DAYS),
+                retrieval_status="review_required" if changed else "verified",
+                source_snapshot_id=data.get("source_snapshot_id"),
+                verification_method=data.get("verification_method"),
             )
+            if changed:
+                latest.retrieval_status = "superseded"
+                latest.fresh_until = retrieved_at
             db.add(authority)
             db.commit()
-            return self._dict(authority)
+            result = self._dict(authority)
+            result["_change_type"] = "changed" if changed else "imported"
+            return result
         except Exception:
             db.rollback()
             raise
@@ -97,6 +128,13 @@ class LegalAuthorityService:
             if authority.retrieval_status != "verified":
                 valid = False
                 warnings.append("来源同步状态不是 verified")
+            now = datetime.now(timezone.utc)
+            fresh_until = authority.fresh_until
+            if fresh_until and fresh_until.tzinfo is None:
+                fresh_until = fresh_until.replace(tzinfo=timezone.utc)
+            if not fresh_until or now > fresh_until:
+                valid = False
+                warnings.append("来源已超过官网核验新鲜度期限")
             if authority.effective_from and effective_at < authority.effective_from:
                 valid = False
                 warnings.append("查询日期早于来源生效日期")
@@ -131,8 +169,29 @@ class LegalAuthorityService:
             "provider": authority.provider, "external_id": authority.external_id,
             "canonical_url": authority.canonical_url, "trust_level": authority.trust_level,
             "version": authority.version, "last_verified_at": authority.last_verified_at.isoformat() if authority.last_verified_at else None,
+            "fresh_until": authority.fresh_until.isoformat() if authority.fresh_until else None,
             "retrieval_status": authority.retrieval_status,
+            "source_snapshot_id": authority.source_snapshot_id,
+            "verification_method": authority.verification_method,
         }
+
+    def approve_version(self, authority_id: str) -> Dict:
+        """内部人工复核入口；不通过 HTTP 或 Agent 工具公开。"""
+        db = SessionLocal()
+        try:
+            authority = db.get(LegalAuthority, authority_id)
+            if authority is None:
+                raise AgentRuntimeError("法律来源不存在", "AUTHORITY_NOT_FOUND")
+            if authority.retrieval_status != "review_required":
+                raise AgentRuntimeError("该版本不在待复核状态", "INVALID_STATE")
+            now = datetime.now(timezone.utc)
+            authority.retrieval_status = "verified"
+            authority.last_verified_at = now
+            authority.fresh_until = now + timedelta(days=self.FRESHNESS_DAYS)
+            db.commit()
+            return self._dict(authority)
+        finally:
+            db.close()
 
     def search(self, country_code: str, effective_at: datetime, terms) -> list:
         """小语料使用结构化过滤和关键词匹配，返回已验证来源。"""
@@ -148,5 +207,24 @@ class LegalAuthorityService:
                 if verified["valid"]:
                     results.append(self._dict(row))
             return results
+        finally:
+            db.close()
+
+    def has_fresh_sources(self, provider: str, external_ids) -> bool:
+        """避免每个 HTTP 请求访问官网；超过新鲜度后才触发同步。"""
+        expected = set(external_ids)
+        if not expected:
+            return False
+        db = SessionLocal()
+        try:
+            now = datetime.now(timezone.utc)
+            rows = db.query(LegalAuthority).filter(
+                LegalAuthority.provider == provider,
+                LegalAuthority.external_id.in_(expected),
+                LegalAuthority.retrieval_status == "verified",
+                LegalAuthority.fresh_until.isnot(None),
+                LegalAuthority.fresh_until > now,
+            ).all()
+            return {row.external_id for row in rows} == expected
         finally:
             db.close()

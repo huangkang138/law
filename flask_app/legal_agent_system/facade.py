@@ -30,12 +30,13 @@ from . import models as _agent_models  # noqa: F401，注册新增 Agent 表元�
 class LegalAgentFacade:
     """组装 Agent Runtime，并向外提供稳定的任务用例。"""
 
-    def __init__(self, llm_fact_extractor=None, auto_sync_authorities: bool = False) -> None:
+    def __init__(self, llm_fact_extractor=None, auto_sync_authorities: bool = False, authority_provider=None) -> None:
         # 每个门面实例都使用无状态仓储；运行状态统一从 PostgreSQL 恢复。
         self.repository = AgentRepository()
         self.materials = MaterialService()
         self.authorities = LegalAuthorityService()
         self.authority_importer = TrustedAuthorityImporter(self.authorities)
+        self.authority_provider = authority_provider or OfficialCnLaborProvider()
         # 生产门面开启自动同步；测试可显式关闭，继续验证“无来源必须阻断”的安全边界。
         self.auto_sync_authorities = auto_sync_authorities
         self.jurisdictions = MatterJurisdictionService()
@@ -52,7 +53,7 @@ class LegalAgentFacade:
             self.repository,
             LaborDisputeGraph(self.repository, self.registry, self.materials, self.labor_disputes),
             self.labor_disputes, self.jurisdictions,
-            self.import_official_labor_authorities if auto_sync_authorities else None,
+            (lambda: self._try_sync_authorities(force=True)) if auto_sync_authorities else None,
         )
 
     def start_run(self, goal: str, client_id: str, session_id: Optional[str] = None):
@@ -107,14 +108,24 @@ class LegalAgentFacade:
 
     def import_official_labor_authorities(self):
         """由内部可信 Provider 同步官方法源；不提供公开写入接口。"""
-        return self.authority_importer.import_all(OfficialCnLaborProvider())
+        return self.authority_importer.import_all(self.authority_provider)
+
+    def _try_sync_authorities(self, force: bool = False):
+        """运行入口的安全同步：失败留痕并交给来源验证状态阻断，不返回 500。"""
+        external_ids = [item.external_id for item in getattr(self.authority_provider, "sources", ())]
+        if not force and self.authorities.has_fresh_sources(self.authority_provider.name, external_ids):
+            return {"ok": True, "skipped": True, "reason": "fresh_cache"}
+        try:
+            return {"ok": True, "authorities": self.import_official_labor_authorities()}
+        except Exception as exc:
+            return {"ok": False, "error_code": type(exc).__name__}
 
     def get_labor_authority_catalog(self):
         """返回劳动纠纷当前可用的官方来源，让用户在运行前也能看到依据。"""
-        if self.auto_sync_authorities:
-            self.import_official_labor_authorities()
+        sync = self._try_sync_authorities() if self.auto_sync_authorities else {"ok": True}
         authorities = self.authorities.search("CN", datetime.now(timezone.utc), [])
-        return {"status": "ready" if authorities else "unavailable", "count": len(authorities), "authorities": authorities}
+        status = "ready" if authorities and sync["ok"] else "degraded" if authorities else "unavailable"
+        return {"status": status, "count": len(authorities), "authorities": authorities, "sync": sync}
 
     @staticmethod
     def list_jurisdictions():
@@ -167,7 +178,7 @@ class LegalAgentFacade:
     def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None):
         """启动或复用当前 Matter 的劳动纠纷 LangGraph 任务。"""
         if self.auto_sync_authorities:
-            self.import_official_labor_authorities()
+            self._try_sync_authorities()
         return self.labor_runtime.start(matter_id, client_id, facts)
 
     def suggest_labor_dispute_facts(self, matter_id: str, client_id: str):

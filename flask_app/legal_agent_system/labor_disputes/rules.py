@@ -15,10 +15,12 @@ class LaborRuleEngine:
 
         if facts.get("employment_active") and "欠薪" in facts.get("claim_types", []):
             deadline = None
+            deadline_type = "employment_active_wage_claim"
             assumptions.append("劳动关系存续期间的拖欠工资争议适用特别规则；终止后再起算一年。")
         else:
             base = interruptions[-1] if interruptions else start
-            deadline = base + timedelta(days=365 + suspension_days)
+            deadline = self._add_calendar_year(base) + timedelta(days=suspension_days)
+            deadline_type = "calculated_calendar_year"
             if interruptions:
                 assumptions.append("按用户确认的最后一次时效中断日期重新起算。")
             if suspension_days:
@@ -29,9 +31,18 @@ class LaborRuleEngine:
             "rule_version": RULE_VERSION,
             "start_date": start.isoformat(),
             "estimated_deadline": deadline.isoformat() if deadline else None,
+            "deadline_type": deadline_type,
             "fact_refs": fact_refs,
             "authority_refs": [a["authority_id"] for a in authorities],
             "assumptions": assumptions,
             "warnings": warnings,
-            "manual_review_required": bool(interruptions or suspension_days),
+            "manual_review_required": deadline is None or bool(interruptions or suspension_days),
         }
+
+    @staticmethod
+    def _add_calendar_year(value: date) -> date:
+        """按自然年推进；2月29日在下一非闰年落到2月28日，不使用固定365天。"""
+        try:
+            return value.replace(year=value.year + 1)
+        except ValueError:
+            return value.replace(year=value.year + 1, month=2, day=28)

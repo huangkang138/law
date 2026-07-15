@@ -20,6 +20,7 @@ export default function DigitalHumanChat() {
     cancelRequest,
     deleteSession,
     emotion,
+    historyError,
     isLoading,
     messages,
     loadSession,
@@ -121,7 +122,12 @@ export default function DigitalHumanChat() {
 
         {historyOpen && (
           <div className="dh-history-list" role="list" aria-label="历史会话列表">
-          {sessions.length === 0 ? (
+          {historyError ? (
+            <div className="dh-history-error">
+              <span>{historyError}</span>
+              <button type="button" onClick={() => void refreshHistory()}>重新读取</button>
+            </div>
+          ) : sessions.length === 0 ? (
             <p>暂无历史会话</p>
           ) : sessions.map((session) => (
             <div

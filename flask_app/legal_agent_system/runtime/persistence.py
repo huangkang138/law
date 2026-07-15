@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from core.database import SessionLocal
+from sqlalchemy import text
 from models.db_models import (
     AgentAuditEvent,
     AgentRun,
@@ -60,6 +61,45 @@ class AgentRepository:
                 raise AgentRuntimeError("Matter 不存在", "MATTER_NOT_FOUND")
             if matter.client_id != client_id:
                 raise AgentRuntimeError("无权访问该 Matter", ErrorCode.FORBIDDEN.value)
+            run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
+            state = AgentState(
+                run_id=run.id, matter_id=matter.id, client_id=client_id,
+                session_id=matter.session_id, goal=matter.goal, task_type=task_type,
+            )
+            run.state_json = state.model_dump(mode="json")
+            db.add(run)
+            db.flush()
+            self._audit(db, run.id, "run_created", {"goal": matter.goal, "task_type": task_type})
+            db.commit()
+            return state
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def find_or_create_active_run(self, matter_id: str, client_id: str, task_type: str) -> AgentState:
+        """在 PostgreSQL 事务锁内复用或创建 Run，避免并发双击生成两个活动任务。"""
+        lock_key = int.from_bytes(
+            hashlib.sha256(f"{matter_id}:{client_id}:{task_type}".encode()).digest()[:8],
+            byteorder="big", signed=True,
+        )
+        terminal = {RunStatus.COMPLETED.value, RunStatus.FAILED.value, RunStatus.CANCELLED.value}
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": lock_key})
+            matter = db.get(Matter, matter_id)
+            if matter is None:
+                raise AgentRuntimeError("Matter 不存在", "MATTER_NOT_FOUND")
+            if matter.client_id != client_id:
+                raise AgentRuntimeError("无权访问该 Matter", ErrorCode.FORBIDDEN.value)
+            runs = db.query(AgentRun).filter(
+                AgentRun.matter_id == matter_id, AgentRun.client_id == client_id,
+            ).order_by(AgentRun.created_at.desc()).all()
+            for run in runs:
+                raw = run.state_json or {}
+                if raw.get("task_type") == task_type and run.status not in terminal:
+                    return AgentState.model_validate(raw)
             run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
             state = AgentState(
                 run_id=run.id, matter_id=matter.id, client_id=client_id,

@@ -2,11 +2,12 @@
 
 本文件适用于整个 `D:\项目\law` 仓库。开始分析、排查或修改前，必须先读取并遵守以下文件：
 
-1. `PROJECT_CONTEXT_RULES.md`
-2. `PROJECT_MODIFICATION_RULES.md`
-3. `raw/` 下与当前任务相关的项目解析或方案文档
-4. `newModify/latest-project-analysis.md`
-5. `newModify/modification-log.md` 中与当前任务相关的历史记录
+1. `CLAUDE.md`（代码修改的技术约束——哪些能改、哪些不能改、改完怎么验证）
+2. `PROJECT_CONTEXT_RULES.md`
+3. `PROJECT_MODIFICATION_RULES.md`
+4. `raw/` 下与当前任务相关的项目解析或方案文档
+5. `newModify/latest-project-analysis.md`
+6. `newModify/modification-log.md` 中与当前任务相关的历史记录
 
 完成上述上下文读取后，再检查当前 Git 状态并阅读实际源码；解析文档与源码不一致时，以当前源码为准。
 

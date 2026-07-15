@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     LOG_FILE: str = "logs/app.log"
     LOG_ROTATION: str = "500 MB"
     LOG_RETENTION: str = "10 days"
+
+    # 数据库配置。生产环境必须通过环境变量提供凭据，源码不保存密码。
+    DATABASE_URL: str = "postgresql://postgres@localhost:5432/sparklaw"
+    AUTO_CREATE_DB_TABLES: bool = False
     
     model_config = SettingsConfigDict(
         env_file=".env",

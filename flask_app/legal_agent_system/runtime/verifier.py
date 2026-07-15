@@ -43,8 +43,12 @@ class AgentResultVerifier:
             if data.get("status") != "awaiting_draft_approval":
                 report.structure_errors.append("劳动纠纷分析没有进入草稿审批状态")
             deadline = data.get("deadline") or {}
-            if not deadline.get("start_date") or not deadline.get("estimated_deadline"):
-                report.fact_errors.append("期限结果缺少起算日或预计截止日")
+            if not deadline.get("start_date"):
+                report.fact_errors.append("期限结果缺少起算日")
+            if not deadline.get("estimated_deadline") and deadline.get("deadline_type") != "employment_active_wage_claim":
+                report.fact_errors.append("期限结果缺少预计截止日或合法的开放期限类型")
+            if deadline.get("deadline_type") == "employment_active_wage_claim" and not deadline.get("manual_review_required"):
+                report.fact_errors.append("劳动关系存续欠薪的开放期限必须标记人工复核")
             authorities = data.get("authorities") or []
             authority_ids = {item.get("authority_id") for item in authorities}
             if not authority_ids or None in authority_ids:

@@ -1,12 +1,23 @@
 """数字人智能助手路由。"""
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.logger import app_logger
 from services.digital_human_service import get_digital_human_service
 
 
 router = Blueprint("digital_human", __name__)
+
+
+def _database_unavailable(operation: str):
+    """统一隐藏数据库驱动细节，避免连接故障被误报为参数错误。"""
+    app_logger.exception(f"数字人{operation}数据库不可用")
+    return jsonify({
+        "success": False,
+        "error": "数字人数据服务暂时不可用，请稍后重试",
+        "code": "DATABASE_UNAVAILABLE",
+    }), 503
 
 
 def _get_client_id():
@@ -71,6 +82,8 @@ def chat():
             custom_config=_get_custom_llm_config(),
         )
         return jsonify({"success": True, **result})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("聊天")
     except (ValueError, LookupError) as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except PermissionError as exc:
@@ -102,6 +115,8 @@ def reset_session():
             "message": "会话已重置",
             "session_id": session_id,
         })
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("重置会话")
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
     except ValueError as exc:
@@ -116,8 +131,13 @@ def list_sessions():
     try:
         sessions = get_digital_human_service().list_sessions(_get_client_id())
         return jsonify({"success": True, "sessions": sessions})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("读取历史会话")
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        app_logger.exception("数字人读取历史会话失败")
+        return jsonify({"success": False, "error": "历史会话读取失败"}), 500
 
 
 @router.route("/digital-human/sessions/<session_id>/messages", methods=["GET"])
@@ -125,6 +145,8 @@ def get_messages(session_id):
     try:
         messages = get_digital_human_service().get_messages(session_id, _get_client_id())
         return jsonify({"success": True, "messages": messages})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("读取会话消息")
     except LookupError as exc:
         return jsonify({"success": False, "error": str(exc)}), 404
     except PermissionError as exc:
@@ -140,6 +162,8 @@ def delete_session(session_id):
         if not deleted:
             return jsonify({"success": False, "error": "会话不存在"}), 404
         return jsonify({"success": True, "message": "会话删除成功"})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("删除会话")
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
     except ValueError as exc:

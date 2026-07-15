@@ -3,7 +3,9 @@
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 
+from core.logger import app_logger
 from legal_agent_system import get_legal_agent_facade
 from legal_agent_system.runtime.errors import AgentRuntimeError
 
@@ -26,8 +28,22 @@ def _response(action):
     except AgentRuntimeError as exc:
         status = 403 if exc.code == "FORBIDDEN" else 404 if exc.code == "RUN_NOT_FOUND" else 409 if exc.code == "INVALID_STATE" else 400
         return jsonify({"success": False, "error": str(exc), "code": exc.code}), status
+    except (UnicodeError, SQLAlchemyError):
+        app_logger.exception("数字人 Agent 数据库不可用")
+        return jsonify({
+            "success": False,
+            "error": "数字人数据服务暂时不可用，请稍后重试",
+            "code": "DATABASE_UNAVAILABLE",
+        }), 503
     except (TypeError, ValueError):
         return jsonify({"success": False, "error": "请求参数格式错误", "code": "INVALID_INPUT"}), 400
+    except Exception:
+        app_logger.exception("数字人 Agent 接口执行失败")
+        return jsonify({
+            "success": False,
+            "error": "数字人 Agent 服务暂时不可用",
+            "code": "INTERNAL_ERROR",
+        }), 500
 
 
 @router.route("/digital-human/agent/runs", methods=["POST"])
