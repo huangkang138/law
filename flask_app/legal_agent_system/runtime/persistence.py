@@ -31,7 +31,10 @@ def _id(prefix: str) -> str:
 class AgentRepository:
     """集中管理运行状态、步骤、工具调用、审批和审计记录。"""
 
-    def create_run(self, goal: str, client_id: str, session_id: Optional[str]) -> AgentState:
+    def create_run(
+        self, goal: str, client_id: str, session_id: Optional[str],
+        task_type: str = "mock_case_summary",
+    ) -> AgentState:
         """在同一事务中创建 Matter、AgentRun 和首条审计事件。"""
         db = SessionLocal()
         try:
@@ -40,11 +43,14 @@ class AgentRepository:
             db.add(matter)
             db.flush()
             run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
-            state = AgentState(run_id=run.id, matter_id=matter.id, client_id=client_id, session_id=session_id, goal=goal)
+            state = AgentState(
+                run_id=run.id, matter_id=matter.id, client_id=client_id,
+                session_id=session_id, goal=goal, task_type=task_type,
+            )
             run.state_json = state.model_dump(mode="json")
             db.add(run)
             db.flush()
-            self._audit(db, run.id, "run_created", {"goal": goal})
+            self._audit(db, run.id, "run_created", {"goal": goal, "task_type": task_type})
             db.commit()
             return state
         except Exception:

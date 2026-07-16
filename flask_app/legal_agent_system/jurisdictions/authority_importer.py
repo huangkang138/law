@@ -19,13 +19,25 @@ class TrustedAuthorityImporter:
     def __init__(self, service) -> None:
         self.service = service
 
-    def import_all(self, provider: AuthorityProvider):
+    def import_all(
+        self,
+        provider: AuthorityProvider,
+        trigger: str = "manual",
+        requested_by: str | None = None,
+    ):
         run_id = f"authority_sync_{uuid.uuid4().hex}"
-        self._create_run(run_id, provider.name)
+        self._create_run(run_id, provider.name, trigger, requested_by)
         try:
             payloads = list(provider.fetch())
             results = []
-            counts = {"fetched_count": len(payloads), "imported_count": 0, "unchanged_count": 0, "review_required_count": 0}
+            provider_errors = list(getattr(provider, "last_errors", []))
+            counts = {
+                "fetched_count": len(payloads),
+                "imported_count": 0,
+                "unchanged_count": 0,
+                "review_required_count": 0,
+                "failed_count": len(provider_errors),
+            }
             for payload in payloads:
                 host = (urlparse(str(payload.canonical_url)).hostname or "").lower()
                 if host not in provider.trusted_domains:
@@ -40,18 +52,40 @@ class TrustedAuthorityImporter:
                 if result["retrieval_status"] == "review_required":
                     counts["review_required_count"] += 1
                 results.append(result)
-            status = "review_required" if counts["review_required_count"] else "completed"
-            self._finish_run(run_id, status, counts)
+            status = (
+                "partial_failed" if provider_errors
+                else "review_required" if counts["review_required_count"]
+                else "completed"
+            )
+            self._finish_run(
+                run_id,
+                status,
+                counts,
+                error_code="PARTIAL_SYNC_FAILED" if provider_errors else None,
+                error_message="; ".join(provider_errors) if provider_errors else None,
+            )
             return results
         except Exception as exc:
             self._fail_run(run_id, exc)
             raise
 
     @staticmethod
-    def _create_run(run_id: str, provider: str) -> None:
+    def _create_run(
+        run_id: str,
+        provider: str,
+        trigger: str,
+        requested_by: str | None,
+    ) -> None:
         db = SessionLocal()
         try:
-            db.add(AuthoritySyncRun(id=run_id, provider=provider, status="running", started_at=datetime.now(timezone.utc)))
+            db.add(AuthoritySyncRun(
+                id=run_id,
+                provider=provider,
+                status="running",
+                trigger=trigger,
+                requested_by=requested_by,
+                started_at=datetime.now(timezone.utc),
+            ))
             db.commit()
         finally:
             db.close()
@@ -87,11 +121,19 @@ class TrustedAuthorityImporter:
             db.close()
 
     @staticmethod
-    def _finish_run(run_id: str, status: str, counts: dict) -> None:
+    def _finish_run(
+        run_id: str,
+        status: str,
+        counts: dict,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
         db = SessionLocal()
         try:
             run = db.get(AuthoritySyncRun, run_id)
             run.status = status
+            run.error_code = error_code
+            run.error_message = error_message
             run.completed_at = datetime.now(timezone.utc)
             for key, value in counts.items():
                 setattr(run, key, value)

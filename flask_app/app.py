@@ -19,6 +19,7 @@ from models.knowledge_graph import KnowledgeNode, KnowledgeRelationship
 from services.legal_agent import get_legal_agent
 from routers import analysis_bp, case_bp, dispute_bp, document_bp, document_drafting_bp, health_bp, knowledge_graph_bp, legal_bp, legal_tools_bp, favorites_bp
 from routers import agent_bp, digital_human_bp, digital_human_agent_bp
+from legal_agent_system.authority_cli import register_authority_commands
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 确保JSON中的中文不被转义为Unicode
@@ -66,6 +67,7 @@ app.register_blueprint(favorites_bp)
 app.register_blueprint(agent_bp)
 app.register_blueprint(digital_human_bp, url_prefix="/api")
 app.register_blueprint(digital_human_agent_bp, url_prefix="/api")
+register_authority_commands(app)
 
 # 注册 WebSocket 路由
 @sock.route('/api/courtroom/ws/<session_id>')

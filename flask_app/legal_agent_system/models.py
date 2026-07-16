@@ -73,8 +73,11 @@ class AuthoritySyncRun(Base):
     imported_count = Column(Integer, nullable=False, default=0)
     unchanged_count = Column(Integer, nullable=False, default=0)
     review_required_count = Column(Integer, nullable=False, default=0)
+    failed_count = Column(Integer, nullable=False, default=0)
     error_code = Column(String)
     error_message = Column(Text)
+    trigger = Column(String, nullable=False, default="manual")
+    requested_by = Column(String)
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True))
 
@@ -99,3 +102,17 @@ class AuthoritySourceSnapshot(Base):
     retrieved_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("sync_run_id", "external_id", name="uq_authority_snapshot_run_source"),)
+
+
+class AuthoritySourceReview(Base):
+    """官网正文变化后的人工复核决策；每次决策独立留痕。"""
+
+    __tablename__ = "authority_source_reviews"
+    id = Column(String, primary_key=True)
+    authority_id = Column(String, ForeignKey("legal_authorities.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_snapshot_id = Column(String, ForeignKey("authority_source_snapshots.id", ondelete="SET NULL"), index=True)
+    decision = Column(String, nullable=False, index=True)
+    reviewer_id = Column(String, nullable=False, index=True)
+    notes = Column(Text)
+    decided_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

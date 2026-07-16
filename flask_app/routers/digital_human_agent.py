@@ -139,8 +139,8 @@ def get_labor_dispute_workflow(matter_id):
 def start_labor_dispute_run(matter_id):
     """兼容入口：可选 task_type 选择三类劳动模板，缺省仍为仲裁申请。"""
     data = request.get_json(silent=True) or {}
-    return _response(lambda: get_legal_agent_facade().start_labor_dispute_run(
-        matter_id, _client_id(), data.get("facts"), data.get("task_type", "cn_labor_dispute"),
+    return _response(lambda: get_legal_agent_facade().start_task(
+        matter_id, _client_id(), data.get("task_type", "cn_labor_dispute"), data.get("facts"),
     ))
 
 
@@ -166,7 +166,7 @@ def continue_labor_dispute_run(run_id):
         action_name = str(data.get("action", "")).strip()
         if not action_name:
             raise AgentRuntimeError("缺少继续动作", "INVALID_INPUT")
-        return get_legal_agent_facade().continue_labor_dispute_run(
+        return get_legal_agent_facade().continue_task(
             run_id, _client_id(), action_name, data.get("payload") or {},
             request.headers.get("Idempotency-Key") or data.get("idempotency_key"),
         )

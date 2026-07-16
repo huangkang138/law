@@ -19,8 +19,6 @@ class TemplatePlanBuilder:
     ) -> PlanRevision:  # 返回一个计划修订对象，包含构建完成的计划信息
         # 根据模板步骤和工作流实例化各个步骤
         steps = [self._instantiate_step(step, workflow) for step in template.steps]
-        # 应用劳动力焦点，根据工作流信息调整步骤的优先级或关注点
-        self._apply_labor_focus(steps, workflow)
         # 构建有效载荷字典，包含模板ID、版本、事实和步骤信息
         payload = {
             "template_id": template.template_id,
@@ -69,15 +67,3 @@ class TemplatePlanBuilder:
         if fact_name:
             return bool((workflow.get("facts") or {}).get(fact_name))
         return bool(condition.get("enabled", False))
-
-    @staticmethod
-    def _apply_labor_focus(steps: list[PlanStep], workflow: Dict[str, Any]) -> None:
-        claims = (workflow.get("facts") or {}).get("claim_types", [])
-        for step in steps:
-            if step.step_id != "evidence_check":
-                continue
-            if "欠薪" in claims:
-                step.name = "核对欠薪期间、金额与工资证据"
-            elif "违法解除" in claims:
-                step.name = "核对解除原因、程序与通知证据"
-

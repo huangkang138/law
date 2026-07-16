@@ -150,19 +150,40 @@ def _document_text(source: RetrievedSource) -> str:
             text = "\n".join(parser.parts)
         else:
             text = decoded
-    return re.sub(r"\s+", "", text)
+    lines = []
+    for line in text.splitlines():
+        normalized = re.sub(r"\s+", "", line)
+        if normalized:
+            lines.append(normalized)
+    return "\n".join(lines)
 
 
 def _extract_articles(text: str, article_numbers: tuple[str, ...]) -> str:
     extracted: list[str] = []
     for number in article_numbers:
         marker = f"第{number}条"
-        start = text.find(marker)
-        if start < 0:
+        heading_starts = [
+            match.start()
+            for match in re.finditer(rf"(?m)^{re.escape(marker)}", text)
+        ]
+        starts = heading_starts or [
+            match.start()
+            for match in re.finditer(re.escape(marker), text)
+        ]
+        if not starts:
             raise AuthorityProviderError(f"官方原文缺少预期条款: {marker}")
-        next_match = re.search(r"第[一二三四五六七八九十百零〇两]+条", text[start + len(marker):])
-        end = start + len(marker) + next_match.start() if next_match else len(text)
-        article = text[start:end]
+        candidates = []
+        for start in starts:
+            remaining = text[start + len(marker):]
+            boundary_pattern = (
+                r"(?m)^第[一二三四五六七八九十百零〇两]+条"
+                if heading_starts
+                else r"第[一二三四五六七八九十百零〇两]+条"
+            )
+            next_match = re.search(boundary_pattern, remaining)
+            end = start + len(marker) + next_match.start() if next_match else len(text)
+            candidates.append(text[start:end].strip())
+        article = max(candidates, key=len)
         if len(article) < len(marker) + 8:
             raise AuthorityProviderError(f"官方条款内容异常短: {marker}")
         extracted.append(article)
@@ -173,7 +194,15 @@ class OfficialCnLaborProvider:
     """实时读取全国人大和人社部官方原文，不提供内置正文降级。"""
 
     name = "official_cn_labor"
-    trusted_domains = frozenset({"www.npc.gov.cn", "flk.npc.gov.cn", "rsj.sh.gov.cn", "chinajob.mohrss.gov.cn", "www.mohrss.gov.cn"})
+    trusted_domains = frozenset({
+        "www.npc.gov.cn",
+        "flk.npc.gov.cn",
+        "rsj.sh.gov.cn",
+        "chinajob.mohrss.gov.cn",
+        "www.mohrss.gov.cn",
+        "www.samr.gov.cn",
+        "fgk.chinatax.gov.cn",
+    })
     sources = (
         OfficialSourceSpec(
             external_id="npc-labor-arbitration-law-27",
@@ -199,13 +228,42 @@ class OfficialCnLaborProvider:
             article_numbers=("二十六", "二十七", "二十八"),
             topic_tags=("仲裁时效", "中断", "中止"),
         ),
+        OfficialSourceSpec(
+            external_id="samr-labor-contract-law-substantive",
+            authority_type="statute",
+            title="中华人民共和国劳动合同法",
+            provision="第三十条、第三十八条至第四十二条、第四十六条至第四十八条、第八十五条、第八十七条",
+            canonical_url="https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/bgt/art/2023/art_0abfdd261c03417b949df19d869add8d.html",
+            fallback_urls=("https://fgk.chinatax.gov.cn/zcfgk/c100009/c5193025/content.html",),
+            issuing_body="全国人民代表大会常务委员会",
+            effective_from="2013-07-01T00:00:00+00:00",
+            article_numbers=(
+                "三十", "三十八", "三十九", "四十", "四十一", "四十二",
+                "四十六", "四十七", "四十八", "八十五", "八十七",
+            ),
+            topic_tags=("欠薪", "劳动报酬", "解除", "经济补偿", "违法解除", "赔偿金"),
+        ),
+        OfficialSourceSpec(
+            external_id="samr-labor-law-wages",
+            authority_type="statute",
+            title="中华人民共和国劳动法",
+            provision="第五十条、第九十一条",
+            canonical_url="https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/bgt/art/2023/art_d9aa750028b14b99a776cb93726a360d.html",
+            fallback_urls=("https://www.npc.gov.cn/zgrdw/npc/zt/2006-03/20/content_347911.htm",),
+            issuing_body="全国人民代表大会常务委员会",
+            effective_from="2018-12-29T00:00:00+00:00",
+            article_numbers=("五十", "九十一"),
+            topic_tags=("欠薪", "工资支付", "劳动报酬"),
+        ),
     )
 
     def __init__(self, client: OfficialSourceClient | None = None) -> None:
         self.client = client or HttpOfficialSourceClient()
+        self.last_errors: list[str] = []
 
     def fetch(self) -> Iterable[AuthorityPayload]:
         payloads: list[AuthorityPayload] = []
+        self.last_errors = []
         for spec in self.sources:
             source = None
             provision_text = None
@@ -219,10 +277,13 @@ class OfficialCnLaborProvider:
                     provision_text = _extract_articles(text, spec.article_numbers)
                     break
                 except Exception as exc:
-                    errors.append(f"{urlparse(source_url).hostname}: {type(exc).__name__}")
+                    errors.append(
+                        f"{urlparse(source_url).hostname}: {self._error_label(exc)}"
+                    )
                     source = None
             if source is None:
-                raise AuthorityProviderError(f"所有官方来源均不可用: {'; '.join(errors)}")
+                self.last_errors.append(f"{spec.external_id}: {'; '.join(errors)}")
+                continue
             content_hash = hashlib.sha256(source.content).hexdigest()
             payloads.append(AuthorityPayload(
                 external_id=spec.external_id,
@@ -243,4 +304,14 @@ class OfficialCnLaborProvider:
                 etag=source.etag,
                 last_modified=source.last_modified,
             ))
+        if not payloads:
+            raise AuthorityProviderError(f"所有官方来源均不可用: {'; '.join(self.last_errors)}")
         return payloads
+
+    @staticmethod
+    def _error_label(exc: Exception) -> str:
+        if isinstance(exc, AuthorityProviderError):
+            return f"AuthorityProviderError({str(exc)[:200]})"
+        if isinstance(exc, httpx.HTTPStatusError):
+            return f"HTTPStatusError({exc.response.status_code})"
+        return type(exc).__name__

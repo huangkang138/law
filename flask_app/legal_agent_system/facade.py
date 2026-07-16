@@ -8,14 +8,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from .runtime.graph import AgentGraph
 from .runtime.persistence import AgentRepository
 from .runtime.registry import ToolRegistry
-from .runtime.runtime import AgentRuntime
 from .runtime.capability_graph import CapabilityRuntimeGraph
 from .runtime.capability_runtime import CapabilityRuntime
 from .capabilities import CapabilityRegistry
-from .domains.labor import build_labor_domain_package
+from .domains.labor import LaborDomainRuntimeAdapter, build_labor_domain_package
+from .domains.mock import MockDomainRuntimeAdapter, build_mock_domain_package
 from .tools import (
     register_authority_verification_tools, register_labor_dispute_tools, register_labor_tools,
     register_material_tools, register_mock_tools,
@@ -24,6 +23,7 @@ from .matters import MaterialService
 from .jurisdictions.authorities import LegalAuthorityService
 from .jurisdictions.authority_importer import TrustedAuthorityImporter
 from .jurisdictions.authority_provider import OfficialCnLaborProvider
+from .jurisdictions.authority_governance import AuthorityGovernanceService
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
 from .labor_disputes import LaborDisputeService, LaborFactSuggestionService
 from . import models as _agent_models  # noqa: F401，注册新增 Agent 表元数据
@@ -39,6 +39,7 @@ class LegalAgentFacade:
         self.authorities = LegalAuthorityService()
         self.authority_importer = TrustedAuthorityImporter(self.authorities)
         self.authority_provider = authority_provider or OfficialCnLaborProvider()
+        self.authority_governance = AuthorityGovernanceService()
         # 生产门面开启自动同步；测试可显式关闭，继续验证“无来源必须阻断”的安全边界。
         self.auto_sync_authorities = auto_sync_authorities
         self.jurisdictions = MatterJurisdictionService()
@@ -51,31 +52,35 @@ class LegalAgentFacade:
         register_labor_tools(self.registry)
         register_labor_dispute_tools(self.registry, self.labor_disputes)
         self.capabilities = CapabilityRegistry(self.registry)
-        self.capabilities.register(build_labor_domain_package())
-        self.runtime = AgentRuntime(self.repository, AgentGraph(self.repository, self.registry))
+        self.capabilities.register(
+            build_labor_domain_package(),
+            LaborDomainRuntimeAdapter(self.materials, self.labor_disputes, self.jurisdictions),
+        )
+        self.capabilities.register(build_mock_domain_package(), MockDomainRuntimeAdapter())
         self.capability_runtime = CapabilityRuntime(
             self.repository,
-            CapabilityRuntimeGraph(
-                self.repository, self.registry, self.capabilities,
-                self.materials, self.labor_disputes,
-            ),
-            self.labor_disputes, self.jurisdictions, self.capabilities,
-            (lambda: self._try_sync_authorities(force=True)) if auto_sync_authorities else None,
+            CapabilityRuntimeGraph(self.repository, self.registry, self.capabilities),
+            self.capabilities,
+            (lambda: self._try_sync_authorities(
+                force=True,
+                trigger="task_retry",
+                requested_by="runtime",
+            )) if auto_sync_authorities else None,
         )
-        # 兼容旧代码读取 labor_runtime 属性；真实执行已统一委托给方案 C Runtime。
-        self.labor_runtime = self.capability_runtime
 
     def start_run(self, goal: str, client_id: str, session_id: Optional[str] = None):
-        """创建并执行任务，直到完成、失败或进入等待用户状态。"""
-        return self.runtime.start(goal, client_id, session_id)
+        """兼容阶段 1 HTTP；内部已统一进入 CapabilityRuntime。"""
+        return self.capability_runtime.start_new_task(
+            goal, client_id, "mock_case_summary", session_id,
+        )
 
     def get_run(self, run_id: str, client_id: str):
         """返回指定客户端可见的任务快照。"""
         return self.repository.snapshot(run_id, client_id)
 
     def resume_run(self, run_id: str, client_id: str, approved: bool):
-        """提交审批决定，并从持久化状态恢复任务。"""
-        return self.runtime.resume(run_id, client_id, approved)
+        """兼容阶段 1审批 HTTP；内部已统一为结构化 continue action。"""
+        return self.continue_task(run_id, client_id, "approve", {"approved": approved})
 
     def cancel_run(self, run_id: str, client_id: str):
         """取消任务及其当前步骤。"""
@@ -115,26 +120,82 @@ class LegalAgentFacade:
         """验证引用在指定法域和日期是否可作为确定依据。"""
         return self.authorities.verify(authority_id, effective_at, country_code)
 
-    def import_official_labor_authorities(self):
+    def import_official_labor_authorities(
+        self,
+        trigger: str = "manual",
+        requested_by: str | None = None,
+    ):
         """由内部可信 Provider 同步官方法源；不提供公开写入接口。"""
-        return self.authority_importer.import_all(self.authority_provider)
+        return self.authority_importer.import_all(
+            self.authority_provider,
+            trigger=trigger,
+            requested_by=requested_by,
+        )
 
-    def _try_sync_authorities(self, force: bool = False):
+    def _try_sync_authorities(
+        self,
+        force: bool = False,
+        trigger: str = "request",
+        requested_by: str | None = None,
+    ):
         """运行入口的安全同步：失败留痕并交给来源验证状态阻断，不返回 500。"""
         external_ids = [item.external_id for item in getattr(self.authority_provider, "sources", ())]
         if not force and self.authorities.has_fresh_sources(self.authority_provider.name, external_ids):
             return {"ok": True, "skipped": True, "reason": "fresh_cache"}
         try:
-            return {"ok": True, "authorities": self.import_official_labor_authorities()}
+            authorities = self.import_official_labor_authorities(
+                trigger=trigger,
+                requested_by=requested_by,
+            )
+            health = self.get_authority_health()
+            return {
+                "ok": health["status"] == "ready",
+                "authorities": authorities,
+                "health": health,
+                "error_code": None if health["status"] == "ready" else "AUTHORITY_COVERAGE_INCOMPLETE",
+            }
         except Exception as exc:
             return {"ok": False, "error_code": type(exc).__name__}
 
     def get_labor_authority_catalog(self):
         """返回劳动纠纷当前可用的官方来源，让用户在运行前也能看到依据。"""
-        sync = self._try_sync_authorities() if self.auto_sync_authorities else {"ok": True}
+        sync = self._try_sync_authorities(
+            trigger="catalog",
+            requested_by="http_catalog",
+        ) if self.auto_sync_authorities else {"ok": True}
         authorities = self.authorities.search("CN", datetime.now(timezone.utc), [])
-        status = "ready" if authorities and sync["ok"] else "degraded" if authorities else "unavailable"
-        return {"status": status, "count": len(authorities), "authorities": authorities, "sync": sync}
+        health = self.get_authority_health()
+        return {
+            "status": health["status"],
+            "count": len(authorities),
+            "authorities": authorities,
+            "sync": sync,
+            "governance": health,
+        }
+
+    def get_authority_health(self):
+        """返回法源覆盖、新鲜度、待复核和最近同步状态。"""
+        external_ids = [item.external_id for item in getattr(self.authority_provider, "sources", ())]
+        return self.authority_governance.health(self.authority_provider.name, external_ids)
+
+    def list_pending_authority_reviews(self):
+        """内部运维读取待复核版本，不暴露原始响应正文。"""
+        return self.authority_governance.pending_reviews(self.authority_provider.name)
+
+    def review_authority_version(
+        self,
+        authority_id: str,
+        decision: str,
+        reviewer_id: str,
+        notes: str | None = None,
+    ):
+        """内部运维复核入口；每次批准或驳回都写入独立审计记录。"""
+        return self.authority_governance.review(
+            authority_id,
+            decision,
+            reviewer_id,
+            notes,
+        )
 
     @staticmethod
     def list_jurisdictions():
@@ -185,15 +246,19 @@ class LegalAgentFacade:
         return self.labor_disputes.create_draft(matter_id, client_id, approved)
 
     def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None, task_type: str = "cn_labor_dispute"):
-        logging.info("启动劳动任务：%s/%s/%s", matter_id, client_id, task_type)
         """兼容入口；默认映射到 labor_arbitration_application 模板。"""
+        return self.start_task(matter_id, client_id, task_type, facts)
+
+    def start_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
+        """启动任一已注册任务；Router 新代码统一调用此入口。"""
+        logging.info("启动 Agent 任务：%s/%s/%s", matter_id, client_id, task_type)
         if self.auto_sync_authorities:
-            self._try_sync_authorities()
-        return self.capability_runtime.start(matter_id, client_id, task_type, facts)
+            self._try_sync_authorities(trigger="task_start", requested_by="runtime")
+        return self.capability_runtime.start_task(matter_id, client_id, task_type, facts)
 
     def start_labor_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
-        """通过能力注册中心启动任一已注册劳动任务。"""
-        return self.start_labor_dispute_run(matter_id, client_id, facts, task_type)
+        """兼容旧劳动命名；新代码使用 start_task。"""
+        return self.start_task(matter_id, client_id, task_type, facts)
 
     def list_agent_capabilities(self):
         """返回可查询的领域与模板元数据，不暴露内部处理器。"""
@@ -214,8 +279,12 @@ class LegalAgentFacade:
         return self.suggest
 
     def continue_labor_dispute_run(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
-        """以补充事实、确认法域、审批或来源重试继续暂停任务。"""
-        return self.capability_runtime.continue_run(run_id, client_id, action, payload, idempotency_key)
+        """兼容旧劳动命名；新代码使用 continue_task。"""
+        return self.continue_task(run_id, client_id, action, payload, idempotency_key)
+
+    def continue_task(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
+        """以结构化动作继续任一已注册任务。"""
+        return self.capability_runtime.continue_task(run_id, client_id, action, payload, idempotency_key)
 
 
 _facade = None

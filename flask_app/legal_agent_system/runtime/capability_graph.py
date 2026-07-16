@@ -1,5 +1,6 @@
-"""方案 C 唯一通用 Runtime Graph；每个节点只处理一个 Step 阶段。
-   当前主执行图；上下文、路由、计划、执行、观察、验证、决策
+"""方案 C 唯一通用 Runtime Graph；只负责上下文、计划和单 Step 执行循环。
+
+task_type 路由由 CapabilityRuntime 在进入 Graph 前完成。
 """
 
 from datetime import datetime, timezone
@@ -19,16 +20,14 @@ from .verifier import LayeredVerifier
 
 class CapabilityRuntimeGraph:
     NODE_NAMES = {
-        "dispatch", "ensure_context", "route_task", "build_plan", "select_next_step",
+        "dispatch", "ensure_context", "build_plan", "select_next_step",
         "execute_step", "observe_step", "verify_step", "decide_step",
     }
 
-    def __init__(self, repository, tool_registry, capability_registry, materials, labor_disputes) -> None:
+    def __init__(self, repository, tool_registry, capability_registry) -> None:
         self.repository = repository
         self.tool_registry = tool_registry
         self.capability_registry = capability_registry
-        self.materials = materials
-        self.labor_disputes = labor_disputes
         self.plan_builder = TemplatePlanBuilder()
         self.executor = PolicyToolExecutor()
         self.verifier = LayeredVerifier()
@@ -37,7 +36,6 @@ class CapabilityRuntimeGraph:
         graph = StateGraph(dict)
         graph.add_node("dispatch", lambda state: state)
         graph.add_node("ensure_context", self._ensure_context)
-        graph.add_node("route_task", self._route_task)
         graph.add_node("build_plan", self._build_plan)
         graph.add_node("select_next_step", self._select_next_step)
         graph.add_node("execute_step", self._execute_step)
@@ -54,8 +52,7 @@ class CapabilityRuntimeGraph:
             "decide_step": "decide_step",
             "stop": END,
         })
-        graph.add_conditional_edges("ensure_context", self._after_context, {"route_task": "route_task", "stop": END})
-        graph.add_edge("route_task", "build_plan")
+        graph.add_conditional_edges("ensure_context", self._after_context, {"build_plan": "build_plan", "stop": END})
         graph.add_conditional_edges("build_plan", self._after_plan, {"select_next_step": "select_next_step", "stop": END})
         graph.add_conditional_edges("select_next_step", self._after_select, {
             "select_next_step": "select_next_step", "execute_step": "execute_step", "stop": END,
@@ -100,7 +97,7 @@ class CapabilityRuntimeGraph:
 
     @staticmethod
     def _after_context(raw: Dict) -> str:
-        return "route_task" if raw["status"] == RunStatus.PLANNING.value else "stop"
+        return "build_plan" if raw["status"] == RunStatus.PLANNING.value else "stop"
 
     @staticmethod
     def _after_plan(raw: Dict) -> str:
@@ -130,55 +127,39 @@ class CapabilityRuntimeGraph:
 
     def _ensure_context(self, raw: Dict) -> Dict:
         state = AgentState.model_validate(raw)
-        try:
-            jurisdiction = self.materials.get_confirmed_jurisdiction(state.matter_id, state.client_id)
-        except AgentRuntimeError as exc:
-            if exc.code != "JURISDICTION_CONFIRMATION_REQUIRED":
-                raise
+        assessment = self._adapter(state).assess_context(state)
+        if assessment.outcome == "awaiting_jurisdiction":
             state.status = RunStatus.AWAITING_JURISDICTION
-            state.questions = ["请明确确认本案件的适用法域和地区。"]
-            state.error_code = "JURISDICTION_CONFIRMATION_REQUIRED"
+            state.questions = assessment.questions
+            state.error_code = assessment.error_code
             self.repository.save_state(state, "run_waiting_for_jurisdiction")
             return state.model_dump(mode="json")
-        if jurisdiction["country_code"] != "CN":
+        if assessment.outcome == "human_handoff":
             state.status = RunStatus.HUMAN_HANDOFF
-            state.blocked_reason = "劳动领域能力包当前只支持中国法域"
-            state.error_code = "UNSUPPORTED_JURISDICTION"
+            state.blocked_reason = assessment.blocked_reason
+            state.error_code = assessment.error_code
             self.repository.save_state(state, "run_handoff_required")
             return state.model_dump(mode="json")
-
-        workflow = self.labor_disputes.get_workflow(state.matter_id, state.client_id)
-        if workflow["missing_facts"]:
+        if assessment.outcome == "awaiting_information":
             state.status = RunStatus.AWAITING_INFORMATION
-            state.missing_facts = workflow["missing_facts"]
-            state.questions = workflow["questions"]
-            state.error_code = "INFORMATION_REQUIRED"
+            state.missing_facts = assessment.missing_facts
+            state.questions = assessment.questions
+            state.error_code = assessment.error_code
             self.repository.save_state(state, "run_waiting_for_information", {"missing_facts": state.missing_facts})
             return state.model_dump(mode="json")
+        if assessment.outcome != "ready":
+            raise AgentRuntimeError(f"未知领域上下文结果: {assessment.outcome}", "INVALID_DOMAIN_CONTEXT")
         state.status = RunStatus.PLANNING
         state.missing_facts = []
         state.questions = []
         state.error_code = None
         return state.model_dump(mode="json")
 
-    def _route_task(self, raw: Dict) -> Dict:
-        state = AgentState.model_validate(raw)
-        package, template = self.capability_registry.resolve(state.task_type)
-        state.domain_id = package.domain_id
-        state.template_id = template.template_id
-        state.template_version = template.version
-        self.repository.save_state(state, "task_routed", {
-            "domain_id": package.domain_id,
-            "task_type": state.task_type,
-            "template_id": template.template_id,
-            "template_version": template.version,
-        })
-        return state.model_dump(mode="json")
-
     def _build_plan(self, raw: Dict) -> Dict:
         state = AgentState.model_validate(raw)
+        adapter = self._adapter(state)
         template = self.capability_registry.get_template(state.template_id)
-        workflow = self.labor_disputes.get_workflow(state.matter_id, state.client_id)
+        workflow = adapter.get_workflow(state)
         revision = self.plan_builder.build(
             template,
             workflow,
@@ -186,6 +167,7 @@ class CapabilityRuntimeGraph:
             replan_reason=state.replan_reason,
             triggered_by="runtime",
         )
+        revision = adapter.customize_plan(revision, workflow)
         if len(revision.steps) > state.max_steps:
             state.status = RunStatus.FAILED
             state.error_code = "BUDGET_EXCEEDED"
@@ -250,8 +232,11 @@ class CapabilityRuntimeGraph:
         step = self.repository.get_step(state.run_id, state.current_step_index + 1, state.plan_revision)
         self.repository.set_step_status(state.run_id, step.id, StepStatus.RUNNING)
         definition, handler = self.tool_registry.get(step.tool_name)
-        arguments = {"matter_id": state.matter_id, "client_id": state.client_id}
-        result = self.executor.execute(definition, handler, arguments, "CN", state.approved is True)
+        adapter = self._adapter(state)
+        arguments = adapter.tool_arguments(state, step)
+        result = self.executor.execute(
+            definition, handler, arguments, adapter.jurisdiction_code(state), state.approved is True,
+        )
         state.tool_call_count += 1
         self._record_usage(state, result)
         state.tool_result_ids.append(result.tool_call_id)
@@ -291,6 +276,7 @@ class CapabilityRuntimeGraph:
             state,
             list(step.verification_policy_ids or []),
             self._step_on_failure(state, step.template_step_id),
+            self._adapter(state),
         )
         state.last_verification = verification
         state.status = RunStatus.DECIDING
@@ -364,7 +350,15 @@ class CapabilityRuntimeGraph:
         template = self.capability_registry.get_template(state.template_id)
         return next(item.on_failure for item in template.steps if item.step_id == template_step_id)
 
+    def _adapter(self, state: AgentState):
+        return self.capability_registry.get_adapter(state.domain_id)
+
     def invoke(self, state: AgentState) -> AgentState:
+        if not state.domain_id or not state.template_id or not state.template_version:
+            raise AgentRuntimeError(
+                "Run 尚未绑定领域和计划模板，请通过 CapabilityRuntime 调用 Graph",
+                "CAPABILITY_NOT_RESOLVED",
+            )
         return AgentState.model_validate(self.compiled.invoke(state.model_dump(mode="json")))
 
     @staticmethod

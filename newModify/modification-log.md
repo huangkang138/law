@@ -450,3 +450,65 @@
 - 实际改动：新增 `flask_app/models/数据库表新增清单.md`；追加本修改记录。
 - 验证：初始 SQL 为 54 张、当前实库为 77 张，差集 23 张与文档逐表清单完全一致；Markdown 清单计数和 `git diff --check` 通过。
 - 风险与后续：统计基线是仓库现有 `sql/public.sql`，不是 Git 最早历史提交；若以后替换初始 SQL 快照，应重新计算差集。
+
+## 2026-07-16 15:38:05 +08:00
+
+- 会话 ID：`019f6703-dccf-7a10-825b-73928bbebd43`。
+- 分支/Git 状态：当前分支 `master`；工作树已有阶段 3.6、前端、测试、迁移、上传材料和图件等改动，本次仅增量修改 Agent 入口、能力解析、Graph、相关测试与架构文档。
+- 用户请求：当前 Agent 代码不利于分析和维护，按已讨论方向统一入口、减少重复解析并明确 Runtime/Graph 职责。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、阶段 3.6 总体规划、最新项目分析、相关修改历史，以及 Router、Facade、Capability Registry、CapabilityRuntime、CapabilityRuntimeGraph、Repository 和阶段 3.1/3.2/3.6 测试源码。
+- 修改思路：保留现有 HTTP 路径和 Facade 旧方法签名，避免破坏前端；新代码统一调用通用任务入口；能力路由只在 Runtime 用例层执行一次，Graph 不再同时承担任务解析。
+- 具体方案：新增 `Facade/CapabilityRuntime.start_task` 与 `continue_task`；旧劳动命名方法保留为兼容包装；`resolve()` 返回带字段名且兼容元组解包的 `ResolvedCapability`；Runtime 将领域/模板绑定并审计到 Run；移除 Graph 的 `route_task`；未绑定 Run 直接调用 Graph 时返回明确的 `CAPABILITY_NOT_RESOLVED`。
+- 实际改动：修改能力注册、Runtime、Graph、Facade、数字人 Agent Router 和阶段 3.2/3.6 测试；同步更新 README、详细 Agent 分析、总体规划、最新项目分析，以及入口/Runtime 两组 Mermaid、SVG、PNG、Excalidraw 图件。
+- 验证：Python compileall 通过；阶段 3.1/3.2/3.6 共 12 个用例通过；应用导入成功并注册 200 条路由；两组 SVG/XML、Excalidraw JSON、README 本地链接和 `git diff --check` 通过；图件已离线渲染并完成视觉检查。
+- 风险与后续：HTTP 路径和返回契约未变化；旧劳动命名方法及 `labor_runtime` 兼容别名暂时保留。通用 Graph 内部仍直接依赖劳动上下文服务，后续接入第二领域前应再抽取 Domain Runtime Adapter；应用导入仍输出既有 NumPy/pyarrow、OCR/PDF 可选依赖警告，本次未修改该环境问题。
+
+## 2026-07-16 20:25:00 +08:00
+
+- 会话 ID：`019f6703-dccf-7a10-825b-73928bbebd43`；关联架构决策会话 `019f66aa-b826-7f01-a8de-b93ef323043f`。
+- 用户请求：执行阶段 3.6 的“领域解耦与旧架构清理”，并确保代码规范、便于后续维护和交接。
+- 修改前检查：重新读取仓库规则、总体规划、最新分析、相关历史和当前源码，检查并保留工作树中已有的阶段 3.6、前端、迁移、测试、上传材料和图件改动。
+- 架构改动：新增 `DomainRuntimeAdapter` 与 `ContextAssessment`；`CapabilityRegistry` 成对注册 `DomainPackage + Adapter`；通用 Runtime/Graph 只依赖 Adapter 契约。劳动上下文、计划定制、工具参数、法域、继续动作和劳动校验下沉到 `domains/labor/`。
+- 旧架构清理：阶段 1 模拟摘要迁入 `domains/mock/` 普通能力包，旧 HTTP 方法仅保留 Facade 薄包装；删除 `runtime/runtime.py`、`graph.py`、`labor_runtime.py`、`labor_graph.py`、`planner.py`，项目只保留 `CapabilityRuntime + CapabilityRuntimeGraph` 一套执行内核。
+- 可维护性：通用 `TemplatePlanBuilder` 移除劳动争议名称定制；`LayeredVerifier` 只负责全局校验和领域报告聚合；新增架构边界测试，禁止旧内核文件回归及 Runtime 直接导入领域 Service。README、详细分析、总体规划、最新分析和包关系图同步更新。
+- 验证：Python compileall 通过；阶段 1、3.2、3.6 和架构边界共 14 个专项测试通过；数字人阶段全量 32 个用例中 31 个通过，唯一失败是既有官方来源残留快照唯一键 fixture 问题；应用导入成功并注册 200 条路由；`git diff --check` 通过。包关系 Mermaid 已离线生成 SVG、PNG、Excalidraw，并完成视觉检查。
+- 风险与后续：真实法律领域当前仍只有中国劳动，`domains/mock` 只承担旧阶段 1 兼容，不能算第二法律领域；阶段 3.5 的法源复核、监控、权限和长期运行保障仍按用户要求暂缓。后续新增领域必须走 `DomainPackage + DomainRuntimeAdapter + 领域评测`，不得复制 Graph。
+## 2026-07-16 21:35:00 +08:00
+
+- 会话 ID：`019f6b12-00d7-72e2-9760-29e31a326a40`。
+- 分支/Git 状态：当前分支 `master`；修改前已有方案 C、前端工作台、测试、迁移、上传材料和图件等大量未提交改动，本次全部保留，仅增量修改法源治理、官方来源、相关前端状态、测试和文档。
+- 用户请求：在方案 C 已落地后优先完善法源闭环。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、`raw/多法域数字人法律Agent总体规划.md`、最新分析、法源相关历史，以及当前 Provider、Importer、Authority Service、Facade、模型、迁移、Router、前端法源状态和测试。
+- 修改思路：不继续扩 Runtime；先补最小生产级法源治理，保持普通 HTTP/Agent 无写权限，官网正文变化必须由法律专业人员复核，所有不完整来源继续失败关闭。
+- 具体方案：新增同步/健康/待复核/复核 CLI；新增复核决策审计表及同步触发字段；健康状态统计覆盖、新鲜度、缺失、失败和待复核；逐来源同步允许部分进展但整体门禁不放松；修复跨批次快照约束和官网条文截断；扩充劳动合同法与劳动法官方条款。
+- 实际改动：`app.py`、`authority_cli.py`、Facade、Authority Provider/Importer/Governance、Agent 法源模型、`20260716_0005`～`0007` 迁移、法源治理/Provider 测试、前端 API 契约和法源状态展示、Agent README、总体规划、最新项目分析及本日志。
+- 官方来源核对：只采用国家机关官方页面；新增市场监管总局《劳动合同法》《劳动法》页面及国家税务总局法规库备用页，没有加入商业法律网站或内置法条降级。
+- 验证：Python compileall 通过；Alembic 当前为 `20260716_0007 (head)`，增量离线 SQL 通过；数字人 Agent 全量 39/39 测试通过；前端 `npx tsc --noEmit` 和 `git diff --check` 通过；CLI help、health 和真实官网同步均实际运行。
+- 真实同步结果：四组来源均已成功抓取。新增《劳动合同法》《劳动法》实体条款为 `verified`；两个时效来源因从历史版本切换到官网正文进入 `review_required`，健康状态为 `degraded`。未擅自替代法律专业人员批准，因此依赖时效来源的确定性结论继续安全阻断。
+- 风险与后续：需要法律专业人员运行 `authority pending` 对照候选/旧版正文，再用 `authority review` 填写依据并批准或驳回；部署环境仍需实际配置定时任务和告警接收端。应用 CLI 启动会输出既有 NumPy/pyarrow 与 OCR 可选依赖警告，不影响法源命令执行，但应另行治理依赖环境。
+
+## 2026-07-16 21:50:00 +08:00
+
+- 用户请求：解释 CLI，并参考常见 Agent 架构画一张更简单、易理解的项目框架图。
+- 设计取舍：参考 LangGraph 官方文档中“步骤、状态、人工介入”的表达方式，但不复制其工程细节；主图仅保留用户、法律 Agent、能力包、工具与官方法源、安全校验、结果六个节点。
+- 实际改动：新增 `diagrams/legal-agent-simple.mmd`、`.svg`、`.png`、`.excalidraw` 四种图件；没有修改运行时代码、接口、数据模型或现有复杂架构图。
+- 验证：完成离线渲染和视觉检查；Mermaid 中文经 UTF-8 传输，SVG 可解析且中文标签完整，Excalidraw JSON 有效，PNG 已生成。
+
+## 2026-07-16 22:05:00 +08:00
+
+- 用户纠正：上一张图是业务流程，不是期望的 Agent 框架；要求采用网上常见、直观的 Agent 架构表达。
+- 参考方式：检索常见 Agent Anatomy/Runtime 图，采用“中心 Agent 核心 + 能力、记忆、工具、知识、安全护栏”的中心辐射结构，并映射到本项目实际能力。
+- 实际改动：新增 `diagrams/legal-agent-internal-simple.mmd`、`.svg`、`.png`、`.excalidraw`；图中不展示源码调用顺序，只展示 Agent 的核心组成和边界。
+- 验证：完成离线渲染与视觉检查；SVG 中文标签正常，Excalidraw JSON 有效，PNG 已生成；未修改业务代码、接口或数据结构。
+- 后续校正：明确 `Verifier` 只是安全护栏的一部分，护栏还包含工具策略和人工审批；将法律知识改为“可信法律知识库”，并补画“白名单官方网站 -> 法源治理 CLI -> 已同步、已审核法源”的后台治理链路，避免误解为 Agent 每次运行都通过 CLI 上网检索。
+
+## 2026-07-16 22:40:00 +08:00
+
+- 会话 ID：`019f6b12-00d7-72e2-9760-29e31a326a40`。
+- 分支/Git 状态：当前分支 `master`；工作树已有 Agent、前端、迁移、测试、法源治理和图件等未提交改动，本次全部保留。
+- 用户请求：阅读当前法律 Agent 源码，按整体流程、核心模块、劳动欠薪案例、单步循环和源码对应关系整理成项目文档。
+- 修改前阅读：仓库协作规则、Agent 总体规划、最新项目分析、相关修改历史，以及 Router、Facade、CapabilityRuntime、CapabilityRuntimeGraph、能力模板、领域 Adapter、工具执行器、Observer 节点、Verifier、DecisionRouter、Repository、劳动规则与专项测试。
+- 修改思路：严格区分普通数字人聊天与可执行 Agent Runtime；以当前源码和阶段 3.6 测试为依据，不把目标架构或通用 Agent 理论写成已实现能力。
+- 实际改动：新增 `flask_app/legal_agent_system/实际Agent架构与运行流程.md`；记录八节点主流程、核心模块输入输出、欠薪咨询真实执行条件、单 Step 循环、预算边界、源码对应表及未实现项。
+- 验证：核对文档中的节点名、模板步骤、状态分支、默认预算和源码路径；未修改业务代码、接口、数据结构或运行配置。
+- 风险与后续：当前普通聊天不会自动启动 Agent，Planner 是确定性模板构建器，且没有独立自然语言 Response Generator；文档已明确标注这些边界。

@@ -1443,7 +1443,7 @@ flowchart TD
 
 ## 22. 方案 C 最终目标架构（2026-07-16 决策）
 
-本节描述已确认的长期目标，不代表当前源码已经完成。当前生产主链路仍是 `LaborDisputeGraph`、`LaborPlanBuilder` 和劳动纠纷三步计划。
+本节最初用于描述长期目标。到 2026-07-16，通用 Runtime、能力注册和领域 Adapter 已落地；跨领域和第二法域仍未完成。
 
 ### 22.1 架构定位
 
@@ -1463,8 +1463,9 @@ Subgraph = 特殊控制流程扩展
 ```mermaid
 flowchart LR
     D["Domain Package"] --> R["Capability Registry"]
-    G["Runtime Graph"] --> T["Task Router"]
-    T --> R
+    U["Capability Runtime"] --> R
+    R --> B["Resolved Capability"]
+    B --> G["Runtime Graph"]
     G --> P["Constrained Planner"]
     P --> R
     R --> C["Templates / Tools / Policies / Optional Subgraphs"]
@@ -1478,9 +1479,9 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["dispatch"] --> B["ensure_context"]
-    B --> C["route_task"]
-    C --> D["build_plan"]
+    R["Runtime resolves and binds capability"] --> A["dispatch"]
+    A --> B["ensure_context"]
+    B --> D["build_plan"]
     D --> E["select_next_step"]
     E --> F["execute_step"]
     F --> G["observe_step"]
@@ -1501,8 +1502,8 @@ flowchart TD
 
 | 节点 | 责任 |
 |---|---|
+| `CapabilityRuntime.resolve` | 在进入 Graph 前把 `task_type` 一次解析为领域包和模板，并绑定到 Run |
 | `ensure_context` | 检查目标、法域、事实、材料和权限，不完整时暂停追问 |
-| `route_task` | 从注册能力中确定 `domain_id` 和 `task_type` |
 | `build_plan` | 选择模板、填充参数、处理允许的可选步骤，创建新 Plan revision |
 | `execute_step` | 只执行一个 Step，通过 ToolRegistry 和 PolicyToolExecutor 调用白名单工具 |
 | `observe_step` | 将 ToolResult、引用、状态变化和使用量标准化为可验证 Observation |
@@ -1623,8 +1624,22 @@ Verifier 只生成结构化报告；Decision Router 才能决定运行状态。�
 
 - `capabilities/contracts.py` 定义 `DomainPackage`、`PlanTemplate`、`TemplateStep`、`PlanRevision`；`CapabilityRegistry` 是领域、路由和模板的唯一查询入口。
 - `domains/labor/package.py` 注册劳动仲裁申请、劳动咨询、劳动案件分析三模板；`cn_labor_dispute` 仅是旧入口别名，不再决定 Graph 结构。
-- `runtime/capability_graph.py` 是当前劳动真实业务使用的通用 Graph，单 Step 严格经过 select/execute/observe/verify/decide。原 `LaborDisputeGraph` 文件暂留作迁移兼容，但 Facade 不再实例化它。
+- `runtime/capability_graph.py` 是唯一通用 Graph，单 Step 严格经过 select/execute/observe/verify/decide。旧 `AgentGraph` 和 `LaborDisputeGraph` 已删除。
 - 分层 Verifier 报告、Decision Router 决策、工具原始结果和 Observation 分开持久化；失败工具不能被记录为 skipped，可选步骤必须有 `skip_reason`。
 - `agent_plans` 追加保存模板版本、父计划、重规划原因和触发者；`agent_steps` 保存步骤类型、审批、验证策略以及观察/验证/决策快照。迁移版本为 `20260716_0004`。
 - `POST /labor-dispute/run` 保持原路径，新增可选 `task_type`；默认仍为 `cn_labor_dispute`。新增 `GET /digital-human/agent/capabilities` 用于查询当前注册能力。
 - 当前已证明“同领域多任务不修改 Runtime Graph”；跨领域和第二法域仍属于后续阶段，不应据此宣称全部多法域能力已经完成。
+
+### 22.10 领域解耦与旧架构清理（2026-07-16）
+
+```text
+HTTP -> Facade -> CapabilityRuntime -> CapabilityRegistry.resolve
+                                  -> DomainRuntimeAdapter
+                                  -> CapabilityRuntimeGraph
+                                  -> Tool -> Verify -> Decide
+```
+
+- `CapabilityRegistry` 现在成对注册 `DomainPackage + DomainRuntimeAdapter`。Package 声明任务和模板，Adapter 提供上下文、领域计划定制、工具参数、法域、领域校验和继续动作。
+- 劳动事实、劳动法域和劳动结果校验已从通用 Graph/Verifier 移到 `domains/labor/adapter.py` 与 `domains/labor/verifier.py`。
+- 阶段 1 模拟摘要改成 `domains/mock/` 普通能力包；旧 `start_run/resume_run` 只是 Facade 兼容包装，内部进入同一个 Capability Runtime。
+- 已删除 `runtime/runtime.py`、`runtime/graph.py`、`runtime/labor_runtime.py`、`runtime/labor_graph.py`、`runtime/planner.py`。项目现在只有一套 Agent 执行内核。

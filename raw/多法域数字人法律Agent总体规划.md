@@ -3,7 +3,7 @@
 更新时间：2026-07-16
 规划对象：YYS-Law 全局数字人“法小助”  
 规划性质：长期目标架构与分阶段实施基线
-当前决策：采用方案 C“统一 Runtime Graph + 可插拔 Domain Package + 声明式 PlanTemplate + 运行时版本化 Plan”。阶段 3.6 已完成首批落地：Capability Registry、通用单步循环、不可变 Plan revision 与中国劳动领域三模板已实现；阶段 3.5 的生产可信化待办仍按原安全门槛继续，其他领域尚未接入。
+当前决策：采用方案 C“统一 Runtime Graph + 可插拔 Domain Package + 声明式 PlanTemplate + 运行时版本化 Plan”。阶段 3.6 已完成：Capability Registry、DomainRuntimeAdapter、通用单步循环、不可变 Plan revision、劳动三模板和旧执行内核清理均已实现；阶段 3.5 的生产可信化待办仍按原安全门槛继续，其他真实法律领域尚未接入。
 
 ## 1. 最终目标
 
@@ -337,13 +337,15 @@ human_handoff
 ```text
 用户文字 / 语音 / 文件输入
         ↓
-dispatch：恢复或创建 Run
+CapabilityRuntime：启动或恢复 Run
+        ↓
+Capability Registry：把 task_type 一次解析为领域包和计划模板，并绑定到 Run
+        ↓
+dispatch：根据 Run 当前状态选择 Graph 入口
         ↓
 ensure_context：检查目标、法域、事实、材料和权限
         ├─ 不完整 → 持久化等待并追问用户
         └─ 完整
-              ↓
-route_task：从 Capability Registry 选择 domain_id / task_type
               ↓
 build_plan：选择 PlanTemplate，生成新的 Plan revision
               ↓
@@ -706,14 +708,22 @@ human_handoff
 
 待完成：
 
-- 由法律专业人员审核首批官网快照和规则金标；建立复核操作台及复核人/复核时间审计字段。
+- 由法律专业人员审核首批官网快照和规则金标。工程侧已提供待复核列表、候选/旧版正文对照、批准/驳回 CLI，以及复核人、说明和时间审计；当前真实同步产生的两个时效来源新版本仍处于 `review_required`，不得自动启用。
 - 扩充欠薪、违法解除、补偿/赔偿的实体规则和真实脱敏评测，不将当前日历计算视为完整法律意见。
-- 建立法源定时同步任务、失败告警、Outbox 消费监控、备份恢复演练和多实例压测。
+- 在部署环境配置法源定时任务和告警接收端；工程侧已提供 `authority sync`、`health --strict`、逐来源 `partial_failed` 和非零退出码。Outbox 消费监控、备份恢复演练和多实例压测仍待完成。
 - 完成登录身份、Matter 权限、敏感材料加密和审计留存策略。
+
+2026-07-16 法源治理第二批已完成：
+
+- 新增 `authority_source_reviews`，正文变化后的批准/驳回均独立记录复核人、说明、快照和时间。
+- 同步批次记录 `trigger`、`requested_by` 和逐来源 `failed_count`；同一批次允许成功来源入库、失败来源继续阻断，整体健康门禁不因部分成功而放宽。
+- 修复官网目录和正文重复条号导致的错误截断：优先识别行首条文标题，同一条号选择最长正文，正文中的条款引用不再被误判为边界。
+- 首批来源从两组时效条款扩展为四组，增加《劳动合同法》欠薪、解除、经济补偿、违法解除条款和《劳动法》工资支付条款，均来自官方白名单站点。
+- 本地真实同步已抓取四组来源；两组新增实体法来源为 `verified`，两组从历史摘要切换到官网正文的时效来源进入 `review_required`，当前法源健康状态为 `degraded`，系统继续失败关闭。
 
 阶段 3.5 验收门槛：确定性结论有效法源覆盖率 100%；无依据确定性结论为 0；事实/法源变化后旧草稿失效 100%；并发继续请求不重复执行工具；同步失败可告警且任务安全阻断。
 
-### 阶段 3.6：方案 C 通用 Runtime 与能力注册（首批已完成，2026-07-16）
+### 阶段 3.6：方案 C 通用 Runtime、领域解耦与旧架构清理（已完成，2026-07-16）
 
 目标：把劳动专用 Graph 提炼为一套全局 Runtime Graph，并让现有法律功能通过 Domain Package 渐进接入。
 
@@ -724,16 +734,20 @@ human_handoff
 5. 增加 `labor_consultation`、`labor_case_analysis` 两个只读模板，验证同一领域多任务。
 6. Plan revision 不可覆盖更新；可选步骤必须记录跳过原因；模板、工具和验证策略均记录版本。
 7. 迁移过程保留旧页面和旧接口，每次接入一个领域；新 Runtime 稳定并通过回归后再切换入口。
+8. 领域运行差异统一通过 `DomainRuntimeAdapter` 接入；通用 Runtime 禁止直接依赖领域 Service。
 
 验收：新增模板不修改 Runtime Graph；同一模板可因事实不同生成不同 Plan；Verifier 可触发补充信息、单步重试或新 revision；劳动三类任务共享同一单步执行内核；现有劳动仲裁闭环行为保持兼容。
 
 实施结果：
 
 - 新增 `capabilities/` 契约和注册中心，领域包注册前校验模板、路由和工具白名单，重复注册失败关闭。
-- 新增唯一 `CapabilityRuntimeGraph`，固定节点为 `ensure_context → route_task → build_plan → select_next_step → execute_step → observe_step → verify_step → decide_step`；Graph 内无劳动仲裁或文书工具名。
+- 新增唯一 `CapabilityRuntimeGraph`，当前固定节点为 `dispatch → ensure_context → build_plan → select_next_step → execute_step → observe_step → verify_step → decide_step`；`task_type` 在进入 Graph 前由 `CapabilityRuntime` 每次请求解析一次并绑定到 Run，Graph 内不再重复路由，也没有劳动仲裁或文书工具名。
 - `LayeredVerifier` 只生成 Global/Domain/Task 报告，`DecisionRouter` 独立产生 next/retry/context/replan/reject/handoff/finish；审批由步骤声明在执行前暂停。
 - `agent_plans` 的每一行作为不可覆盖 revision，记录 domain、模板及版本、触发者、重规划原因和父计划；Step 保存类型、策略版本、跳过原因、Observation、Verification 和 Decision。
 - 中国劳动能力包注册 `labor_arbitration_application`、`labor_consultation`、`labor_case_analysis`。旧 `cn_labor_dispute` 作为路由别名，旧 Router/Facade 方法签名与页面继续兼容。
+- `CapabilityRegistry` 成对注册 `DomainPackage + DomainRuntimeAdapter`。劳动事实、法域、计划定制、工具参数和劳动校验已下沉到 `domains/labor/`；阶段 1 模拟摘要已下沉为 `domains/mock/` 能力包。
+- 已删除两套旧执行内核及旧劳动 Planner：`runtime/runtime.py`、`runtime/graph.py`、`runtime/labor_runtime.py`、`runtime/labor_graph.py`、`runtime/planner.py`。旧 HTTP 方法只保留 Facade 薄包装。
+- 新增架构边界测试，禁止旧文件回归，并禁止通用 Runtime 直接导入 domains、labor_disputes、matters、jurisdictions。
 - Alembic 已升级到 `20260716_0004`；阶段 3.1、3.2、3.6 相关 10 个回归通过，前端 TypeScript 检查通过。
 
 ### 阶段 4：实时 2D 数字人
@@ -882,10 +896,10 @@ human_handoff
 
 ## 18. 下一步执行入口
 
-阶段 3.4A～3.4E 和阶段 3.6 首批已落地，阶段 3.5 仍有生产可信化待办。下一步执行入口：
+阶段 3.4A～3.4E 和阶段 3.6 已落地，阶段 3.5 仍有生产可信化待办。下一步执行入口：
 
 1. 继续完成法源复核、规则金标、定时同步告警、权限和长期运行等阶段 3.5 安全门槛。
-2. 完成阶段 3.6 的运行监控和更多失败/恢复评测，继续观察旧入口兼容性。
+2. 补充阶段 3.6 的运行监控和更多失败/恢复评测；旧入口只观察 Facade 兼容包装，不再维护旧 Runtime。
 3. 按“法律咨询 → 合同审查 → 案件分析/纠纷 → 文书 → 其他工具”的顺序注册新 Domain Package；新增模板不得修改全局 Graph。
 4. 第二领域优先接入只读合同审查，用它验证跨领域注册、来源策略和工具隔离。
-5. 新 Runtime 稳定并满足生产门槛后，再移除未被调用的劳动专用 Graph；移除前保持代码兼容。
+5. 新领域必须实现 `DomainPackage + DomainRuntimeAdapter + 领域评测`，不得复制 Runtime Graph。

@@ -266,6 +266,17 @@ npm run dev
 - 劳动仲裁时效从固定 `+365天` 改为自然年推进；2月29日下一年落到2月28日。劳动关系存续欠薪返回开放期限类型而非伪造截止日期，并强制人工复核。
 - 无数据库专项测试 6/6 通过，覆盖官方条文精确抽取、原始快照、缺条失败关闭、HTTPS/域名限制、自然年日期和超时不重试；真实官网连接在本机代理/TLS环境中存在间歇失败，失败关闭路径符合预期。
 
+### 阶段 3.5：法源治理闭环第二批（2026-07-16）
+
+- 新增内部法源 CLI：`authority sync/health/pending/review`。同步和严格健康检查在未全部就绪时返回非零退出码，可交给 Windows 任务计划程序、容器 CronJob 或监控系统；普通 HTTP 与 Agent 仍不能批准、驳回或写入法源。
+- 新增 `authority_source_reviews` 表；法源正文变化必须由法律专业人员填写对照依据后批准或驳回，记录复核人、决定、说明、原始快照和时间。Alembic 已升级到 `20260716_0007`。
+- 同步批次新增触发来源、执行者和失败来源数。Provider 改为逐来源失败关闭：单站失败不再让整批零进展，但失败来源仍不可用，健康状态只有全部必需来源新鲜且已验证时才为 `ready`。
+- 修复实库历史快照唯一约束与“每批保存原始响应”冲突的问题；批次内仍按来源唯一，跨批次允许保存相同官网响应用于审计。
+- 修复官网目录与正文重复条号、正文内引用其他条款导致的错误截断，改为优先识别行首条文标题并选择最长候选正文。
+- 官方来源从两组仲裁时效条款扩展为四组，新增《劳动合同法》欠薪、解除、经济补偿、违法解除条款和《劳动法》工资支付条款；新增域名仅包含市场监管总局和国家税务总局法规库官方站点。
+- 本地真实同步已成功抓取四组来源：新增两组实体法来源已验证；两组时效来源因从历史版本切换到官网正文进入 `review_required`。当前健康状态为 `degraded`，在法律专业人员完成复核前继续阻断依赖时效来源的确定性结论。
+- 新增法源治理专项测试；数字人 Agent 全量 39 项测试通过，前端 TypeScript、Python compileall、迁移 head 与差异检查通过。
+
 ### 数字人数据库故障恢复与错误可见性（2026-07-14）
 
 - 截图中的历史会话和案件记录没有被删除。当前浏览器匿名客户端在 PostgreSQL 中仍有 4 条会话、20 条消息和 7 条案件记录；此前“记录消失”是数据库运行账号不存在导致列表接口整体失败。
@@ -288,12 +299,21 @@ npm run dev
 ### 阶段 3.6：方案 C Runtime 首批落地（2026-07-16）
 
 - 新增 `capabilities/` 与 `domains/labor/`：Capability Registry 统一注册领域包、任务路由、三类 PlanTemplate、工具声明和验证策略；注册时校验模板工具白名单，拒绝重复或不完整能力。
-- 新增 `CapabilityRuntimeGraph`，真实劳动入口现统一执行 `select → execute → observe → verify → decide` 单 Step 内核。业务工具和仲裁草稿不再是 Graph 节点，旧 `LaborDisputeGraph` 暂留但 Facade 已不实例化。
+- 新增 `CapabilityRuntimeGraph`，真实劳动入口现统一执行 `select → execute → observe → verify → decide` 单 Step 内核。业务工具和仲裁草稿不再是 Graph 节点，旧专用 Graph 已删除。
+- 入口职责已进一步收口：Router 统一调用 `Facade.start_task/continue_task`；`CapabilityRuntime` 每次请求只调用一次 `CapabilityRegistry.resolve` 并把领域/模板绑定到 Run；Graph 已移除重复的 `route_task` 节点，只负责上下文、计划和单 Step 循环。旧劳动命名方法保留为兼容包装。
 - 劳动能力包提供 `labor_arbitration_application`、`labor_consultation`、`labor_case_analysis`；旧 `cn_labor_dispute` 作为仲裁模板别名，原 Router、Facade 和前端页面保持兼容。只读咨询与案件分析不会进入文书审批或生成 Artifact。
 - Verifier 拆为 Global/Domain/Task 报告，Decision Router 独立路由；步骤持久化 Observation、Verification、Decision、验证策略版本和可选步骤跳过原因。
 - `agent_plans` 现在按行保存不可覆盖 revision、模板版本、父计划、重规划原因和触发者；Alembic `20260716_0004` 已应用到本地 PostgreSQL。
 - API 新增能力查询，原劳动启动 API 新增可选 `task_type`；前端运行快照契约已同步模板、revision 和步骤审计字段。
 - 阶段 3.1/3.2/3.6 相关 10 个用例通过，`npx tsc --noEmit` 和 `git diff --check` 通过。全量 30 个用例中另有 2 个既有环境/fixture 问题：Loguru 多进程管道被沙箱拒绝、官方来源残留快照撞唯一键；与本次 Runtime 改动无关。
+
+### 阶段 3.6：领域解耦与旧架构清理（2026-07-16）
+
+- 新增 `DomainRuntimeAdapter` 契约；`CapabilityRegistry` 必须成对注册领域声明和运行适配器。
+- 劳动上下文判断、事实更新、法域、计划定制、工具参数和劳动校验已迁入 `domains/labor/adapter.py` 与 `verifier.py`；通用 Graph、Planner、Verifier 不再包含劳动规则。
+- 阶段 1 模拟摘要已成为 `domains/mock/` 能力包。`Facade.start_run/resume_run` 保持 HTTP 兼容，但内部与劳动任务使用同一个 `CapabilityRuntimeGraph`。
+- 已删除 `AgentRuntime/AgentGraph`、`LaborDisputeRuntime/LaborDisputeGraph` 和 `LaborPlanBuilder` 五个旧实现文件；当前仅保留一套 Agent 执行内核。
+- 新增架构边界测试，持续禁止旧内核文件和 Runtime→领域 Service 直接依赖；README 文件索引与可编辑架构图已同步更新。
 
 ### 数字人启动恢复与模块导航（2026-07-16）
 

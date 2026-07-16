@@ -204,13 +204,45 @@ export interface LaborFactSuggestions {
 }
 
 export interface LaborAuthorityCatalog {
-  status: 'ready' | 'unavailable';
+  status: 'ready' | 'degraded' | 'unavailable';
   count: number;
   authorities: Array<{
     authority_id: string; title: string; provision: string | null;
     source_url: string; issuing_body: string; trust_level: string;
     version: string; last_verified_at: string | null;
   }>;
+  governance: {
+    status: 'ready' | 'degraded' | 'unavailable';
+    provider: string;
+    checked_at: string;
+    expected_count: number;
+    ready_count: number;
+    pending_review_count: number;
+    stale_count: number;
+    missing_count: number;
+    failed_count: number;
+    sources: Array<{
+      external_id: string;
+      state: string;
+      authority_id: string | null;
+      version: string | null;
+      fresh_until: string | null;
+    }>;
+    latest_sync: null | {
+      run_id: string;
+      status: string;
+      trigger: string;
+      requested_by: string | null;
+      fetched_count: number;
+      imported_count: number;
+      unchanged_count: number;
+      review_required_count: number;
+      failed_count: number;
+      error_code: string | null;
+      started_at: string;
+      completed_at: string | null;
+    };
+  };
 }
 
 const CLIENT_ID_KEY = 'yys-law-digital-human-client-id';
