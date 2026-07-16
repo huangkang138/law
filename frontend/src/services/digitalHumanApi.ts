@@ -40,7 +40,7 @@ export interface DigitalHumanHistoryMessage {
 
 export type AgentRunStatus =
   | 'planning' | 'awaiting_jurisdiction' | 'awaiting_information'
-  | 'executing' | 'verifying' | 'retrying' | 'awaiting_approval'
+  | 'executing' | 'observing' | 'verifying' | 'deciding' | 'retrying' | 'awaiting_approval'
   | 'blocked_authority' | 'replanning' | 'human_handoff'
   | 'completed' | 'failed' | 'cancelled';
 
@@ -51,9 +51,27 @@ export interface DigitalHumanAgentRun {
   matter_id: string;
   status: AgentRunStatus;
   current_step_id: string | null;
-  steps: Array<{ id: string; name: string; status: string; tool_name: string | null }>;
+  steps: Array<{
+    id: string;
+    name: string;
+    status: string;
+    tool_name: string | null;
+    step_type: string | null;
+    skip_reason: string | null;
+    requires_approval: boolean;
+    verification_policy_ids: string[];
+    observation: Record<string, unknown> | null;
+    verification: Record<string, unknown> | null;
+    decision: Record<string, unknown> | null;
+  }>;
   approval: { id: string; prompt: string; status: string } | null;
   task_type: string;
+  domain_id: string | null;
+  template_id: string | null;
+  template_version: string | null;
+  plan_id: string | null;
+  plan_revision: number;
+  replan_reason: string | null;
   plan_version: number;
   missing_facts: string[];
   questions: string[];
@@ -394,9 +412,10 @@ export async function createLaborDisputeDraft(matterId: string): Promise<LaborDi
 
 export async function startLaborDisputeAgentRun(
   matterId: string, facts: Record<string, unknown>,
+  taskType: 'cn_labor_dispute' | 'labor_arbitration_application' | 'labor_consultation' | 'labor_case_analysis' = 'cn_labor_dispute',
 ): Promise<DigitalHumanAgentRun> {
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/run`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facts }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facts, task_type: taskType }),
   });
   return readJson(response);
 }

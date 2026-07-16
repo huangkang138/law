@@ -137,10 +137,17 @@ def get_labor_dispute_workflow(matter_id):
 
 @router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/run", methods=["POST"])
 def start_labor_dispute_run(matter_id):
-    """启动劳动纠纷 LangGraph，并推进到等待、阻断、审批或完成状态。"""
+    """兼容入口：可选 task_type 选择三类劳动模板，缺省仍为仲裁申请。"""
+    data = request.get_json(silent=True) or {}
     return _response(lambda: get_legal_agent_facade().start_labor_dispute_run(
-        matter_id, _client_id(), (request.get_json(silent=True) or {}).get("facts"),
+        matter_id, _client_id(), data.get("facts"), data.get("task_type", "cn_labor_dispute"),
     ))
+
+
+@router.route("/digital-human/agent/capabilities", methods=["GET"])
+def list_agent_capabilities():
+    """查询当前已注册领域和计划模板。"""
+    return _response(lambda: get_legal_agent_facade().list_agent_capabilities())
 
 
 @router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/suggestions", methods=["GET"])

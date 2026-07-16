@@ -9,7 +9,9 @@ class RunStatus(str, Enum):
     AWAITING_JURISDICTION = "awaiting_jurisdiction"
     AWAITING_INFORMATION = "awaiting_information"
     EXECUTING = "executing"
+    OBSERVING = "observing"
     VERIFYING = "verifying"
+    DECIDING = "deciding"
     AWAITING_APPROVAL = "awaiting_approval"
     BLOCKED_AUTHORITY = "blocked_authority"
     REPLANNING = "replanning"
@@ -18,6 +20,7 @@ class RunStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    SKIPPED = "skipped"
 
 
 class StepStatus(str, Enum):
@@ -28,6 +31,7 @@ class StepStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    SKIPPED = "skipped"
 
 
 class ErrorCode(str, Enum):

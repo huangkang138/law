@@ -1,6 +1,6 @@
 # YYS-Law 最新项目解析
 
-更新时间：2026-07-13 16:34:05 +08:00
+更新时间：2026-07-16 +08:00
 
 本文件是后续项目解析和项目修改前需要优先阅读的最新汇总。它基于 `D:\项目\law\raw\项目解析报告.md` 与当前仓库只读检查生成。后续远程仓库更新或用户要求重新解析时，覆盖更新本文件，不再生成多个解析副本。
 
@@ -274,6 +274,35 @@ npm run dev
 - 历史会话与案件工作台不再静默吞掉加载失败：失败状态与“确实没有记录”分开显示，并提供原位重试；原左右双栏和窗口尺寸未调整。
 - Loguru 关闭 `diagnose` 局部变量展开，保留回溯但避免数据库连接信息进入后续异常日志。
 
+### 方案 C 最终 Agent 架构决策（2026-07-16，文档规划）
+
+- 已确认长期目标采用“一套全局 Runtime Graph + Capability Registry + 多领域 Domain Package + 声明式 PlanTemplate + 每次运行独立 Plan revision”。本次只更新规划和架构文档，尚未修改 Runtime、数据库或 API。
+- 当前源码事实保持不变：真实业务仍由中国劳动纠纷专用 `LaborDisputeGraph` 执行；`LaborPlanBuilder` 生成三步劳动模板，前两步由 `execute` 节点执行，审批后第三步由 `draft` 节点执行。该实现将作为首个迁移样板，不再被描述为通用 Planner。
+- 目标 Runtime Graph 只负责上下文、任务路由、规划、单 Step 执行、Observation、分层验证、决策、审批、恢复、预算和审计，不包含仲裁申请书、合同审查等固定业务节点。
+- `Domain Package` 通过 Capability Registry 注册路由规则、PlanTemplate、工具、验证策略和必要的可选 Subgraph，但不得控制全局 Run 状态。只有独立生命周期、多轮循环、中断恢复或独立审批的复杂能力才允许使用 Subgraph。
+- `PlanTemplate` 是经审核的业务策略；`Plan` 是本次 Run 的版本化执行快照。重规划必须创建新 revision，不能覆盖旧计划；可选步骤必须记录跳过原因。
+- 工具结果处理明确拆为 `execute_step → observe_step → verify_step → decide_step`。Verifier 分为 Global/Domain/Task 三层，只返回结构化报告；Decision Router 才能决定 next、retry、need_context、replan、approval、reject、handoff 或 finish。
+- 迁移采取并行兼容方式：先完成方案 C 的注册和运行契约，再把现有劳动三步下沉为 `labor_arbitration_application` 模板，并补充劳动咨询、劳动案件分析；随后按法律咨询、合同审查、案件/纠纷、文书和其他工具逐个接入现有功能。
+- 目标架构源文件已更新为 `raw/目标Agent架构图.mmd`；完整设计同步写入 `raw/多法域数字人法律Agent总体规划.md` 和 `flask_app/legal_agent_system/analyse-agents.md`。
+
+### 阶段 3.6：方案 C Runtime 首批落地（2026-07-16）
+
+- 新增 `capabilities/` 与 `domains/labor/`：Capability Registry 统一注册领域包、任务路由、三类 PlanTemplate、工具声明和验证策略；注册时校验模板工具白名单，拒绝重复或不完整能力。
+- 新增 `CapabilityRuntimeGraph`，真实劳动入口现统一执行 `select → execute → observe → verify → decide` 单 Step 内核。业务工具和仲裁草稿不再是 Graph 节点，旧 `LaborDisputeGraph` 暂留但 Facade 已不实例化。
+- 劳动能力包提供 `labor_arbitration_application`、`labor_consultation`、`labor_case_analysis`；旧 `cn_labor_dispute` 作为仲裁模板别名，原 Router、Facade 和前端页面保持兼容。只读咨询与案件分析不会进入文书审批或生成 Artifact。
+- Verifier 拆为 Global/Domain/Task 报告，Decision Router 独立路由；步骤持久化 Observation、Verification、Decision、验证策略版本和可选步骤跳过原因。
+- `agent_plans` 现在按行保存不可覆盖 revision、模板版本、父计划、重规划原因和触发者；Alembic `20260716_0004` 已应用到本地 PostgreSQL。
+- API 新增能力查询，原劳动启动 API 新增可选 `task_type`；前端运行快照契约已同步模板、revision 和步骤审计字段。
+- 阶段 3.1/3.2/3.6 相关 10 个用例通过，`npx tsc --noEmit` 和 `git diff --check` 通过。全量 30 个用例中另有 2 个既有环境/fixture 问题：Loguru 多进程管道被沙箱拒绝、官方来源残留快照撞唯一键；与本次 Runtime 改动无关。
+
+### 数字人启动恢复与模块导航（2026-07-16）
+
+- 前端历史会话与案件记录同时报“数字人服务暂时不可用”的直接原因是 `127.0.0.1:8001` 未监听，不是记录被删除，也不是前端状态组件渲染失败。
+- 后端启动先被受限 Windows 环境禁止创建 Loguru 多进程队列阻断；日志初始化现优先异步队列，遇 `PermissionError` 自动降级为同步输出。
+- 启动链路还导入了未被 Flask 使用的 `routers/courtroom_websocket.py`，从而要求未安装的 FastAPI。主入口已移除该冗余导入；实际模拟法庭 WebSocket 继续由 Flask-Sock 服务注册。
+- 数字人健康、历史会话和案件列表接口已恢复 HTTP 200。可选 OCR 栈仍有 NumPy/pyarrow 二进制兼容警告，但该导入异常被业务模块隔离，不再阻断数字人基础服务。
+- `flask_app/legal_agent_system/README.md` 已建立当前目录导航，明确阶段 3.6 主链路、兼容旧链路、全部文件职责、扩展位置、数据库/测试入口和排错方式。
+
 ## 当前重要风险点
 
 1. `requirements.txt` 标题和部分依赖仍偏 FastAPI，但当前主入口是 Flask。依赖清单需要与真实后端同步。
@@ -284,6 +313,7 @@ npm run dev
 6. `raw` 中旧报告提到当前目录不是 Git 仓库，但现在 `D:\项目\law` 已识别为 Git 仓库，当前分支为 `master`。后续应以当前 Git 状态为准。
 7. 数字人阶段 0 的代码能力已补齐浏览器级匿名隔离、历史恢复、删除、请求幂等、超时和前端取消；清除浏览器数据后会被视为新匿名用户。
 8. 数字人阶段 0 已通过真实 PostgreSQL 专用集成测试，覆盖匿名隔离、历史读取、请求幂等和删除清理。完整 Flask 应用导入仍受其他旧模块环境影响：图像处理依赖与 NumPy 版本冲突，且模拟法庭 WebSocket 依赖 FastAPI；该问题不属于数字人链路。
+9. 方案 C 的通用 Runtime、Capability Registry 和劳动三模板已首批实现，但跨领域与第二法域尚未接入；只能宣称“劳动领域已验证通用内核”，不能宣称完整多法域能力已完成。
 
 ## 后续解析和修改规则
 

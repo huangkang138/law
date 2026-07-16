@@ -4,7 +4,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 from .schemas import AgentState, ToolResult
 
@@ -38,10 +38,11 @@ class AgentResultVerifier:
                 if key not in data:
                     report.structure_errors.append(f"证据清单缺少字段: {key}")
 
-        if tool_name == "analyze_labor_dispute" and result.success:
+        if tool_name in {"analyze_labor_dispute", "analyze_labor_consultation", "analyze_labor_case"} and result.success:
             data = result.data or {}
-            if data.get("status") != "awaiting_draft_approval":
-                report.structure_errors.append("劳动纠纷分析没有进入草稿审批状态")
+            expected_status = "awaiting_draft_approval" if tool_name == "analyze_labor_dispute" else "completed_readonly"
+            if data.get("status") != expected_status:
+                report.structure_errors.append("劳动分析没有进入模板声明的完成状态")
             deadline = data.get("deadline") or {}
             if not deadline.get("start_date"):
                 report.fact_errors.append("期限结果缺少起算日")
@@ -70,3 +71,59 @@ class AgentResultVerifier:
 
         report.valid = not report.errors
         return report
+
+
+class LayeredVerifier:
+    """Global/Domain/Task 三层只产出报告，不负责状态跳转。"""
+
+    def __init__(self) -> None:
+        self.task_verifier = AgentResultVerifier()
+
+    def verify(
+        self,
+        tool_name: str,
+        result: ToolResult,
+        state: AgentState,
+        policy_ids: List[str],
+        on_failure: str,
+    ) -> Dict:
+        global_errors: List[str] = []
+        if not result.success:
+            global_errors.append(result.error_message or result.error_code or "工具执行失败")
+        if result.success and not isinstance(result.data, dict):
+            global_errors.append("成功工具必须返回结构化 data")
+        reports = [{
+            "layer": "global", "policy_id": "global.tool_result", "version": "1.0.0",
+            "valid": not global_errors, "errors": global_errors,
+            "warnings": list(result.warnings),
+            "decision_hint": self._failure_hint(result, on_failure) if global_errors else "pass",
+        }]
+
+        task_report = self.task_verifier.verify(tool_name, result, state) if result.success else VerificationReport(valid=False)
+        domain_errors = task_report.authority_errors + task_report.fact_errors
+        if any(policy_id.startswith("labor.") for policy_id in policy_ids):
+            reports.append({
+                "layer": "domain", "policy_id": "labor.domain", "version": "1.0.0",
+                "valid": not domain_errors, "errors": domain_errors,
+                "warnings": list(task_report.risk_warnings),
+                "decision_hint": on_failure if domain_errors else "pass",
+            })
+        reports.append({
+            "layer": "task", "policy_id": f"task.{tool_name}", "version": "1.0.0",
+            "valid": not task_report.structure_errors,
+            "errors": list(task_report.structure_errors),
+            "warnings": list(task_report.risk_warnings),
+            "decision_hint": on_failure if task_report.structure_errors else "pass",
+        })
+        return {
+            "valid": all(item["valid"] for item in reports),
+            "reports": reports,
+        }
+
+    @staticmethod
+    def _failure_hint(result: ToolResult, on_failure: str) -> str:
+        if result.error_code == "AUTHORITY_REQUIRED":
+            return "reject"
+        if result.retryable:
+            return "retry"
+        return on_failure

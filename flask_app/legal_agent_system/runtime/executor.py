@@ -1,4 +1,5 @@
-"""工具策略执行器：统一输入、法域、审批、超时和重试边界。"""
+"""工具策略执行器：统一输入、法域、审批、超时和重试边界。
+"""
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from .schemas import ToolResult

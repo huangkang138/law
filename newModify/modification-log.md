@@ -398,3 +398,55 @@
 - 代码修复：数字人及 Agent Router 将数据库异常统一转换为安全的 `503 DATABASE_UNAVAILABLE`；修正重置会话异常分支；前端历史与案件列表区分“加载失败”和“空记录”并支持重试；Loguru 关闭 `diagnose`，避免后续异常日志展开局部敏感变量。没有修改数字人窗口尺寸或双栏布局。
 - 验证：配置运行账号连接成功；会话 API 返回 4 条、案件 API 返回 7 条；临时会话聊天成功并已清理；实库 Alembic 为 `20260713_0003`；前端 `npx tsc --noEmit` 通过；数字人故障回归及阶段 0/2/3.5 回归共 12 项通过。
 - 风险与后续：旧日志可能已含历史异常上下文，后续应轮换数据库凭据并按运维策略清理受控日志；生产环境继续使用独立迁移账号执行 DDL，运行账号只保留业务运行权限。
+
+## 2026-07-16 02:12:40 +08:00
+
+- 会话 ID：`019f66aa-b826-7f01-a8de-b93ef323043f`
+- 分支/Git 状态：当前分支 `master`；修改前工作树已有大量 Agent、配置、前端、测试、迁移、上传材料和图件改动，本次全部保留，仅增量修改 Agent 规划与架构文档及目标图件。
+- 用户请求：参考讨论方案，确定方案 C 的最终法律 Agent 框架和完整执行流程，并更新项目中对应的 Agent 文档。
+- 修改前阅读：`CLAUDE.md`、`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/多法域数字人法律Agent总体规划.md`、当前/目标 Agent Mermaid 图、`flask_app/legal_agent_system/analyse-agents.md`、`newModify/latest-project-analysis.md`、相关修改历史，以及当前 Planner、Labor Graph、ToolRegistry、ToolExecutor、Verifier、Runtime Schema 和 Facade 源码。
+- 修改思路：明确区分当前实现与长期目标；当前劳动三步流程继续作为兼容基线，最终采用一套全局 Runtime Graph，通过 Capability Registry 加载 Domain Package、PlanTemplate、工具和验证策略，每次 Run 生成不可静默修改的 Plan revision，特殊控制流程才允许使用 Subgraph。
+- 具体方案：固化 `execute_step → observe_step → verify_step → decide_step` 单 Step 闭环；Verifier 拆为 Global/Domain/Task 三层且只返回报告，由 Decision Router 统一路由；补充模板/计划版本、跳过原因、重规划审计、工具元数据、Subgraph 准入和并行迁移顺序；新增阶段 3.6 作为方案 C 通用 Runtime 落地阶段。
+- 实际改动：`raw/多法域数字人法律Agent总体规划.md`、`raw/目标Agent架构图.mmd`、`raw/目标Agent架构图.svg`、`raw/目标Agent架构图.png`、`raw/目标Agent架构图.excalidraw`、`flask_app/legal_agent_system/analyse-agents.md`、`newModify/latest-project-analysis.md`、本日志。
+- 验证：使用离线 Mermaid/Excalidraw 渲染包成功生成目标图 SVG、PNG 和可编辑 Excalidraw，PNG 尺寸为 1950×2303 并完成视觉检查；检查目标架构关键术语、当前/目标边界、Markdown/Mermaid 代码块和 Git 差异；本次未修改业务代码、接口或数据库，因此不运行后端/前端测试。
+- 风险与后续：方案 C 当前只是已确认并写入文档的目标架构，Capability Registry、通用 Runtime Graph、Observation/Decision 节点、多模板和新 Plan revision 数据仍未实现；实施时必须保留现有入口并分领域迁移，不能将目标文档对外描述为当前已完成能力。
+
+## 2026-07-16 02:38:10 +08:00
+
+- 会话 ID：`019f6703-dccf-7a10-825b-73928bbebd43`；关联架构决策会话 `019f66aa-b826-7f01-a8de-b93ef323043f`。
+- 分支/Git 状态：当前分支 `master`；修改前已有 Agent 文档、前端工作台、测试、迁移、上传材料、outputs 和架构图等大量已修改/未跟踪内容，本次保留并仅增量修改阶段 3.6 相关文件。
+- 用户请求：跳过阶段 3.5 剩余的生产可信化与运行保障，直接实现阶段 3.6“方案 C 通用 Runtime 与能力注册”。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、`raw/多法域数字人法律Agent总体规划.md`、`newModify/latest-project-analysis.md`、关联会话历史记录、`analyse-agents.md`，以及当前 Facade、劳动 Graph/Runtime、Planner、ToolRegistry/Executor、Verifier、Persistence、数据库模型、迁移、Router、前端契约和测试源码。
+- 修改思路：保留旧 HTTP/Facade 入口和数据字段，以并行兼容方式新增唯一通用 Runtime；领域包只提供声明式模板和工具/验证声明，不掌握 Run 状态；Verifier 只报告，Decision Router 唯一路由；计划变化只追加 revision。
+- 具体方案：新增 `capabilities/` 契约、注册中心与模板 Planner；新增中国劳动 Domain Package 和仲裁申请/咨询/案件分析三模板；新增 `CapabilityRuntimeGraph` 的 select/execute/observe/verify/decide 单步循环及通用用例层；扩展 Plan/Step 审计字段与 `20260716_0004` 非破坏迁移；旧 `cn_labor_dispute` 映射仲裁模板，原路径支持可选 `task_type` 并新增能力查询 API；同步前端运行快照类型。
+- 实际改动：新增 `legal_agent_system/capabilities/`、`domains/labor/`、`runtime/capability_graph.py`、`capability_runtime.py`、`decision_router.py`、迁移 `20260716_0004` 和阶段 3.6 测试；修改 Facade、Runtime schemas/enums/persistence/verifier、劳动工具、Agent/Step 模型、Router、前端 API 类型、总体规划、Agent 分析和最新项目分析。
+- 验证：Python compileall 通过；Alembic 从 `20260713_0003` 升级并确认 `20260716_0004 (head)`；阶段 3.1/3.2/3.6 共 10 个相关用例通过；前端 `npx tsc --noEmit` 通过；`git diff --check` 通过。全量 30 个后端用例中 28 个通过，阶段 0 因沙箱禁止 Loguru 多进程管道、阶段 3.4 fixture 因数据库残留官方快照撞唯一键失败，均未修改相关代码或删除现有数据。
+- 风险与后续：当前只完成劳动领域多模板，其他领域和第二法域尚未接入；阶段 3.5 的法源复核、监控、权限和长期压测仍未完成；旧 `LaborDisputeGraph` 暂留兼容，待新 Runtime 生产稳定后再单独评估移除。
+
+## 2026-07-16 数字人启动恢复与目录说明
+
+- 用户请求：为 `flask_app/legal_agent_system` 生成易读的文件说明文档，并排查截图中历史会话、案件记录均提示“数字人服务暂时不可用”的前端故障。
+- 修改前检查：重新阅读仓库协作规则、总体规划、最新项目分析和相关修改历史；检查 Git 工作树并保留阶段 3.6、前端、测试、迁移、上传材料和图件等既有改动；核对数字人前端错误映射、后端端口、应用启动链路及 Agent 全目录源码。
+- 根因：前端两个读取请求均因 8001 后端未监听失败。应用启动先在 Loguru `enqueue=True` 创建多进程队列时遇 Windows `PermissionError`；修复后又被主入口未使用的 FastAPI 旧 WebSocket Router 导入阻断。
+- 实际改动：`core/logger.py` 在异步日志队列不可用时同步降级；`app.py` 移除未使用的 `courtroom_websocket` Router 导入，实际 Flask-Sock 路由不变；新增 `legal_agent_system/README.md`，并从详细分析文档交叉链接；同步更新最新项目分析和本日志。
+- 验证：应用导入和服务初始化成功；后端已在 `127.0.0.1:8001` 启动；`/api/health`、`/api/digital-human/sessions`、`/api/digital-human/agent/matters` 均返回 HTTP 200。阶段 0、数据库故障和阶段 3.6 专项共 5 个测试通过；Python compileall、前端 `npx tsc --noEmit`、README 本地链接检查和 `git diff --check` 通过。
+- 兼容说明：OCR 可选依赖仍输出 NumPy/pyarrow 二进制兼容警告，但异常已被旧纠纷 Router 隔离，不影响数字人基础服务；本次未修改用户数据、数据库结构或前端布局。
+
+## 2026-07-16 Agent README 重构
+
+- 用户反馈：原 README 内容过多，重点不清，流程表示不准确；需要优先说明每个包、每个文件以及真实函数调用关系。
+- 实际改动：重写 `legal_agent_system/README.md`，删除背景性长说明，按“包职责、逐文件索引、函数调用、新代码位置”组织；基于当前 Facade、CapabilityRuntime 和 CapabilityRuntimeGraph 源码重新绘制包关系图与函数调用图。
+- 图件：新增包关系、入口函数调用、Runtime 单步循环三组可编辑图件。将原本过高且长函数名断行的单图拆开；Mermaid 源文件作为单一事实源，README 引用渲染后的 SVG，避免 Markdown 环境直接解析复杂 Mermaid 时出现布局差异。
+- 验证：三张图均完成离线渲染和视觉检查；SVG 可解析、Excalidraw JSON 有效、PNG 已生成；README 本地链接检查与 `git diff --check` 通过。
+
+## 2026-07-16 10:19:42 +08:00
+
+- 会话 ID：`019f6703-dccf-7a10-825b-73928bbebd43`。
+- 分支/Git 状态：当前分支 `master`；工作树已有阶段 3.6、前端、测试、迁移、上传材料和图件改动，本次全部保留，仅新增数据库表说明并追加本记录。
+- 用户请求：统计项目初始到当前新增了多少张表、每张表对应什么，并将清单放入 `flask_app/models`。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、`raw/项目解析报告.md` 的数据库章节、最新项目分析、相关修改历史、初始 `sql/public.sql`、当前 ORM、Agent 扩展模型、Alembic 迁移和实际 PostgreSQL `information_schema`。
+- 修改思路：不只统计 ORM；以初始 SQL 快照和当前实库表名做差集，同时用 ORM/迁移核对新增表职责，避免漏掉 SQL-only 历史表和 Alembic 管理表。
+- 具体方案：记录初始 54、当前 77、净新增 23；按数字人聊天、Agent Runtime、材料/法域/法源、劳动纠纷、版本化可信运行、迁移管理分组说明新增表。
+- 实际改动：新增 `flask_app/models/数据库表新增清单.md`；追加本修改记录。
+- 验证：初始 SQL 为 54 张、当前实库为 77 张，差集 23 张与文档逐表清单完全一致；Markdown 清单计数和 `git diff --check` 通过。
+- 风险与后续：统计基线是仓库现有 `sql/public.sql`，不是 Git 最早历史提交；若以后替换初始 SQL 快照，应重新计算差集。

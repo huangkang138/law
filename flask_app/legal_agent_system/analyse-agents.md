@@ -1,5 +1,7 @@
 # 模拟法庭和当前数字人 Agent 详细分析
 
+> 日常开发请先看当前目录导航：[README.md](./README.md)。本文保留更完整的架构背景与演进分析。
+
 > 文档名称：`analyse-agents.md`  
 > 目标位置：`D:\项目\law\raw\analyse-agents.md`  
 > 分析范围：模拟法庭模块、数字人聊天模块、法律数字人 Agent Runtime、材料与法域服务、劳动纠纷闭环。  
@@ -1436,3 +1438,193 @@ flowchart TD
 ### 两者当前关系
 
 数字人聊天负责识别用户意图和引导页面；模拟法庭与 Agent Runtime 当前各自执行自己的业务流程，尚不能简单视为同一个 Agent 状态机。
+
+---
+
+## 22. 方案 C 最终目标架构（2026-07-16 决策）
+
+本节描述已确认的长期目标，不代表当前源码已经完成。当前生产主链路仍是 `LaborDisputeGraph`、`LaborPlanBuilder` 和劳动纠纷三步计划。
+
+### 22.1 架构定位
+
+```text
+Runtime Graph = 通用编排内核
+Capability Registry = 统一能力注册与查询入口
+Domain Package = 可插拔法律领域能力
+PlanTemplate = 经审核的任务策略
+Plan = 本次 Run 的版本化执行快照
+Subgraph = 特殊控制流程扩展
+```
+
+最终只保留一套全局 Runtime Graph。劳动仲裁、合同审查、法律咨询、案件分析和文书生成不各自复制 Graph，而是注册为领域能力包和任务模板。
+
+### 22.2 注册关系
+
+```mermaid
+flowchart LR
+    D["Domain Package"] --> R["Capability Registry"]
+    G["Runtime Graph"] --> T["Task Router"]
+    T --> R
+    G --> P["Constrained Planner"]
+    P --> R
+    R --> C["Templates / Tools / Policies / Optional Subgraphs"]
+    C --> RP["Run-specific Plan Revision"]
+    RP --> G
+```
+
+`Domain Package` 只能提供模板、工具、路由规则、验证策略和必要的可选 Subgraph。全局状态、步骤循环、审批、预算、重试、恢复和审计始终由 Runtime Graph 控制。
+
+### 22.3 单 Step 执行闭环
+
+```mermaid
+flowchart TD
+    A["dispatch"] --> B["ensure_context"]
+    B --> C["route_task"]
+    C --> D["build_plan"]
+    D --> E["select_next_step"]
+    E --> F["execute_step"]
+    F --> G["observe_step"]
+    G --> H["verify_step"]
+    H --> I["decide_step"]
+    I -->|next| E
+    I -->|retry| F
+    I -->|need_context| B
+    I -->|replan| D
+    I -->|approval| J["awaiting_approval"]
+    J -->|approved| E
+    I -->|handoff / reject| K["blocked_or_handoff"]
+    I -->|finish| L["final_verify"]
+    L --> M["completed"]
+```
+
+节点含义：
+
+| 节点 | 责任 |
+|---|---|
+| `ensure_context` | 检查目标、法域、事实、材料和权限，不完整时暂停追问 |
+| `route_task` | 从注册能力中确定 `domain_id` 和 `task_type` |
+| `build_plan` | 选择模板、填充参数、处理允许的可选步骤，创建新 Plan revision |
+| `execute_step` | 只执行一个 Step，通过 ToolRegistry 和 PolicyToolExecutor 调用白名单工具 |
+| `observe_step` | 将 ToolResult、引用、状态变化和使用量标准化为可验证 Observation |
+| `verify_step` | 执行 Global、Domain、Task 三层验证，不直接修改 Run 状态 |
+| `decide_step` | 把验证报告转换成 next/retry/context/replan/approval/handoff/finish 决策 |
+| `final_verify` | 检查最终交付物与本次 Plan、事实、证据和法源的一致性 |
+
+### 22.4 Domain Package 边界
+
+建议最小契约：
+
+```python
+class DomainPackage:
+    domain_id: str
+    version: str
+    routing_rules: list
+    plan_templates: list
+    tools: list
+    verification_policies: list
+    optional_subgraphs: dict
+```
+
+首批能力包来自项目现有功能：
+
+| 能力包/任务 | 现有能力迁移来源 | 目标模板示例 |
+|---|---|---|
+| 劳动纠纷 | 当前劳动 Runtime、规则、法源和草稿工具 | `labor_consultation`、`labor_case_analysis`、`labor_arbitration_application` |
+| 法律咨询 | 普法问答和会话能力 | `legal_consultation` |
+| 合同审查 | 合同上传、审查和 SSE 服务 | `contract_review` |
+| 案件/纠纷 | 案情分析、纠纷整理、证据和风险能力 | `case_analysis`、`dispute_resolution` |
+| 文书 | 现有文书起草能力 | `lawsuit_document`、`legal_opinion` |
+| 法律工具 | 利息、补偿、诉讼费、时效等计算能力 | 作为其他模板调用的确定性工具 |
+
+现有大型 Router 中混合的逻辑必须先下沉 Service，再包装为工具；Runtime 不直接调用 Router。
+
+### 22.5 PlanTemplate 与 Plan
+
+`PlanTemplate` 声明允许出现的步骤及约束：
+
+```json
+{
+  "template_id": "labor_arbitration_application",
+  "version": "1.0.0",
+  "domain_id": "labor",
+  "task_type": "document_drafting",
+  "steps": [
+    {
+      "step_type": "legal_analysis",
+      "tool_name": "analyze_labor_dispute",
+      "optional": false,
+      "requires_approval": false,
+      "verification_policy_ids": ["labor_authority_required"]
+    },
+    {
+      "step_type": "document_drafting",
+      "tool_name": "draft_labor_arbitration_application",
+      "optional": false,
+      "requires_approval": true,
+      "verification_policy_ids": ["labor_draft_consistency"]
+    }
+  ]
+}
+```
+
+Planner 只能选择已注册模板、填充参数、跳过满足条件的可选步骤，或插入模板明确允许的补充步骤。运行时 Plan 必须保存 `template_id`、`template_version`、`plan_revision`、步骤参数和跳过原因。
+
+Plan 不允许静默原地修改：
+
+```text
+Plan Revision 1
+→ Verifier/用户补充触发 replan
+→ Plan Revision 2
+```
+
+旧 revision 保留，用于审计为什么新增、删除、重排或跳过步骤。
+
+### 22.6 分层验证与决策
+
+```text
+Global Verifier
+├─ 输出结构
+├─ 工具权限
+├─ 预算与调用次数
+└─ 状态流转合法性
+
+Domain Verifier
+├─ 法域事实完整性
+├─ 法律来源有效性
+├─ 时效与管辖
+└─ 领域规则
+
+Task Verifier
+├─ 交付字段完整性
+├─ 请求与事实一致性
+├─ 证据支撑关系
+└─ 文书前后一致性
+```
+
+Verifier 只生成结构化报告；Decision Router 才能决定运行状态。禁止使用模糊关键字直接推进高风险步骤。
+
+### 22.7 Subgraph 准入标准
+
+只有同时满足至少一项控制复杂性时才注册 Subgraph：独立生命周期、多轮循环、中断恢复、独立审批或普通 Plan Step 无法清晰表达。适合的例子包括证据真实性多轮核验、合同逐条审查修订循环和文书生成审查修订循环。
+
+普通“检索→分析→生成”不得建立专用 Graph，使用 PlanTemplate 即可。
+
+### 22.8 迁移原则
+
+1. 保留现有页面、Router 和劳动闭环，不一次性替换。
+2. 先建立注册、模板、Plan revision、Observation 和 Decision 契约。
+3. 以劳动领域迁移验证同一领域多模板。
+4. 再按法律咨询、合同审查、案件/纠纷、文书和其他工具逐个接入。
+5. 每接入一个领域同时增加来源、Schema、验证策略、审批规则、评测和回归测试。
+
+方案 C 的完成标志不是“模板数量多”，而是新增领域和任务时无需修改全局 Runtime Graph，同时仍能保持来源可信、工具受控、结果可验证、计划可审计。
+
+### 22.9 阶段 3.6 实际落地（2026-07-16）
+
+- `capabilities/contracts.py` 定义 `DomainPackage`、`PlanTemplate`、`TemplateStep`、`PlanRevision`；`CapabilityRegistry` 是领域、路由和模板的唯一查询入口。
+- `domains/labor/package.py` 注册劳动仲裁申请、劳动咨询、劳动案件分析三模板；`cn_labor_dispute` 仅是旧入口别名，不再决定 Graph 结构。
+- `runtime/capability_graph.py` 是当前劳动真实业务使用的通用 Graph，单 Step 严格经过 select/execute/observe/verify/decide。原 `LaborDisputeGraph` 文件暂留作迁移兼容，但 Facade 不再实例化它。
+- 分层 Verifier 报告、Decision Router 决策、工具原始结果和 Observation 分开持久化；失败工具不能被记录为 skipped，可选步骤必须有 `skip_reason`。
+- `agent_plans` 追加保存模板版本、父计划、重规划原因和触发者；`agent_steps` 保存步骤类型、审批、验证策略以及观察/验证/决策快照。迁移版本为 `20260716_0004`。
+- `POST /labor-dispute/run` 保持原路径，新增可选 `task_type`；默认仍为 `cn_labor_dispute`。新增 `GET /digital-human/agent/capabilities` 用于查询当前注册能力。
+- 当前已证明“同领域多任务不修改 Runtime Graph”；跨领域和第二法域仍属于后续阶段，不应据此宣称全部多法域能力已经完成。

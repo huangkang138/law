@@ -19,6 +19,7 @@ from .enums import ErrorCode, RunStatus, StepStatus
 from .errors import AgentRuntimeError
 from .schemas import AgentState, ToolResult
 from legal_agent_system.models import AgentEventOutbox, AgentPlan, AgentRunAction
+from legal_agent_system.capabilities.contracts import PlanRevision
 
 """数据库仓储层。它让Agent能够暂停、恢复和审计。"""
 
@@ -211,6 +212,90 @@ class AgentRepository:
         finally:
             db.close()
 
+    def persist_plan_revision(self, state: AgentState, revision: PlanRevision) -> List[str]:
+        """保存不可变 Plan revision；同输入重复调用只复用，不覆盖旧记录。"""
+        db = SessionLocal()
+        try:
+            existing = db.query(AgentPlan).filter(
+                AgentPlan.run_id == state.run_id,
+                AgentPlan.template_id == revision.template_id,
+                AgentPlan.template_version == revision.template_version,
+                AgentPlan.input_fingerprint == revision.input_fingerprint,
+            ).order_by(AgentPlan.version.desc()).first()
+            if existing:
+                state.plan_id = existing.id
+                state.plan_version = existing.version
+                state.plan_revision = existing.version
+                state.domain_id = existing.domain_id
+                state.template_id = existing.template_id
+                state.template_version = existing.template_version
+                return [row.id for row in db.query(AgentStep).filter(
+                    AgentStep.run_id == state.run_id,
+                    AgentStep.plan_id == existing.id,
+                ).order_by(AgentStep.sequence).all()]
+
+            latest = db.query(AgentPlan).filter(AgentPlan.run_id == state.run_id).order_by(AgentPlan.version.desc()).first()
+            version = (latest.version + 1) if latest else 1
+            plan_id = _id("plan")
+            revision.plan_id = plan_id
+            revision.plan_revision = version
+            revision.parent_plan_id = latest.id if latest else None
+            db.add(AgentPlan(
+                id=plan_id,
+                run_id=state.run_id,
+                version=version,
+                task_type=state.task_type,
+                domain_id=revision.domain_id,
+                template_id=revision.template_id,
+                template_version=revision.template_version,
+                replan_reason=revision.replan_reason,
+                triggered_by=revision.triggered_by,
+                parent_plan_id=revision.parent_plan_id,
+                input_fingerprint=revision.input_fingerprint,
+                plan_json=revision.model_dump(mode="json"),
+            ))
+            ids: List[str] = []
+            for sequence, item in enumerate(revision.steps, start=1):
+                step_id = _id("step")
+                ids.append(step_id)
+                db.add(AgentStep(
+                    id=step_id,
+                    run_id=state.run_id,
+                    sequence=sequence,
+                    name=item.name,
+                    status=item.status,
+                    tool_name=item.tool_name,
+                    plan_id=plan_id,
+                    plan_version=version,
+                    template_step_id=item.step_id,
+                    step_type=item.step_type,
+                    requires_approval=item.requires_approval,
+                    verification_policy_ids=item.verification_policy_ids,
+                    skip_reason=item.skip_reason,
+                ))
+            state.plan_id = plan_id
+            state.plan_version = version
+            state.plan_revision = version
+            state.domain_id = revision.domain_id
+            state.template_id = revision.template_id
+            state.template_version = revision.template_version
+            state.replan_reason = revision.replan_reason
+            self._audit(db, state.run_id, "plan_revision_created", {
+                "plan_id": plan_id,
+                "plan_revision": version,
+                "template_id": revision.template_id,
+                "template_version": revision.template_version,
+                "replan_reason": revision.replan_reason,
+                "step_ids": ids,
+            })
+            db.commit()
+            return ids
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     def get_step(self, run_id: str, sequence: int, plan_version: Optional[int] = None) -> AgentStep:
         """按稳定序号读取当前计划步骤。"""
         db = SessionLocal()
@@ -234,10 +319,36 @@ class AgentRepository:
             now = datetime.now(timezone.utc)
             if status == StepStatus.RUNNING:
                 step.started_at = now
-            if status in {StepStatus.COMPLETED, StepStatus.FAILED, StepStatus.CANCELLED}:
+            if status in {StepStatus.COMPLETED, StepStatus.FAILED, StepStatus.CANCELLED, StepStatus.SKIPPED}:
                 step.completed_at = now
             self._audit(db, run_id, "step_status_changed", {"step_id": step_id, "status": status.value})
             db.commit()
+        finally:
+            db.close()
+
+    def save_step_runtime(self, run_id: str, step_id: str, *, observation=None, verification=None, decision=None) -> None:
+        """分别保存观察、验证和决策，避免 Verifier 直接修改 Run 状态。"""
+        db = SessionLocal()
+        try:
+            step = db.get(AgentStep, step_id)
+            if step is None or step.run_id != run_id:
+                raise AgentRuntimeError("Agent 计划步骤不存在", ErrorCode.INVALID_STATE.value)
+            if observation is not None:
+                step.observation_json = observation
+            if verification is not None:
+                step.verification_json = verification
+            if decision is not None:
+                step.decision_json = decision
+            self._audit(db, run_id, "step_runtime_recorded", {
+                "step_id": step_id,
+                "has_observation": observation is not None,
+                "has_verification": verification is not None,
+                "decision": (decision or {}).get("action"),
+            })
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         finally:
             db.close()
 
@@ -337,9 +448,22 @@ class AgentRepository:
             return {
                 "run_id": run.id, "matter_id": run.matter_id, "status": run.status,
                 "current_step_id": run.current_step_id,
-                "steps": [{"id": s.id, "name": s.name, "status": s.status, "tool_name": s.tool_name} for s in steps],
+                "steps": [{
+                    "id": s.id, "name": s.name, "status": s.status, "tool_name": s.tool_name,
+                    "step_type": s.step_type, "skip_reason": s.skip_reason,
+                    "requires_approval": bool(s.requires_approval),
+                    "verification_policy_ids": list(s.verification_policy_ids or []),
+                    "observation": s.observation_json, "verification": s.verification_json,
+                    "decision": s.decision_json,
+                } for s in steps],
                 "approval": ({"id": approval.id, "prompt": approval.prompt, "status": approval.status} if approval else None),
                 "task_type": (run.state_json or {}).get("task_type", "mock_case_summary"),
+                "domain_id": (run.state_json or {}).get("domain_id"),
+                "template_id": (run.state_json or {}).get("template_id"),
+                "template_version": (run.state_json or {}).get("template_version"),
+                "plan_id": (run.state_json or {}).get("plan_id"),
+                "plan_revision": (run.state_json or {}).get("plan_revision", plan_version),
+                "replan_reason": (run.state_json or {}).get("replan_reason"),
                 "plan_version": (run.state_json or {}).get("plan_version", 0),
                 "missing_facts": (run.state_json or {}).get("missing_facts", []),
                 "questions": (run.state_json or {}).get("questions", []),

@@ -1,9 +1,9 @@
 # 多法域数字人法律 Agent 总体规划
 
-更新时间：2026-07-13
+更新时间：2026-07-16
 规划对象：YYS-Law 全局数字人“法小助”  
 规划性质：长期目标架构与分阶段实施基线
-当前决策：采用方案 B“可信基础优先、平衡演进”。阶段 0～3.4 的工程框架已完成；阶段 3.5 已开始生产可信化，真实官网原文抓取、原始快照、变更复核、新鲜度阻断和 Run 并发锁已落地，完整法律规则、真实脱敏评测和长期运行验收仍未完成。
+当前决策：采用方案 C“统一 Runtime Graph + 可插拔 Domain Package + 声明式 PlanTemplate + 运行时版本化 Plan”。阶段 3.6 已完成首批落地：Capability Registry、通用单步循环、不可变 Plan revision 与中国劳动领域三模板已实现；阶段 3.5 的生产可信化待办仍按原安全门槛继续，其他领域尚未接入。
 
 ## 1. 最终目标
 
@@ -39,9 +39,9 @@
 | 任务理解 | 已有劳动任务入口和缺失事实追问 | 通用目标、任务类型、法域、风险和完整度识别 |
 | 记忆 | 会话、Matter、Run、Step 和审批可恢复 | 用户偏好、事实版本、计划版本和运行状态分层存储 |
 | 行动 | 可调用材料、证据清单、劳动分析和草稿工具 | 调用检索、计算、合同、纠纷、文书和平台工具 |
-| 计划 | 固定三步劳动计划 | 版本化动态 Plan-and-Execute，支持重新规划 |
-| 执行 | LangGraph + 白名单工具，但声明策略未统一执行 | Policy ToolExecutor + 受限 ReAct 单步执行 |
-| 验证 | 已有结构、事实、来源、风险四类确定性验证 | 领域规则扩展、证据引用闭环和评测门禁 |
+| 计划 | 劳动领域三步模板，按争议类型调整首步重点 | Domain Package 注册模板，Planner 受限选择/裁剪，生成不可静默修改的版本化 Plan |
+| 执行 | 劳动专用 Graph 顺序执行两个步骤，审批后由 `draft` 节点执行第三步 | 一套全局 Runtime Graph 按 Step 循环，业务文书只是可审批的普通 Step |
+| 验证 | 已有结构、事实、来源、风险四类确定性验证 | Global/Domain/Task 三层 Verifier + Observation + Decision Router |
 | 安全 | 已有审批、过期、步骤/工具预算和审计 | 可信来源、幂等、并发、时长/费用预算和人工接管 |
 | 法域 | 数据结构显式，当前业务只支持中国劳动纠纷 | 多国家、多地区、多语言、跨境冲突识别 |
 
@@ -80,6 +80,37 @@
 - 小型权威语料优先使用结构化过滤与全文检索，不为技术展示提前引入向量数据库。
 - 第二业务领域用于验证通用架构，但必须在当前领域的来源、规则和评测稳定后接入。
 - 事件模型先于 SSE/WS 传输实现；慢工具真实出现后再引入异步任务队列。
+
+### 3.8 一套全局 Runtime Graph
+
+- Runtime Graph 只管理上下文、规划、单步执行、观察、验证、决策、审批、恢复、预算和审计。
+- Runtime Graph 不写入劳动仲裁、合同审查、起诉状等业务步骤，不为每个模板复制一套 Graph。
+- 文书生成属于 Plan 中的 `document_drafting` Step；是否出现由模板和本次 Plan 决定，不是全局必经节点。
+
+### 3.9 Domain Package 提供能力，不掌握全局状态
+
+每个领域能力包统一声明：
+
+```text
+Domain Package
+├─ routing_rules
+├─ plan_templates
+├─ tools
+├─ verification_policies
+└─ optional_subgraphs
+```
+
+能力包先注册到 `CapabilityRegistry`，Task Router、Planner、ToolExecutor 和 Verifier 只通过注册中心查询能力。领域代码不得直接修改全局 Run 状态、绕过审批或自行推进其他领域步骤。
+
+### 3.10 PlanTemplate 与 Plan 分离
+
+- `PlanTemplate` 是开发者和法律专业人员审核过的任务策略，声明允许步骤、依赖、可选条件、工具范围、审批和验证策略。
+- `Plan` 是某次 Run 根据模板、案件事实和用户目标生成的执行快照，必须记录模板版本、计划修订号、参数、跳过原因和触发依据。
+- Plan 生成后不可静默原地修改；重规划必须创建新 revision，并保留差异、原因和触发者。
+
+### 3.11 Subgraph 只处理特殊控制流程
+
+只有具备独立生命周期、多轮循环、中断恢复或独立审批的能力才允许注册 Subgraph，例如证据真实性多轮核验、合同逐条审查修订循环。普通“检索→分析→生成”继续使用 PlanTemplate，禁止把 Domain Package 演变成隐藏的第二套 Runtime。
 
 ## 4. 总体分层架构
 
@@ -121,13 +152,27 @@ flask_app/
     ├── __init__.py                 # 仅导出稳定公共接口
     ├── facade.py                   # Router/现有业务调用的统一门面
     ├── runtime/
-    │   ├── graph.py
+    │   ├── graph.py              # 唯一全局 Runtime Graph
     │   ├── state.py
+    │   ├── task_router.py
     │   ├── planner.py
     │   ├── executor.py
+    │   ├── observer.py
     │   ├── verifier.py
+    │   ├── decision_router.py
     │   ├── policies.py
     │   └── checkpoints.py
+    ├── capabilities/
+    │   ├── registry.py           # Domain/模板/工具/策略统一注册入口
+    │   ├── domain.py
+    │   ├── templates.py
+    │   └── plans.py
+    ├── domains/
+    │   ├── labor/                # 首个迁移领域
+    │   ├── consultation/
+    │   ├── contracts/
+    │   ├── disputes/
+    │   └── drafting/
     ├── tools/
     │   ├── base.py
     │   ├── registry.py
@@ -156,6 +201,8 @@ flask_app/
 
 - `routers/` 只能调用 `legal_agent_system.facade` 暴露的公共用例，不直接调用 `runtime/`、具体工具或法域实现。
 - `runtime/` 依赖抽象工具协议和案件状态，不依赖 Flask、Router 或前端结构。
+- `capabilities/` 只保存注册协议、声明式模板和运行时 Plan 契约，不承载领域业务实现。
+- `domains/` 以能力包形式提供模板、工具适配、路由规则和验证策略；不得拥有全局 Run 状态机。
 - `tools/` 可以适配现有 Service，但工具之间不得互相直接调用；组合关系由 Runtime 管理。
 - `jurisdictions/` 只提供法域规则、能力声明和来源适配，不持有会话状态。
 - `matters/` 是案件事实和工作区的权威访问层，不包含 LLM 规划逻辑。
@@ -243,6 +290,7 @@ class AgentState:
     user_id: str
 
     user_goal: str
+    domain_id: str | None
     task_type: str
     risk_level: str
     jurisdiction: JurisdictionContext | None
@@ -252,7 +300,9 @@ class AgentState:
     document_ids: list[str]
 
     plan_id: str | None
-    plan_version: int
+    template_id: str | None
+    template_version: str | None
+    plan_revision: int
     current_step_id: str | None
 
     tool_result_ids: list[str]
@@ -273,6 +323,7 @@ awaiting_information
 planning
 executing
 verifying
+deciding
 awaiting_approval
 replanning
 completed
@@ -286,37 +337,35 @@ human_handoff
 ```text
 用户文字 / 语音 / 文件输入
         ↓
-恢复或创建案件工作区
+dispatch：恢复或创建 Run
         ↓
-识别目标、任务类型、风险和候选法域
-        ├─ 普通闲聊 → 直接回答
-        ├─ 法律问答 → 检索 → 生成 → 验证 → 回答
-        ├─ 紧急高风险 → 提示 → 人工接管
-        └─ 法律任务
-                ↓
-        提取事实与材料信息
-                ↓
-        法域或信息是否完整
-          ├─ 否 → 暂停并追问用户
-          └─ 是
-                ↓
-        生成或更新执行计划
-                ↓
-        执行当前步骤
-                ↓
-        受限 ReAct 选择工具
-                ↓
-        结构、事实、来源、风险验证
-          ├─ 失败 → 重试 / 换工具 / 重新规划
-          ├─ 需确认 → 暂停并请求确认
-          └─ 通过 → 下一步骤
-                ↓
-        生成最终交付物
-                ↓
-        用户审阅、修改、导出或转人工
-                ↓
-        保存案件状态与审计记录
+ensure_context：检查目标、法域、事实、材料和权限
+        ├─ 不完整 → 持久化等待并追问用户
+        └─ 完整
+              ↓
+route_task：从 Capability Registry 选择 domain_id / task_type
+              ↓
+build_plan：选择 PlanTemplate，生成新的 Plan revision
+              ↓
+select_next_step
+              ↓
+execute_step：ToolRegistry + PolicyToolExecutor 执行一个 Step
+              ↓
+observe_step：标准化 ToolResult、状态变化和引用
+              ↓
+verify_step：Global + Domain + Task 三层验证
+              ↓
+decide_step
+  ├─ next_step        → select_next_step
+  ├─ retry_step       → execute_step
+  ├─ request_context  → ensure_context
+  ├─ replan           → build_plan（创建新 revision）
+  ├─ require_approval → 暂停，批准后继续当前/下一 Step
+  ├─ reject/handoff   → 阻断或人工接管
+  └─ finish           → final_verify → completed
 ```
+
+`execute_step`、`observe_step`、`verify_step` 和 `decide_step` 均只处理一个 Step。Runtime 不允许一个节点隐式跑完整份 Plan。
 
 硬限制：
 
@@ -324,7 +373,78 @@ human_handoff
 - 同一工具和等价参数连续失败两次后禁止盲目重试。
 - 高风险动作执行前必须有未过期的用户审批。
 - 任务可在任意等待用户的节点持久化并恢复。
+- 可选步骤被跳过时必须保存 `skip_reason`；工具失败不得被记为跳过。
+- 重规划必须保留旧 Plan，新增 revision 并记录差异、原因和触发来源。
 - 不向用户展示模型内部思维链，只展示任务目标、当前步骤、依据、假设和等待事项。
+
+### 7.1 Runtime、能力包和计划的关系
+
+```text
+Runtime Graph = 通用编排内核
+Capability Registry = 领域能力查询入口
+Domain Package = 可插拔法律能力
+PlanTemplate = 经审核的任务策略
+Plan = 本次运行的不可变执行快照
+Subgraph = 特殊控制流程扩展
+```
+
+### 7.2 Domain Package 契约
+
+```python
+class DomainPackage:
+    domain_id: str
+    version: str
+    routing_rules: list
+    plan_templates: list
+    tools: list
+    verification_policies: list
+    optional_subgraphs: dict
+```
+
+### 7.3 PlanTemplate 最小契约
+
+```python
+class PlanTemplate:
+    template_id: str
+    version: str
+    domain_id: str
+    task_type: str
+    allowed_step_types: list[str]
+    steps: list[TemplateStep]
+```
+
+模板步骤至少声明：`step_type`、`tool_name`、`depends_on`、`optional`、`requires_approval`、`verification_policy_ids`、`on_failure`。Planner 只能选择注册模板、填充参数、跳过有条件的可选步骤或插入模板显式允许的补充步骤。
+
+### 7.4 运行时 Plan 契约
+
+```json
+{
+  "plan_id": "plan_xxx",
+  "template_id": "labor_arbitration_application",
+  "template_version": "1.0.0",
+  "plan_revision": 2,
+  "replan_reason": "补充了劳动关系解除日期",
+  "steps": [
+    {
+      "step_id": "step_xxx",
+      "step_type": "evidence_analysis",
+      "tool_name": "generate_evidence_checklist",
+      "status": "skipped",
+      "skip_reason": "用户已提供且验证通过完整证据清单"
+    }
+  ]
+}
+```
+
+### 7.5 分层 Verifier 和决策输出
+
+```text
+Global Verifier：结构、工具权限、预算、状态流转
+Domain Verifier：法域事实、来源、时效、管辖和领域规则
+Task Verifier：交付物字段、请求与事实、证据支撑和前后一致性
+```
+
+Verifier 只返回验证报告，不直接修改 Run 状态。`DecisionRouter` 将报告归一为：`pass`、`need_context`、`retry`、`replan`、`require_approval`、`reject` 或 `handoff`。
 
 ## 8. 工具协议
 
@@ -341,6 +461,10 @@ class ToolDefinition:
     risk_level: str
     requires_confirmation: bool
     timeout_seconds: int
+    side_effect: bool
+    idempotent: bool
+    required_permissions: list[str]
+    supported_domains: list[str]
 ```
 
 ### 8.2 统一结果
@@ -545,15 +669,15 @@ human_handoff
 
 验收：修改事实或来源后旧分析和旧草稿失效；核心请求可追溯到事实、材料和法条；相同输入幂等复用。
 
-#### 3.4D：动态 Plan-and-Execute 与统一工具执行器（已完成）
+#### 3.4D：模板化 Plan-and-Execute 与统一工具执行器（已完成基线）
 
 - 建立 `AgentPlan` 和计划版本；Planner 第一版使用确定性任务模板。
-- 至少区分欠薪、违法解除、补偿/赔偿三类劳动计划。
+- `LaborPlanBuilder` 根据欠薪、违法解除等争议调整核对重点，但当前工具序列仍为证据清单、劳动分析和审批后草稿三步；它不是通用动态 Planner。
 - `PolicyToolExecutor` 统一执行 Schema、法域、审批、超时、重试、预算和 ToolCall 审计。
 - 建立运行操作幂等记录和事件 Outbox；需要慢工具时再接 SSE/WS 与异步队列。
 - 工具失败只允许明确重试、换策略、重新规划或人工接管，不允许无限循环。
 
-验收：不同争议类型生成不同计划；事实变化产生新计划版本；重复继续/审批不重复执行；工具声明真正生效。
+验收：争议类型可以调整模板重点；事实变化产生新计划版本；重复继续/审批不重复执行；工具声明真正生效。多模板选择、条件步骤和 Verifier 驱动重规划转入阶段 3.6。
 
 #### 3.4E：受控引入 LLM（已完成）
 
@@ -589,6 +713,29 @@ human_handoff
 
 阶段 3.5 验收门槛：确定性结论有效法源覆盖率 100%；无依据确定性结论为 0；事实/法源变化后旧草稿失效 100%；并发继续请求不重复执行工具；同步失败可告警且任务安全阻断。
 
+### 阶段 3.6：方案 C 通用 Runtime 与能力注册（首批已完成，2026-07-16）
+
+目标：把劳动专用 Graph 提炼为一套全局 Runtime Graph，并让现有法律功能通过 Domain Package 渐进接入。
+
+1. 建立 `CapabilityRegistry`、`DomainPackage`、`PlanTemplate`、`PlanRevision` 和分层验证契约。
+2. 将 Graph 改为明确的单 Step 循环：`select → execute → observe → verify → decide`。
+3. 将 Verifier 与状态路由解耦，由 `DecisionRouter` 统一产生 next/retry/context/replan/approval/handoff/finish 决策。
+4. 把现有劳动三步计划下沉为 `labor_arbitration_application` 模板；保留原入口作为兼容适配器。
+5. 增加 `labor_consultation`、`labor_case_analysis` 两个只读模板，验证同一领域多任务。
+6. Plan revision 不可覆盖更新；可选步骤必须记录跳过原因；模板、工具和验证策略均记录版本。
+7. 迁移过程保留旧页面和旧接口，每次接入一个领域；新 Runtime 稳定并通过回归后再切换入口。
+
+验收：新增模板不修改 Runtime Graph；同一模板可因事实不同生成不同 Plan；Verifier 可触发补充信息、单步重试或新 revision；劳动三类任务共享同一单步执行内核；现有劳动仲裁闭环行为保持兼容。
+
+实施结果：
+
+- 新增 `capabilities/` 契约和注册中心，领域包注册前校验模板、路由和工具白名单，重复注册失败关闭。
+- 新增唯一 `CapabilityRuntimeGraph`，固定节点为 `ensure_context → route_task → build_plan → select_next_step → execute_step → observe_step → verify_step → decide_step`；Graph 内无劳动仲裁或文书工具名。
+- `LayeredVerifier` 只生成 Global/Domain/Task 报告，`DecisionRouter` 独立产生 next/retry/context/replan/reject/handoff/finish；审批由步骤声明在执行前暂停。
+- `agent_plans` 的每一行作为不可覆盖 revision，记录 domain、模板及版本、触发者、重规划原因和父计划；Step 保存类型、策略版本、跳过原因、Observation、Verification 和 Decision。
+- 中国劳动能力包注册 `labor_arbitration_application`、`labor_consultation`、`labor_case_analysis`。旧 `cn_labor_dispute` 作为路由别名，旧 Router/Facade 方法签名与页面继续兼容。
+- Alembic 已升级到 `20260716_0004`；阶段 3.1、3.2、3.6 相关 10 个回归通过，前端 TypeScript 检查通过。
+
 ### 阶段 4：实时 2D 数字人
 
 目标：把成熟的 Agent 闭环接入自然语音互动。
@@ -600,13 +747,13 @@ human_handoff
 
 验收：用户能用语音完成阶段 3 主流程；插话能终止播报；网络异常不丢失案件状态。
 
-### 阶段 5：扩展中国法律工具与专业领域
+### 阶段 5：扩展中国法律 Domain Package
 
 目标：逐步覆盖合同、一般民事纠纷、文书和费用时效工具。
 
-- 将现有业务 Service 逐步包装为统一工具。
+- 将现有法律咨询、合同审查、案件分析、纠纷、文书和计算 Service 逐步包装为统一工具，并按领域注册 PlanTemplate。
 - 不直接让 Agent 调用大型 Router 文件中的混杂逻辑；先下沉 Service。
-- 每新增一个领域必须同时增加法域声明、Schema、评测和风险规则。
+- 每新增一个领域必须同时增加 Domain Package、法域声明、Schema、模板、验证策略和评测。
 - 第二领域优先选择“只读合同审查”：上传合同、提取条款、识别风险、关联依据、给出修改建议；暂不自动改写或发送合同。
 
 ### 阶段 6：第二法域试点
@@ -642,8 +789,12 @@ human_handoff
 阶段3.4D 动态 Planner + ToolExecutor + Event Outbox
    ↓
 阶段3.4E 受控 LLM
+   ↓
+阶段3.5 生产可信化（可与下一阶段部分并行）
+   ↓
+阶段3.6 统一 Runtime Graph + Capability Registry
    ├────────→ 阶段4 实时 2D 数字人
-   └────────→ 阶段5 第二业务领域
+   └────────→ 阶段5 多领域 Domain Package
                       ↓
                 阶段6 第二法域
                       ↓
@@ -667,6 +818,8 @@ human_handoff
 - `authority_versions` / `authority_sync_runs`
 - `agent_runs`
 - `agent_plans`
+- `agent_plan_revisions`
+- `agent_plan_step_decisions`
 - `agent_steps`
 - `agent_run_actions`
 - `agent_event_outbox`
@@ -729,9 +882,10 @@ human_handoff
 
 ## 18. 下一步执行入口
 
-阶段 3.4A～3.4E 已全部落地。下一步执行入口：
+阶段 3.4A～3.4E 和阶段 3.6 首批已落地，阶段 3.5 仍有生产可信化待办。下一步执行入口：
 
-1. 在受控环境运行官方法源同步，并建立定期复核任务。
-2. 扩充时效中断、中止、劳动关系存续期间欠薪等评测案例。
-3. 用真实脱敏材料验证受控 LLM 候选召回率；未配置模型时继续使用确定性提取器。
-4. 完成并发压测、Outbox 消费器和生产监控后，再进入阶段 4 实时数字人。
+1. 继续完成法源复核、规则金标、定时同步告警、权限和长期运行等阶段 3.5 安全门槛。
+2. 完成阶段 3.6 的运行监控和更多失败/恢复评测，继续观察旧入口兼容性。
+3. 按“法律咨询 → 合同审查 → 案件分析/纠纷 → 文书 → 其他工具”的顺序注册新 Domain Package；新增模板不得修改全局 Graph。
+4. 第二领域优先接入只读合同审查，用它验证跨领域注册、来源策略和工具隔离。
+5. 新 Runtime 稳定并满足生产门槛后，再移除未被调用的劳动专用 Graph；移除前保持代码兼容。

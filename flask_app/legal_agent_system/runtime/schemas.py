@@ -93,6 +93,12 @@ class AgentState(BaseModel):
     client_id: str
     goal: str
     task_type: str = "mock_case_summary"
+    domain_id: Optional[str] = None
+    template_id: Optional[str] = None
+    template_version: Optional[str] = None
+    plan_id: Optional[str] = None
+    plan_revision: int = 0
+    replan_reason: Optional[str] = None
     risk_level: str = "L1"
     status: RunStatus = RunStatus.PLANNING
     current_step_id: Optional[str] = None
@@ -111,6 +117,10 @@ class AgentState(BaseModel):
     approved: Optional[bool] = None
     final_output: Optional[Dict[str, Any]] = None
     error_code: Optional[str] = None
+    last_tool_result: Optional[Dict[str, Any]] = None
+    last_observation: Optional[Dict[str, Any]] = None
+    last_verification: Optional[Dict[str, Any]] = None
+    last_decision: Optional[Dict[str, Any]] = None
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     budget_wallclock_seconds: int = Field(default=300, ge=1, le=3600)
     budget_tokens: int = Field(default=12000, ge=0)

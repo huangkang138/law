@@ -3,7 +3,7 @@
 Flask Router 只依赖本模块，不直接感知 LangGraph 节点、仓储或具体工具，
 从而保证后续替换 Runtime 实现时不会影响接口层。
 """
-
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -12,8 +12,10 @@ from .runtime.graph import AgentGraph
 from .runtime.persistence import AgentRepository
 from .runtime.registry import ToolRegistry
 from .runtime.runtime import AgentRuntime
-from .runtime.labor_graph import LaborDisputeGraph
-from .runtime.labor_runtime import LaborDisputeRuntime
+from .runtime.capability_graph import CapabilityRuntimeGraph
+from .runtime.capability_runtime import CapabilityRuntime
+from .capabilities import CapabilityRegistry
+from .domains.labor import build_labor_domain_package
 from .tools import (
     register_authority_verification_tools, register_labor_dispute_tools, register_labor_tools,
     register_material_tools, register_mock_tools,
@@ -48,13 +50,20 @@ class LegalAgentFacade:
         register_authority_verification_tools(self.registry, self.authorities)
         register_labor_tools(self.registry)
         register_labor_dispute_tools(self.registry, self.labor_disputes)
+        self.capabilities = CapabilityRegistry(self.registry)
+        self.capabilities.register(build_labor_domain_package())
         self.runtime = AgentRuntime(self.repository, AgentGraph(self.repository, self.registry))
-        self.labor_runtime = LaborDisputeRuntime(
+        self.capability_runtime = CapabilityRuntime(
             self.repository,
-            LaborDisputeGraph(self.repository, self.registry, self.materials, self.labor_disputes),
-            self.labor_disputes, self.jurisdictions,
+            CapabilityRuntimeGraph(
+                self.repository, self.registry, self.capabilities,
+                self.materials, self.labor_disputes,
+            ),
+            self.labor_disputes, self.jurisdictions, self.capabilities,
             (lambda: self._try_sync_authorities(force=True)) if auto_sync_authorities else None,
         )
+        # 兼容旧代码读取 labor_runtime 属性；真实执行已统一委托给方案 C Runtime。
+        self.labor_runtime = self.capability_runtime
 
     def start_run(self, goal: str, client_id: str, session_id: Optional[str] = None):
         """创建并执行任务，直到完成、失败或进入等待用户状态。"""
@@ -175,19 +184,38 @@ class LegalAgentFacade:
         """经用户确认生成劳动仲裁申请书草稿。"""
         return self.labor_disputes.create_draft(matter_id, client_id, approved)
 
-    def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None):
-        """启动或复用当前 Matter 的劳动纠纷 LangGraph 任务。"""
+    def start_labor_dispute_run(self, matter_id: str, client_id: str, facts=None, task_type: str = "cn_labor_dispute"):
+        logging.info("启动劳动任务：%s/%s/%s", matter_id, client_id, task_type)
+        """兼容入口；默认映射到 labor_arbitration_application 模板。"""
         if self.auto_sync_authorities:
             self._try_sync_authorities()
-        return self.labor_runtime.start(matter_id, client_id, facts)
+        return self.capability_runtime.start(matter_id, client_id, task_type, facts)
+
+    def start_labor_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
+        """通过能力注册中心启动任一已注册劳动任务。"""
+        return self.start_labor_dispute_run(matter_id, client_id, facts, task_type)
+
+    def list_agent_capabilities(self):
+        """返回可查询的领域与模板元数据，不暴露内部处理器。"""
+        return [{
+            "domain_id": package.domain_id,
+            "version": package.version,
+            "task_types": [rule.task_type for rule in package.routing_rules],
+            "templates": [{
+                "template_id": item.template_id,
+                "version": item.version,
+                "task_type": item.task_type,
+            } for item in package.plan_templates],
+        } for package in self.capabilities.list_domains()]
 
     def suggest_labor_dispute_facts(self, matter_id: str, client_id: str):
         """从已授权材料生成带出处候选值，不自动确认或写入案件事实。"""
-        return self.labor_suggestions.suggest(matter_id, client_id)
+        self.suggest = self.labor_suggestions.suggest(matter_id, client_id)
+        return self.suggest
 
     def continue_labor_dispute_run(self, run_id: str, client_id: str, action: str, payload=None, idempotency_key=None):
         """以补充事实、确认法域、审批或来源重试继续暂停任务。"""
-        return self.labor_runtime.continue_run(run_id, client_id, action, payload, idempotency_key)
+        return self.capability_runtime.continue_run(run_id, client_id, action, payload, idempotency_key)
 
 
 _facade = None
