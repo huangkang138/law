@@ -125,6 +125,7 @@ export interface MatterAnalysisResult {
 
 export interface DigitalHumanMatterSummary {
   matter_id: string;
+  session_id: string | null;
   title: string;
   goal: string;
   created_at: string | null;
@@ -133,6 +134,7 @@ export interface DigitalHumanMatterSummary {
 
 export interface DigitalHumanMatterDetail {
   matter_id: string;
+  session_id: string | null;
   title: string;
   goal: string;
   jurisdiction: null | {
@@ -404,9 +406,18 @@ export async function cancelDigitalHumanAgentRun(runId: string): Promise<Digital
   return readJson<DigitalHumanAgentRun>(response);
 }
 
-export async function createDigitalHumanMatter(goal: string): Promise<{ matter_id: string; title: string; goal: string }> {
+export async function getDigitalHumanAgentRun(runId: string): Promise<DigitalHumanAgentRun> {
+  const response = await request(`/api/digital-human/agent/runs/${encodeURIComponent(runId)}`);
+  return readJson(response);
+}
+
+export async function createDigitalHumanMatter(
+  goal: string,
+  sessionId?: string | null,
+): Promise<{ matter_id: string; session_id: string | null; title: string; goal: string }> {
   const response = await request('/api/digital-human/agent/matters', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal, ...(sessionId ? { session_id: sessionId } : {}) }),
   });
   return readJson(response);
 }
@@ -494,7 +505,10 @@ export async function createLaborDisputeDraft(matterId: string): Promise<LaborDi
 
 export async function startLaborDisputeAgentRun(
   matterId: string, facts: Record<string, unknown>,
-  taskType: 'cn_labor_dispute' | 'labor_arbitration_application' | 'labor_consultation' | 'labor_case_analysis' = 'cn_labor_dispute',
+  taskType:
+    | 'cn_labor_dispute' | 'labor_arbitration_application'
+    | 'labor_consultation' | 'labor_case_analysis' | 'labor_relationship_assessment'
+    = 'cn_labor_dispute',
 ): Promise<DigitalHumanAgentRun> {
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/run`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facts, task_type: taskType }),

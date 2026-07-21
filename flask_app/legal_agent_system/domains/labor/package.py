@@ -48,7 +48,7 @@ def _analysis_step(depends_on: list[str], tool_name: str = "analyze_labor_disput
 
 
 def build_labor_domain_package() -> DomainPackage:
-    relationship = PlanTemplate(
+    relationship = PlanTemplate(#劳动关系评估
         template_id="labor_relationship_assessment",
         version="1.0.0",
         domain_id="cn_labor",
@@ -63,7 +63,7 @@ def build_labor_domain_package() -> DomainPackage:
             on_failure="handoff",
         )],
     )
-    arbitration = PlanTemplate(
+    arbitration = PlanTemplate(#劳动仲裁申请
         template_id="labor_arbitration_application",
         version="1.0.0",
         domain_id="cn_labor",
@@ -84,7 +84,7 @@ def build_labor_domain_package() -> DomainPackage:
             ),
         ],
     )
-    consultation = PlanTemplate(
+    consultation = PlanTemplate(#劳动法律咨询
         template_id="labor_consultation",
         version="1.0.0",
         domain_id="cn_labor",
@@ -92,7 +92,7 @@ def build_labor_domain_package() -> DomainPackage:
         allowed_step_types=COMMON_STEP_TYPES,
         steps=[_evidence_step(), _analysis_step(["evidence_check"], "analyze_labor_consultation")],
     )
-    case_analysis = PlanTemplate(
+    case_analysis = PlanTemplate(#劳动案件分析
         template_id="labor_case_analysis",
         version="1.0.0",
         domain_id="cn_labor",

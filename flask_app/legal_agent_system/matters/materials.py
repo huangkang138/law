@@ -6,7 +6,10 @@ import uuid
 from typing import Dict, List
 
 from core.database import SessionLocal
-from models.db_models import AgentDocument, DocumentFragment, LegalFact, Matter, MatterJurisdiction
+from models.db_models import (
+    AgentDocument, DigitalHumanSession, DocumentFragment,
+    LegalFact, Matter, MatterJurisdiction,
+)
 
 from legal_agent_system.runtime.errors import AgentRuntimeError
 
@@ -25,20 +28,29 @@ class MaterialService:
     MAX_CHARACTERS = 200_000
     FRAGMENT_SIZE = 1_000
 
-    def create_matter(self, client_id: str, goal: str) -> Dict:
+    def create_matter(self, client_id: str, goal: str, session_id: str | None = None) -> Dict:
         """创建独立材料工作区，不触发阶段 1 的模拟 Runtime。"""
         goal = goal.strip() if isinstance(goal, str) else ""
         if not goal:
             raise AgentRuntimeError("案件目标不能为空", "INVALID_INPUT")
         db = SessionLocal()
         try:
+            if session_id:
+                session = db.get(DigitalHumanSession, session_id)
+                if session is None:
+                    raise AgentRuntimeError("数字人会话不存在", "SESSION_NOT_FOUND")
+                if session.user_id != client_id:
+                    raise AgentRuntimeError("无权关联该数字人会话", "FORBIDDEN")
             matter = Matter(
                 id=_id("matter"), client_id=client_id, title=goal[:60],
-                goal=goal, status="active",
+                goal=goal, session_id=session_id, status="active",
             )
             db.add(matter)
             db.commit()
-            return {"matter_id": matter.id, "title": matter.title, "goal": matter.goal}
+            return {
+                "matter_id": matter.id, "title": matter.title,
+                "goal": matter.goal, "session_id": matter.session_id,
+            }
         except Exception:
             db.rollback()
             raise
@@ -54,6 +66,7 @@ class MaterialService:
             ).order_by(Matter.updated_at.desc(), Matter.created_at.desc()).all()
             return [{
                 "matter_id": item.id, "title": item.title, "goal": item.goal,
+                "session_id": item.session_id,
                 "created_at": item.created_at.isoformat() if item.created_at else None,
                 "updated_at": item.updated_at.isoformat() if item.updated_at else None,
             } for item in matters]
@@ -72,6 +85,7 @@ class MaterialService:
             ).first()
             return {
                 "matter_id": matter.id, "title": matter.title, "goal": matter.goal,
+                "session_id": matter.session_id,
                 "jurisdiction": None if jurisdiction is None else {
                     "country_code": jurisdiction.country_code,
                     "subdivision_code": jurisdiction.subdivision_code,

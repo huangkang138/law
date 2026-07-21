@@ -61,8 +61,9 @@ LangGraph 与 Plan 的后续边界已经明确：
 - 新增 `labor_relationship_assessment` 模板和 `assess_labor_relationship` 工具；劳动 Domain Package 现有四个真实模板，继续共享同一通用 Runtime Graph。
 - 初筛基于主体资格、有偿劳动、劳动管理、业务组成和就业目的，覆盖学校安排实习、勤工助学、自主实习、兼职、毕业就业和普通用工。学生身份、协议名称或欠薪关键词均不能单独触发仲裁流程。
 - 分流结果保存争议标签、判断依据、缺失事实、问题、风险等级、推荐任务、下一步和人工复核标记，并固定声明不是最终法律结论。
-- 新增 `GET/POST /api/digital-human/agent/matters/{matter_id}/labor/triage`。普通数字人聊天尚未自动调用分流、创建 Matter 或启动推荐任务，该部分仍属于 3.7D。
-- 完整数字人 Agent 测试 44/44 通过；同步修复阶段 3.4 测试 Provider 使用固定历史抓取时间导致七天后自然失效的问题。
+- 新增 `GET/POST /api/digital-human/agent/matters/{matter_id}/labor/triage`。
+- 阶段 3.7A.1 已打通聊天会话、Matter、分流、Agent Run 与右侧工作台：Matter 持久绑定 `session_id`；前端共享当前 Matter/Triage/Run；分流完成后校验并消费 `recommended_task_type`，分别启动劳动咨询、劳动关系判断或劳动案件分析模板；缺失事实、高风险和非劳动场景保持失败关闭。
+- 完整数字人 Agent 测试 45/45、前端类型检查和隔离生产构建通过；同步修复阶段 3.4 测试 Provider 使用固定历史抓取时间导致七天后自然失效的问题。
 
 ## 后端怎么看
 

@@ -100,9 +100,9 @@ class LegalAgentFacade:
         """向当前客户端所属 Matter 添加授权材料。"""
         return self.materials.ingest_text(matter_id, client_id, filename, text, media_type)
 
-    def create_matter(self, client_id: str, goal: str):
+    def create_matter(self, client_id: str, goal: str, session_id: str | None = None):
         """创建阶段 2 材料工作区，不执行阶段 1 模拟任务。"""
-        return self.materials.create_matter(client_id, goal)
+        return self.materials.create_matter(client_id, goal, session_id)
 
     def extract_material_facts(self, matter_id: str, client_id: str, document_id: str):
         """提取带材料位置引用的候选事实。"""

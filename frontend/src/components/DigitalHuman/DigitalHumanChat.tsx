@@ -40,7 +40,7 @@ export default function DigitalHumanChat() {
     if (container) {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages, isLoading, laborTriage.snapshot, laborTriage.isLoading]);
+  }, [messages, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -115,7 +115,6 @@ export default function DigitalHumanChat() {
           type="button"
           onClick={() => {
             startNewConversation();
-            laborTriage.reset();
             setHistoryOpen(false);
           }}
           aria-label="开始新对话"
@@ -144,7 +143,6 @@ export default function DigitalHumanChat() {
                 type="button"
                 className="dh-history-select"
                 onClick={() => {
-                  laborTriage.reset();
                   void loadSession(session.id);
                   setHistoryOpen(false);
                 }}
@@ -202,6 +200,7 @@ export default function DigitalHumanChat() {
         )}
         <LaborTriageCard
           snapshot={laborTriage.snapshot}
+          agentRun={laborTriage.agentRun}
           isLoading={laborTriage.isLoading}
           error={laborTriage.error}
           onSubmit={laborTriage.submitFacts}

@@ -536,3 +536,39 @@
 - 实际改动：新增职责分离的 `labor_disputes/triage_schemas.py`、`triage_rules.py`、`triage.py`，以及 `tools/labor_triage_tools.py`、迁移 `20260721_0008` 和阶段 3.7A 测试；更新模型、劳动 Domain Package/Adapter/Verifier、Capability Adapter 契约、Runtime 调用、Facade、Router、README、阶段 3.6 测试、总体规划和最新分析。另将阶段 3.4 测试 Provider 的抓取时间改为运行时当前时间，避免七天新鲜度门禁造成日历型测试失败。
 - 验证：Python compileall 通过；阶段 3.6+3.7A 专项 11/11 通过；完整数字人 Agent 回归 44/44 通过；本地 PostgreSQL 已从 `20260716_0007` 非破坏性升级到 `20260721_0008 (head)`。
 - 风险与后续：当前为结构化初筛，不是最终劳动关系法律结论；尚未为自然语言聊天自动提取全部分流字段，也未自动启动推荐任务。阶段 3.5 法源复核/权限/告警仍按用户决定暂缓；下一步可进入 3.7B 的欠薪、解除、补偿模板与受控组合 Plan，或先做 3.7D 的聊天入口融合。
+
+## 2026-07-21 16:24:10 +08:00
+
+- 会话 ID：`019f832d-788d-7080-85db-7d503fa11450`。
+- 分支/Git 状态：当前分支 `master`；修改前已有阶段 3.7A、迁移、测试、工作台、图件、上传材料和输出物等未提交或未跟踪内容，本次全部保留，仅增量修改分流编排闭环相关代码、测试与规定文档。
+- 用户请求：执行阶段 3.7A.1，打通 `Chat Session ↔ Matter ↔ Triage Result ↔ Agent Run ↔ DigitalHumanMatterWorkspace`，让五类分流真正决定后续 Runtime 行为。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、总体规划、最新项目分析、阶段 3.6/3.7A 历史，以及当前聊天 Store、分流 Hook/Card、Workspace、API、Matter Service、Facade、Router、Capability Runtime、劳动 Adapter 和专项测试。
+- 修改思路：不复制 Runtime、不新增 3.7B 模板；把 Matter/Triage/Run 提升到现有 Zustand Store，后端只补齐 Matter 已有 `session_id` 外键的安全写入；前端严格校验后端推荐任务后调用既有 Runtime。
+- 具体方案：数字人会话创建的 Matter 持久绑定并校验 `session_id`；Store 按会话保存当前 Matter/Run 标识并从后端恢复快照；简单咨询、关系判断、正式纠纷分别启动 `labor_consultation`、`labor_relationship_assessment`、`labor_case_analysis`；缺失事实不启动 Run，高风险和非劳动保持阻断；Workspace 共用当前 Matter/Run，法域确认和事实补充继续同一 Run，并展示分流、缺失事实、状态和最终结果入口。
+- 实际改动：Matter Service/Facade/Router 的可选会话绑定；前端 API 契约、数字人 Store、分流编排 Hook/Card、Chat 与 Workspace；阶段 3.7A 测试；总体规划、最新分析和本日志。
+- 验证：阶段 3.6+3.7A 专项 12/12 通过；完整数字人测试 45/45 通过；前端 `npx tsc --noEmit` 通过；在隔离临时目录中完成 Next.js 生产构建，37 个静态页面全部生成。正式 `.next` 仍由正在运行的开发服务占用，因此未停止用户服务，隔离构建完成后临时目录已清理。
+- 风险与后续：劳动场景入口仍采用前端保守关键词和有限结构化提取；浏览器只保存每个会话当前的一组 Matter/Run 映射，后端尚无“按 Matter 查询全部历史 Run”的恢复接口；高风险只有人工复核标记，没有真实人工服务通道；阶段 3.7B 未进入。
+
+## 2026-07-21 16:45:00 +08:00
+
+- 会话 ID：当前环境未暴露；本地追踪标识 `ai-workflow-20260721`。
+- 分支/Git 状态：当前分支 `master`；修改前工作树已有劳动分流、前端工作台、迁移、测试、图件、上传材料和输出物等未提交改动，本次全部保留。
+- 用户请求：仅整理 Markdown 协作规则和工作流文档，新增 `AI_WORKFLOW/` 六种模式与初始化状态；禁止修改业务代码、配置、数据库或前后端源码。
+- 修改前阅读：`AGENTS.md`、`CLAUDE.md`、`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/多法域数字人法律Agent总体规划.md`、`flask_app/legal_agent_system/实际Agent架构与运行流程.md`、`newModify/latest-project-analysis.md`、相关修改历史，以及当前 Facade、Router、前端 Store 与劳动分流 Hook。
+- 修改思路：保留既有权威资料位置，建立轻量工作流面板；当前任务和下一步允许覆盖，架构决策与阶段记忆保持可检索且不复制完整项目分析或历史。
+- 具体方案：在 `AGENTS.md` 增加清晰导航与默认“开发者记忆卡”交付规则；新增 `AI_WORKFLOW/README.md`、四份状态文档及 FEATURE、BUGFIX、REVIEW、LEARN、ARCHITECTURE、FRONTEND 六种模式；按当前 3.7A/3.7A.1 源码状态初始化内容。
+- 实际改动：仅修改 `AGENTS.md`、新增 `AI_WORKFLOW/` 下 11 个 Markdown 文件，并追加本记录；未修改业务代码、配置、数据库、迁移或前后端源码。
+- 验证：核对新增文件结构、Markdown 标题和链接引用；检查 `git diff --check`；复核变更文件均为允许范围内的 Markdown。
+- 风险与后续：工作流文件是协作导航而非真相副本；代码任务仍需以当前源码和 `newModify/latest-project-analysis.md` 为准，并继续按规则写入完整修改历史。
+
+## 2026-07-21 18:50:00 +08:00
+
+- 会话 ID：当前环境未暴露；本地追踪标识 `ai-workflow-export-20260721`。
+- 分支/Git 状态：当前分支 `master`；工作树已有业务、文档、迁移、测试和图件改动，本次全部保留。
+- 用户请求：将协作体系按既定层级复制到 `D:\ProfileManage`，作为将来可复用或迁移到其他项目的资料。
+- 修改前阅读：`AGENTS.md`、`PROJECT_MODIFICATION_RULES.md`、当前 Git 状态与目标目录状态。
+- 修改思路：仅导出协作规则、工作流、当前项目状态、完整修改历史与长期架构资料；不复制业务源码、配置、数据库或敏感信息。
+- 具体方案：建立 `D:\ProfileManage\YYS-Law-AI-Collaboration-Template`，保留 `AGENTS.md`、`CLAUDE.md`、`AI_WORKFLOW/`、`newModify/` 指定两份文档及完整 `raw/` 的相对层级。
+- 实际改动：追加本记录；外部资料副本不属于当前 Git 仓库。
+- 验证：复制后核对目标文件树、文件计数和关键 Markdown 文件存在性。
+- 风险与后续：该副本包含当前项目的状态与历史，迁用到新项目时应保留规则与模式，替换项目状态、历史和 `raw/` 架构资料。

@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import {
+  DigitalHumanAgentRun,
   DigitalHumanEmotion,
   DigitalHumanSessionSummary,
+  LaborTriageSnapshot,
   deleteDigitalHumanSession,
   getDigitalHumanMessages,
   getDigitalHumanSessions,
@@ -28,6 +30,16 @@ interface DigitalHumanStore {
   isLoading: boolean;
   sessions: DigitalHumanSessionSummary[];
   historyError: string;
+  currentMatterId: string | null;
+  currentTriage: LaborTriageSnapshot | null;
+  currentAgentRun: DigitalHumanAgentRun | null;
+  laborTriageLoading: boolean;
+  laborTriageError: string;
+  laborContextBySession: Record<string, {
+    matterId: string;
+    runId: string | null;
+    triageStarted: boolean;
+  }>;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -40,6 +52,15 @@ interface DigitalHumanStore {
   refreshHistory: () => Promise<void>;
   startNewConversation: () => void;
   cancelRequest: () => void;
+  setLaborContext: (context: {
+    matterId?: string | null;
+    triage?: LaborTriageSnapshot | null;
+    run?: DigitalHumanAgentRun | null;
+    loading?: boolean;
+    error?: string;
+  }) => void;
+  selectCurrentMatter: (matterId: string | null) => void;
+  setCurrentAgentRun: (run: DigitalHumanAgentRun | null) => void;
 }
 
 let activeRequest: AbortController | null = null;
@@ -65,6 +86,12 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       isLoading: false,
       sessions: [],
       historyError: '',
+      currentMatterId: null,
+      currentTriage: null,
+      currentAgentRun: null,
+      laborTriageLoading: false,
+      laborTriageError: '',
+      laborContextBySession: {},
 
       open: () => {
         set((state) => ({
@@ -160,6 +187,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           sessionId: null,
           emotion: 'welcome',
           isLoading: false,
+          currentMatterId: null,
+          currentTriage: null,
+          currentAgentRun: null,
+          laborTriageError: '',
         });
         void get().loadSessions();
       },
@@ -179,6 +210,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       loadSession: async (sessionId) => {
         try {
           const history = await getDigitalHumanMessages(sessionId);
+          const context = get().laborContextBySession[sessionId];
           set({
             sessionId,
             messages: history.length ? history.map((item) => ({
@@ -186,6 +218,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
               createdAt: item.created_at ? Date.parse(item.created_at) : 0,
             })) : [WELCOME_MESSAGE],
             emotion: 'idle',
+            currentMatterId: context?.matterId || null,
+            currentTriage: null,
+            currentAgentRun: null,
+            laborTriageError: '',
           });
         } catch { /* 会话可能已从其他页面删除 */ }
       },
@@ -193,8 +229,16 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       deleteSession: async (sessionId) => {
         await deleteDigitalHumanSession(sessionId);
         if (get().sessionId === sessionId) {
-          set({ sessionId: null, messages: [WELCOME_MESSAGE], emotion: 'welcome' });
+          set({
+            sessionId: null, messages: [WELCOME_MESSAGE], emotion: 'welcome',
+            currentMatterId: null, currentTriage: null, currentAgentRun: null,
+          });
         }
+        set((state) => {
+          const contexts = { ...state.laborContextBySession };
+          delete contexts[sessionId];
+          return { laborContextBySession: contexts };
+        });
         await get().loadSessions();
       },
 
@@ -210,6 +254,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           messages: [WELCOME_MESSAGE],
           emotion: 'welcome',
           isLoading: false,
+          currentMatterId: null,
+          currentTriage: null,
+          currentAgentRun: null,
+          laborTriageError: '',
         });
       },
 
@@ -219,11 +267,55 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         set({ isLoading: false, emotion: 'idle' });
       },
 
+      setLaborContext: (context) => set((state) => {
+        const matterId = context.matterId !== undefined ? context.matterId : state.currentMatterId;
+        const run = context.run !== undefined ? context.run : state.currentAgentRun;
+        const contexts = { ...state.laborContextBySession };
+        if (state.sessionId && context.matterId === null) delete contexts[state.sessionId];
+        if (state.sessionId && matterId) {
+          const previous = contexts[state.sessionId];
+          contexts[state.sessionId] = {
+            matterId,
+            runId: run?.run_id || null,
+            triageStarted: previous?.matterId === matterId
+              ? previous.triageStarted || context.triage != null
+              : context.triage != null,
+          };
+        }
+        return {
+          currentMatterId: matterId,
+          currentTriage: context.triage !== undefined ? context.triage : state.currentTriage,
+          currentAgentRun: run,
+          laborTriageLoading: context.loading !== undefined ? context.loading : state.laborTriageLoading,
+          laborTriageError: context.error !== undefined ? context.error : state.laborTriageError,
+          laborContextBySession: contexts,
+        };
+      }),
+
+      selectCurrentMatter: (matterId) => set((state) => {
+        if (matterId && state.currentMatterId === matterId) return { currentMatterId: matterId };
+        const contexts = { ...state.laborContextBySession };
+        if (state.sessionId && matterId) {
+          contexts[state.sessionId] = { matterId, runId: null, triageStarted: false };
+        }
+        if (state.sessionId && !matterId) delete contexts[state.sessionId];
+        return {
+          currentMatterId: matterId,
+          currentTriage: null,
+          currentAgentRun: null,
+          laborTriageError: '',
+          laborContextBySession: contexts,
+        };
+      }),
+
+      setCurrentAgentRun: (run) => get().setLaborContext({ run }),
+
     }),
     {
       name: 'yys-law-digital-human',
       partialize: (state) => ({
         sessionId: state.sessionId,
+        laborContextBySession: state.laborContextBySession,
       }),
     },
   ),

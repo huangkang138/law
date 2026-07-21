@@ -98,8 +98,9 @@ def add_material(matter_id):
 @router.route("/digital-human/agent/matters", methods=["POST"])
 def create_matter():
     """创建阶段 2 材料工作区。"""
+    data = request.get_json(silent=True) or {}
     return _response(lambda: get_legal_agent_facade().create_matter(
-        _client_id(), (request.get_json(silent=True) or {}).get("goal"),
+        _client_id(), data.get("goal"), data.get("session_id"),
     ))
 
 
