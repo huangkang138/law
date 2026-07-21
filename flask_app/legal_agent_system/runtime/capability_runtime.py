@@ -22,7 +22,7 @@ class CapabilityRuntime:
         logging.info("启动 Agent 任务: matter=%s client=%s task=%s", matter_id, client_id, task_type)
         resolved = self.capability_registry.resolve(task_type)#1找到属于哪个领域、使用哪个模板
         adapter = self.capability_registry.get_adapter(resolved.domain.domain_id)
-        updated = adapter.prepare_start(matter_id, client_id, facts)#2保存劳动事实
+        updated = adapter.prepare_start(matter_id, client_id, facts, task_type)#2保存领域事实
         state = self.repository.find_or_create_active_run(matter_id, client_id, task_type)#3找到或创建任务
         self._bind_capability(state, resolved)
         if state.status == RunStatus.AWAITING_INFORMATION.value and updated:

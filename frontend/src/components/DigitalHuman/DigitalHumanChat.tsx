@@ -7,7 +7,9 @@ import { useRouter } from 'next/navigation';
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
+import LaborTriageCard from './LaborTriageCard';
 import DigitalHumanMatterWorkspace from './DigitalHumanMatterWorkspace';
+import { isLaborQuestion, useLaborTriage } from './useLaborTriage';
 
 export default function DigitalHumanChat() {
   const [question, setQuestion] = useState('');
@@ -15,6 +17,7 @@ export default function DigitalHumanChat() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const laborTriage = useLaborTriage();
   const {
     close,
     cancelRequest,
@@ -37,7 +40,7 @@ export default function DigitalHumanChat() {
     if (container) {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, laborTriage.snapshot, laborTriage.isLoading]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -45,6 +48,7 @@ export default function DigitalHumanChat() {
     if (!value || isLoading) return;
     setQuestion('');
     await sendMessage(value);
+    if (isLaborQuestion(value)) await laborTriage.start(value);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -111,6 +115,7 @@ export default function DigitalHumanChat() {
           type="button"
           onClick={() => {
             startNewConversation();
+            laborTriage.reset();
             setHistoryOpen(false);
           }}
           aria-label="开始新对话"
@@ -139,6 +144,7 @@ export default function DigitalHumanChat() {
                 type="button"
                 className="dh-history-select"
                 onClick={() => {
+                  laborTriage.reset();
                   void loadSession(session.id);
                   setHistoryOpen(false);
                 }}
@@ -194,6 +200,13 @@ export default function DigitalHumanChat() {
             </div>
           </div>
         )}
+        <LaborTriageCard
+          snapshot={laborTriage.snapshot}
+          isLoading={laborTriage.isLoading}
+          error={laborTriage.error}
+          onSubmit={laborTriage.submitFacts}
+          onRetry={laborTriage.retry}
+        />
       </div>
 
       <form className="dh-composer" onSubmit={handleSubmit}>

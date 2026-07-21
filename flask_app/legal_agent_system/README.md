@@ -25,8 +25,8 @@ facade.py
 | `tools/` | 可被 Runtime 执行的最小动作 | `ToolRegistry`、`PolicyToolExecutor` |
 | `matters/` | 案件、材料、事实、时间线、证据清单 | Facade、领域 Adapter、Tools |
 | `jurisdictions/` | 法域确认、官方法源同步与校验 | Facade、领域 Adapter、Tools |
-| `labor_disputes/` | 劳动事实、规则、分析、建议、草稿 | 劳动 Adapter、劳动 Tools |
-| `models.py` | 本模块新增的数据库模型 | `runtime/persistence.py`、法源服务 |
+| `labor_disputes/` | 劳动分流、关系初筛、事实、规则、分析、建议、草稿 | 劳动 Adapter、劳动 Tools |
+| `models.py` | 本模块新增的数据库模型 | Runtime、法源服务、劳动分流服务 |
 
 ![包关系图](./diagrams/legal-agent-packages.svg)
 
@@ -61,8 +61,8 @@ facade.py
 |---|---|---|
 | `__init__.py` | - | 领域包命名空间。 |
 | `labor/__init__.py` | - | 导出劳动领域包和 Adapter。 |
-| `labor/package.py` | `build_labor_domain_package` | 声明劳动仲裁、劳动咨询、案件分析三种模板及工具白名单。 |
-| `labor/adapter.py` | `LaborDomainRuntimeAdapter` | 提供劳动上下文判断、计划定制、工具参数、法域和继续动作。 |
+| `labor/package.py` | `build_labor_domain_package` | 声明劳动关系判断、仲裁、咨询、案件分析四种模板及工具白名单。 |
+| `labor/adapter.py` | `LaborDomainRuntimeAdapter` | 提供劳动分流/纠纷上下文判断、计划定制、工具参数、法域和继续动作。 |
 | `labor/verifier.py` | `LaborResultVerifier` | 劳动领域的结构、事实和法源结果校验。 |
 | `mock/package.py` | `build_mock_domain_package` | 把阶段 1 模拟摘要声明为普通能力包。 |
 | `mock/adapter.py` | `MockDomainRuntimeAdapter` | 让旧阶段 1 HTTP 进入同一个通用 Runtime。 |
@@ -88,6 +88,7 @@ facade.py
 
 | 文件 | 主要入口 | 对应内容 |
 |---|---|---|
+| `labor_triage_tools.py` | `register_labor_triage_tools` | 执行可解释、只读的劳动关系初筛与案件分流。 |
 | `__init__.py` | - | 工具统一导出。 |
 | `material_tools.py` | `register_material_tools` | 材料解析、事实提取、时间线、证据清单工具。 |
 | `authority_tools.py` | `register_authority_verification_tools` | 法源引用校验工具。 |
@@ -118,6 +119,9 @@ facade.py
 
 | 文件 | 主要入口 | 对应内容 |
 |---|---|---|
+| `triage_schemas.py` | `LaborTriageFacts` | 定义实习、兼职、就业和高风险分流事实契约。 |
+| `triage_rules.py` | `LaborTriageDecisionEngine` | 输出五类分流、关系倾向、依据、缺失事实、风险和下一步。 |
+| `triage.py` | `LaborCaseTriageService` | 版本化保存分流事实和判断结果。 |
 | `__init__.py` | - | 劳动争议组件导出。 |
 | `schemas.py` | `LaborDisputeFacts` | 劳动争议事实字段 Schema。 |
 | `service.py` | `LaborDisputeService` | 确认事实、缺失项、分析结果和仲裁草稿。 |

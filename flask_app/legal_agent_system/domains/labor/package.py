@@ -9,8 +9,12 @@ from legal_agent_system.capabilities.contracts import (
 )
 
 
-COMMON_STEP_TYPES = ["evidence_analysis", "timeline_analysis", "legal_analysis", "document_drafting"]
+COMMON_STEP_TYPES = [
+    "relationship_assessment", "evidence_analysis", "timeline_analysis",
+    "legal_analysis", "document_drafting",
+]
 COMMON_TOOLS = [
+    "assess_labor_relationship",
     "generate_evidence_checklist",
     "build_case_timeline",
     "analyze_labor_dispute",
@@ -44,6 +48,21 @@ def _analysis_step(depends_on: list[str], tool_name: str = "analyze_labor_disput
 
 
 def build_labor_domain_package() -> DomainPackage:
+    relationship = PlanTemplate(
+        template_id="labor_relationship_assessment",
+        version="1.0.0",
+        domain_id="cn_labor",
+        task_type="labor_relationship_assessment",
+        allowed_step_types=COMMON_STEP_TYPES,
+        steps=[TemplateStep(
+            step_id="relationship_assessment",
+            name="判断实习、兼职或就业场景中的法律关系",
+            step_type="relationship_assessment",
+            tool_name="assess_labor_relationship",
+            verification_policy_ids=["global.tool_result", "labor.relationship"],
+            on_failure="handoff",
+        )],
+    )
     arbitration = PlanTemplate(
         template_id="labor_arbitration_application",
         version="1.0.0",
@@ -106,13 +125,18 @@ def build_labor_domain_package() -> DomainPackage:
             ),
             RoutingRule(task_type="labor_consultation", template_id=consultation.template_id),
             RoutingRule(task_type="labor_case_analysis", template_id=case_analysis.template_id),
+            RoutingRule(
+                task_type="labor_relationship_assessment",
+                template_id=relationship.template_id,
+            ),
         ],
-        plan_templates=[arbitration, consultation, case_analysis],
+        plan_templates=[relationship, arbitration, consultation, case_analysis],
         tool_names=COMMON_TOOLS,
         verification_policies=[
             VerificationPolicy(policy_id="labor.evidence", layer="task"),
             VerificationPolicy(policy_id="labor.authority", layer="domain"),
             VerificationPolicy(policy_id="labor.analysis", layer="task"),
             VerificationPolicy(policy_id="labor.draft", layer="task"),
+            VerificationPolicy(policy_id="labor.relationship", layer="domain"),
         ],
     )

@@ -135,6 +135,22 @@ def get_labor_dispute_workflow(matter_id):
     return _response(lambda: get_legal_agent_facade().get_labor_dispute_workflow(matter_id, _client_id()))
 
 
+@router.route("/digital-human/agent/matters/<matter_id>/labor/triage", methods=["GET"])
+def get_labor_case_triage(matter_id):
+    """恢复青年就业劳动案件分流与关系初筛结果。"""
+    return _response(lambda: get_legal_agent_facade().get_labor_case_triage(
+        matter_id, _client_id(),
+    ))
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/labor/triage", methods=["POST"])
+def update_labor_case_triage(matter_id):
+    """保存结构化分流事实；不会自动启动仲裁或生成文书。"""
+    return _response(lambda: get_legal_agent_facade().update_labor_case_triage(
+        matter_id, _client_id(), request.get_json(silent=True) or {},
+    ))
+
+
 @router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/run", methods=["POST"])
 def start_labor_dispute_run(matter_id):
     """兼容入口：可选 task_type 选择三类劳动模板，缺省仍为仲裁申请。"""

@@ -203,6 +203,56 @@ export interface LaborFactSuggestions {
   warning: string;
 }
 
+export type LaborTriageType =
+  | 'simple_labor_consultation'
+  | 'labor_relationship_assessment'
+  | 'formal_labor_dispute'
+  | 'non_labor_dispute'
+  | 'high_risk_handoff';
+
+export interface LaborTriageFacts {
+  issue_domain: 'labor' | 'non_labor' | 'unknown';
+  scenario_type:
+    | 'school_arranged_internship' | 'independent_internship' | 'work_study'
+    | 'part_time' | 'graduate_employment' | 'regular_employment' | 'other' | 'unknown';
+  student_status: 'current_student' | 'graduating' | 'graduated' | 'not_student' | 'unknown';
+  school_arranged: boolean | null;
+  employment_intent: boolean | null;
+  employer_qualified: boolean | null;
+  paid_labor: boolean | null;
+  management_control: boolean | null;
+  business_integrated: boolean | null;
+  regular_schedule: boolean | null;
+  agreement_type: 'labor_contract' | 'internship_agreement' | 'service_agreement' | 'none' | 'unknown';
+  claim_types: string[];
+  urgent_risks: string[];
+}
+
+export interface LaborTriageResult {
+  triage_type: LaborTriageType;
+  relationship_status: 'not_assessed' | 'uncertain' | 'likely_established' | 'likely_not_established';
+  dispute_tags: string[];
+  basis: string[];
+  missing_facts: string[];
+  questions: string[];
+  risk_level: 'low' | 'medium' | 'high';
+  recommended_task_type: string | null;
+  recommended_next_step: string;
+  manual_review_required: boolean;
+  rule_version: string;
+  legal_conclusion: false;
+  notice: string;
+  scenario_type: LaborTriageFacts['scenario_type'];
+  student_status: LaborTriageFacts['student_status'];
+}
+
+export interface LaborTriageSnapshot {
+  matter_id: string;
+  facts: LaborTriageFacts;
+  result: LaborTriageResult;
+  version: number;
+}
+
 export interface LaborAuthorityCatalog {
   status: 'ready' | 'degraded' | 'unavailable';
   count: number;
@@ -465,6 +515,28 @@ export async function continueLaborDisputeAgentRun(
 
 export async function getLaborDisputeFactSuggestions(matterId: string): Promise<LaborFactSuggestions> {
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/suggestions`);
+  return readJson(response);
+}
+
+export async function getLaborCaseTriage(matterId: string): Promise<LaborTriageSnapshot> {
+  const response = await request(
+    `/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor/triage`,
+  );
+  return readJson(response);
+}
+
+export async function updateLaborCaseTriage(
+  matterId: string,
+  facts: Partial<LaborTriageFacts>,
+): Promise<LaborTriageSnapshot> {
+  const response = await request(
+    `/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor/triage`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(facts),
+    },
+  );
   return readJson(response);
 }
 

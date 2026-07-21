@@ -48,6 +48,23 @@ class LaborResultVerifier:
                 report.authority_errors.append("工具 authority_refs 与分析来源不一致")
             report.risk_warnings.extend(result.assumptions)
 
+        if tool_name == "assess_labor_relationship" and result.success:
+            data = result.data or {}
+            for key in (
+                "triage_type", "relationship_status", "dispute_tags", "basis",
+                "risk_level", "recommended_next_step", "manual_review_required",
+                "rule_version", "legal_conclusion", "notice",
+            ):
+                if key not in data:
+                    report.structure_errors.append(f"劳动关系初筛缺少字段: {key}")
+            if data.get("legal_conclusion") is not False:
+                report.fact_errors.append("劳动关系初筛不得包装为最终法律结论")
+            if data.get("relationship_status") in {"uncertain", "likely_not_established"} and not data.get("manual_review_required"):
+                report.fact_errors.append("不确定或倾向不成立的劳动关系必须标记人工复核")
+            if data.get("student_status") in {"current_student", "graduating"} and data.get("relationship_status") == "likely_established" and not data.get("manual_review_required"):
+                report.fact_errors.append("学生或临近毕业场景的劳动关系初筛必须标记人工复核")
+            report.risk_warnings.extend(result.warnings)
+
         if tool_name == "draft_labor_arbitration_application" and result.success:
             data = result.data or {}
             content = str(data.get("content", ""))

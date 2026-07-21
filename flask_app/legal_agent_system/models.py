@@ -116,3 +116,16 @@ class AuthoritySourceReview(Base):
     notes = Column(Text)
     decided_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LaborCaseTriage(Base):
+    """每个 Matter 的劳动分流事实与可审计判断结果。"""
+
+    __tablename__ = "labor_case_triages"
+    matter_id = Column(String, ForeignKey("matters.id", ondelete="CASCADE"), primary_key=True)
+    client_id = Column(String, nullable=False, index=True)
+    facts_json = Column(JSON, nullable=False, default=dict)
+    result_json = Column(JSON, nullable=False, default=dict)
+    version = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

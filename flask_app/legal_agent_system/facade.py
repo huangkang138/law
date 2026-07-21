@@ -17,7 +17,7 @@ from .domains.labor import LaborDomainRuntimeAdapter, build_labor_domain_package
 from .domains.mock import MockDomainRuntimeAdapter, build_mock_domain_package
 from .tools import (
     register_authority_verification_tools, register_labor_dispute_tools, register_labor_tools,
-    register_material_tools, register_mock_tools,
+    register_labor_triage_tools, register_material_tools, register_mock_tools,
 )
 from .matters import MaterialService
 from .jurisdictions.authorities import LegalAuthorityService
@@ -25,7 +25,7 @@ from .jurisdictions.authority_importer import TrustedAuthorityImporter
 from .jurisdictions.authority_provider import OfficialCnLaborProvider
 from .jurisdictions.authority_governance import AuthorityGovernanceService
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
-from .labor_disputes import LaborDisputeService, LaborFactSuggestionService
+from .labor_disputes import LaborCaseTriageService, LaborDisputeService, LaborFactSuggestionService
 from . import models as _agent_models  # noqa: F401，注册新增 Agent 表元数据
 
 
@@ -44,6 +44,7 @@ class LegalAgentFacade:
         self.auto_sync_authorities = auto_sync_authorities
         self.jurisdictions = MatterJurisdictionService()
         self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
+        self.labor_triage = LaborCaseTriageService(self.materials)
         self.labor_suggestions = LaborFactSuggestionService(self.materials, llm_fact_extractor)
         self.registry = ToolRegistry()
         register_mock_tools(self.registry)
@@ -51,10 +52,13 @@ class LegalAgentFacade:
         register_authority_verification_tools(self.registry, self.authorities)
         register_labor_tools(self.registry)
         register_labor_dispute_tools(self.registry, self.labor_disputes)
+        register_labor_triage_tools(self.registry, self.labor_triage)
         self.capabilities = CapabilityRegistry(self.registry)
         self.capabilities.register(
             build_labor_domain_package(),
-            LaborDomainRuntimeAdapter(self.materials, self.labor_disputes, self.jurisdictions),
+            LaborDomainRuntimeAdapter(
+                self.materials, self.labor_disputes, self.labor_triage, self.jurisdictions,
+            ),
         )
         self.capabilities.register(build_mock_domain_package(), MockDomainRuntimeAdapter())
         self.capability_runtime = CapabilityRuntime(
@@ -236,6 +240,14 @@ class LegalAgentFacade:
     def get_labor_dispute_workflow(self, matter_id: str, client_id: str):
         """恢复劳动纠纷闭环状态。"""
         return self.labor_disputes.get_workflow(matter_id, client_id)
+
+    def update_labor_case_triage(self, matter_id: str, client_id: str, data):
+        """保存青年就业分流事实并返回劳动关系初筛结果。"""
+        return self.labor_triage.update(matter_id, client_id, data)
+
+    def get_labor_case_triage(self, matter_id: str, client_id: str):
+        """恢复指定 Matter 的劳动案件分流结果。"""
+        return self.labor_triage.get(matter_id, client_id)
 
     def analyze_labor_dispute(self, matter_id: str, client_id: str):
         """校验事实、期限、证据和法律来源。"""

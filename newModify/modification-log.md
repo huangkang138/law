@@ -512,3 +512,27 @@
 - 实际改动：新增 `flask_app/legal_agent_system/实际Agent架构与运行流程.md`；记录八节点主流程、核心模块输入输出、欠薪咨询真实执行条件、单 Step 循环、预算边界、源码对应表及未实现项。
 - 验证：核对文档中的节点名、模板步骤、状态分支、默认预算和源码路径；未修改业务代码、接口、数据结构或运行配置。
 - 风险与后续：当前普通聊天不会自动启动 Agent，Planner 是确定性模板构建器，且没有独立自然语言 Response Generator；文档已明确标注这些边界。
+
+## 2026-07-21 11:29:19 +08:00
+
+- 会话 ID：`019f8287-4627-74b2-bd42-1d59748e1ba1`。
+- 分支/Git 状态：当前分支 `master`；修改前已有 `CLAUDE.md`、Agent 图件、迁移、测试、上传材料、数字人工作台和 `outputs/` 等未跟踪内容，本次全部保留，只修改四份规划/解析文档。
+- 用户请求：总结已讨论的劳动用工垂直定位，说明 LangGraph 与 Plan 如何按不同问题处理，并更新相关文档和后续规划。
+- 修改前阅读：`CLAUDE.md`、`PROJECT_CONTEXT_RULES.md`、`PROJECT_MODIFICATION_RULES.md`、`raw/项目解析报告.md`、`raw/多法域数字人法律Agent总体规划.md`、`raw/数字人智能助手实现方案.md`、`raw/AI前端问题与Agent架构分析.md`、`newModify/latest-project-analysis.md`、相关修改历史；并重新核对 `facade.py`、劳动 Domain Package、`CapabilityRuntimeGraph`、`TemplatePlanBuilder`、数字人 Service 和实际 Agent 流程文档。
+- 修改思路：保持“一套固定 Runtime Graph + 劳动 Domain Package + 受控组合 Plan”的架构边界；把大学生实习、兼职和初入职场青年定义为第一批产品入口，而不是新技术 Domain；严格区分当前已实现能力和下一阶段规划。
+- 具体方案：总体规划增加劳动用工垂直定位、数字人/Agent 分工、LangGraph 与 Plan 组合规则，以及阶段 3.7“劳动用工深化与数字人入口融合”；实际流程文档补充复合劳动问题的主模板、争议标签、步骤去重和 Plan revision 策略；最新项目解析同步记录产品决策与开发优先级。
+- 实际改动：`raw/多法域数字人法律Agent总体规划.md`、`flask_app/legal_agent_system/实际Agent架构与运行流程.md`、`newModify/latest-project-analysis.md`、`newModify/modification-log.md`。
+- 验证：仅修改 Markdown 文档；核对当前源码仍只有劳动咨询、劳动案件分析、劳动仲裁申请三个真实劳动模板，普通数字人聊天仍不会自动启动 Agent；随后执行关键词检查、`git diff --check` 和限定文件差异复核。
+- 风险与后续：劳动关系判断、欠薪/解除/补偿模板、聊天转 Agent、组合式 Plan 和基础语音均是规划能力，尚未实现；对外介绍必须继续与当前源码能力分开。下一步应先形成阶段 3.7A 的详细实现方案和验收用例，再修改代码。
+
+## 2026-07-21 14:06:20 +08:00
+
+- 会话 ID：`019f832d-788d-7080-85db-7d503fa11450`。
+- 分支/Git 状态：当前分支 `master`；修改前已有规划文档、Agent 图件、迁移、测试、上传材料、数字人工作台和 `outputs/` 等大量未提交/未跟踪内容，本次全部保留，仅增量修改阶段 3.7A 相关文件及规定文档。
+- 用户请求：暂缓阶段 3.5 的身份、告警、加密和长期运行工作，改为实施阶段 3.7A，增加劳动案件分流和劳动关系判断，优先覆盖实习、兼职和初入职场。
+- 修改前阅读：`CLAUDE.md`、项目上下文/修改规则、`raw/多法域数字人法律Agent总体规划.md`、最新项目分析、阶段 3.5/3.6/3.7 相关历史，以及当前劳动 Schema/Service/Domain Package/Adapter/Verifier、Capability Runtime、工具、Router、Facade、模型、迁移和测试。
+- 修改思路：不修改通用 Graph，不因学生身份、协议名称或欠薪关键词直接认定劳动关系；用独立、可解释、版本化的领域分流服务生成初筛结果，再以第四个劳动 PlanTemplate 接入现有 Runtime。
+- 具体方案：新增五类分流、劳动关系倾向、缺失事实、风险和推荐任务契约；按主体资格、有偿劳动、劳动管理、业务组成和就业目的综合初筛；高风险和非劳动问题失败关闭；新增分流表、API、工具、模板、Adapter 分支和领域 Verifier；覆盖学校实习、勤工助学、学生兼职、普通兼职、信息不足和高风险用例。
+- 实际改动：新增职责分离的 `labor_disputes/triage_schemas.py`、`triage_rules.py`、`triage.py`，以及 `tools/labor_triage_tools.py`、迁移 `20260721_0008` 和阶段 3.7A 测试；更新模型、劳动 Domain Package/Adapter/Verifier、Capability Adapter 契约、Runtime 调用、Facade、Router、README、阶段 3.6 测试、总体规划和最新分析。另将阶段 3.4 测试 Provider 的抓取时间改为运行时当前时间，避免七天新鲜度门禁造成日历型测试失败。
+- 验证：Python compileall 通过；阶段 3.6+3.7A 专项 11/11 通过；完整数字人 Agent 回归 44/44 通过；本地 PostgreSQL 已从 `20260716_0007` 非破坏性升级到 `20260721_0008 (head)`。
+- 风险与后续：当前为结构化初筛，不是最终劳动关系法律结论；尚未为自然语言聊天自动提取全部分流字段，也未自动启动推荐任务。阶段 3.5 法源复核/权限/告警仍按用户决定暂缓；下一步可进入 3.7B 的欠薪、解除、补偿模板与受控组合 Plan，或先做 3.7D 的聊天入口融合。

@@ -34,7 +34,10 @@ class DomainRuntimeAdapter(Protocol):
 
     domain_id: str
 
-    def prepare_start(self, matter_id: str, client_id: str, facts: Dict[str, Any] | None) -> bool: ...
+    def prepare_start(
+        self, matter_id: str, client_id: str, facts: Dict[str, Any] | None,
+        task_type: str | None = None,
+    ) -> bool: ...
 
     def assess_context(self, state: "AgentState") -> ContextAssessment: ...
 
