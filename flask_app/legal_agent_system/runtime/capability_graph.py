@@ -127,7 +127,17 @@ class CapabilityRuntimeGraph:
 
     def _ensure_context(self, raw: Dict) -> Dict:
         state = AgentState.model_validate(raw)
-        assessment = self._adapter(state).assess_context(state)
+        try:
+            assessment = self._adapter(state).assess_context(state)
+        except ValueError as exc:
+            state.status = RunStatus.FAILED
+            state.error_code = "INVALID_PLAN_COMPOSITION"
+            state.blocked_reason = str(exc)
+            self.repository.save_state(state, "run_plan_composition_rejected", {
+                "template_id": state.template_id,
+                "reason": str(exc),
+            })
+            return state.model_dump(mode="json")
         if assessment.outcome == "awaiting_jurisdiction":
             state.status = RunStatus.AWAITING_JURISDICTION
             state.questions = assessment.questions
@@ -159,15 +169,26 @@ class CapabilityRuntimeGraph:
         state = AgentState.model_validate(raw)
         adapter = self._adapter(state)
         template = self.capability_registry.get_template(state.template_id)
-        workflow = adapter.get_workflow(state)
-        revision = self.plan_builder.build(
-            template,
-            workflow,
-            requested_task_type=state.task_type,
-            replan_reason=state.replan_reason,
-            triggered_by="runtime",
-        )
-        revision = adapter.customize_plan(revision, workflow)
+        try:
+            workflow = adapter.get_workflow(state)
+            revision = self.plan_builder.build(
+                template,
+                workflow,
+                requested_task_type=state.task_type,
+                replan_reason=state.replan_reason,
+                triggered_by="runtime",
+            )
+            revision = adapter.customize_plan(revision, workflow)
+            self.capability_registry.validate_plan(revision)
+        except ValueError as exc:
+            state.status = RunStatus.FAILED
+            state.error_code = "INVALID_PLAN_COMPOSITION"
+            state.blocked_reason = str(exc)
+            self.repository.save_state(state, "run_plan_composition_rejected", {
+                "template_id": state.template_id,
+                "reason": str(exc),
+            })
+            return state.model_dump(mode="json")
         if len(revision.steps) > state.max_steps:
             state.status = RunStatus.FAILED
             state.error_code = "BUDGET_EXCEEDED"

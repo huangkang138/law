@@ -58,6 +58,7 @@ export interface DigitalHumanAgentRun {
     tool_name: string | null;
     step_type: string | null;
     skip_reason: string | null;
+    triggered_by_tags: string[];
     requires_approval: boolean;
     verification_policy_ids: string[];
     observation: Record<string, unknown> | null;
@@ -72,6 +73,8 @@ export interface DigitalHumanAgentRun {
   plan_id: string | null;
   plan_revision: number;
   replan_reason: string | null;
+  dispute_tags: string[];
+  composition_version: string | null;
   plan_version: number;
   missing_facts: string[];
   questions: string[];

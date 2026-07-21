@@ -93,7 +93,7 @@ facade.py
 | `material_tools.py` | `register_material_tools` | 材料解析、事实提取、时间线、证据清单工具。 |
 | `authority_tools.py` | `register_authority_verification_tools` | 法源引用校验工具。 |
 | `labor_tools.py` | `register_labor_tools` | 劳动补偿金额计算工具。 |
-| `labor_dispute_tools.py` | `register_labor_dispute_tools` | 劳动分析、只读咨询、案件分析、仲裁草稿工具。 |
+| `labor_dispute_tools.py` | `register_labor_dispute_tools` | 劳动公共分析、三个争议问题步骤和仲裁草稿工具。 |
 | `mock_case_summary.py` | `register_mock_tools` | 阶段 1 模拟摘要工具。 |
 
 ### `matters/`
@@ -124,6 +124,8 @@ facade.py
 | `triage.py` | `LaborCaseTriageService` | 版本化保存分流事实和判断结果。 |
 | `__init__.py` | - | 劳动争议组件导出。 |
 | `schemas.py` | `LaborDisputeFacts` | 劳动争议事实字段 Schema。 |
+| `dispute_tags.py` | `normalize_dispute_tags` | 将中文请求归一为欠薪、解除、经济补偿稳定标签，未知值失败关闭。 |
+| `issue_analysis.py` | `LaborIssueAnalysisService` | 主模板内三个白名单问题步骤的初步分析与补偿估算。 |
 | `service.py` | `LaborDisputeService` | 确认事实、缺失项、分析结果和仲裁草稿。 |
 | `suggestions.py` | `LaborFactSuggestionService.suggest` | 从材料提取带原文出处的候选事实。 |
 | `llm_extractor.py` | `ControlledLaborFactExtractor.extract` | 可选 LLM 候选提取，校验 Schema、原文位置和预算。 |

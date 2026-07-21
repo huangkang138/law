@@ -8,6 +8,11 @@ from legal_agent_system.capabilities import ContextAssessment, RuntimeStep
 from legal_agent_system.capabilities.contracts import PlanRevision
 from legal_agent_system.runtime.errors import AgentRuntimeError
 from legal_agent_system.runtime.schemas import AgentState
+from legal_agent_system.labor_disputes.dispute_tags import (
+    TERMINATION,
+    WAGE_ARREARS,
+    dispute_tags_from_facts,
+)
 
 from .verifier import LaborResultVerifier
 
@@ -77,16 +82,20 @@ class LaborDomainRuntimeAdapter:
     def get_workflow(self, state: AgentState) -> Dict[str, Any]:
         if state.task_type == "labor_relationship_assessment":
             return self.labor_triage.get(state.matter_id, state.client_id)
-        return self.labor_disputes.get_workflow(state.matter_id, state.client_id)
+        workflow = self.labor_disputes.get_workflow(state.matter_id, state.client_id)
+        return {
+            **workflow,
+            "dispute_tags": dispute_tags_from_facts(workflow.get("facts") or {}),
+        }
 
     def customize_plan(self, revision: PlanRevision, workflow: Dict[str, Any]) -> PlanRevision:
-        claims = (workflow.get("facts") or {}).get("claim_types", [])
+        dispute_tags = set(workflow.get("dispute_tags") or [])
         for step in revision.steps:
             if step.step_id != "evidence_check":
                 continue
-            if "欠薪" in claims:
+            if WAGE_ARREARS in dispute_tags:
                 step.name = "核对欠薪期间、金额与工资证据"
-            elif "违法解除" in claims:
+            elif TERMINATION in dispute_tags:
                 step.name = "核对解除原因、程序与通知证据"
         return revision
 

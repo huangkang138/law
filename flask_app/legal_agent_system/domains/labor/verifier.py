@@ -22,6 +22,11 @@ class LaborVerification:
 class LaborResultVerifier:
     def verify(self, tool_name: str, result: ToolResult, state: AgentState) -> LaborVerification:
         report = LaborVerification()
+        issue_tools = {
+            "analyze_wage_arrears",
+            "analyze_labor_termination",
+            "analyze_economic_compensation",
+        }
         if tool_name == "generate_evidence_checklist" and result.success:
             data = result.data or {}
             for key in ("available", "missing", "located_fact_count", "warning"):
@@ -64,6 +69,22 @@ class LaborResultVerifier:
             if data.get("student_status") in {"current_student", "graduating"} and data.get("relationship_status") == "likely_established" and not data.get("manual_review_required"):
                 report.fact_errors.append("学生或临近毕业场景的劳动关系初筛必须标记人工复核")
             report.risk_warnings.extend(result.warnings)
+
+        if tool_name in issue_tools and result.success:
+            data = result.data or {}
+            for key in (
+                "status", "issue_tag", "missing_facts", "manual_review_required",
+                "legal_conclusion", "data", "warnings",
+            ):
+                if key not in data:
+                    report.structure_errors.append(f"劳动问题分析缺少字段: {key}")
+            if data.get("status") != "preliminary":
+                report.structure_errors.append("劳动问题步骤不得包装为最终分析")
+            if data.get("legal_conclusion") is not False:
+                report.fact_errors.append("劳动问题步骤不得输出最终法律结论")
+            if not data.get("manual_review_required"):
+                report.fact_errors.append("劳动问题步骤必须保留人工复核标记")
+            report.risk_warnings.extend(data.get("warnings") or [])
 
         if tool_name == "draft_labor_arbitration_application" and result.success:
             data = result.data or {}

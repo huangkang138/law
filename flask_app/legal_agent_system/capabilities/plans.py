@@ -10,27 +10,28 @@ from .contracts import PlanRevision, PlanStep, PlanTemplate, TemplateStep
 class TemplatePlanBuilder:
     def build(
         self,
-        template: PlanTemplate,  # 计划模板对象，包含构建计划所需的基本结构信息
-        workflow: Dict[str, Any],  # 工作流字典，包含执行流程中的各种数据
+        template: PlanTemplate,
+        workflow: Dict[str, Any],
         *,
-        requested_task_type: str,  # 请求的任务类型，指定计划执行的具体任务类别
-        replan_reason: str | None = None,  # 重新计划的原因，可选参数，用于说明重新计划的原因
-        triggered_by: str = "runtime",  # 触发者，默认为"runtime"，表示由运行时触发
-    ) -> PlanRevision:  # 返回一个计划修订对象，包含构建完成的计划信息
-        # 根据模板步骤和工作流实例化各个步骤
-        steps = [self._instantiate_step(step, workflow) for step in template.steps]
-        # 构建有效载荷字典，包含模板ID、版本、事实和步骤信息
+        requested_task_type: str,
+        replan_reason: str | None = None,
+        triggered_by: str = "runtime",
+    ) -> PlanRevision:
+        dispute_tags = self._validate_dispute_tags(template, workflow)
+        steps = [
+            self._instantiate_step(step, workflow, dispute_tags)
+            for step in template.steps
+        ]
         payload = {
             "template_id": template.template_id,
             "template_version": template.version,
             "facts": workflow.get("facts", {}),
+            "dispute_tags": dispute_tags,
             "steps": [item.model_dump(mode="json") for item in steps],
         }
-        # 计算有效载荷的指纹，用于唯一标识这个特定的计划配置
         fingerprint = hashlib.sha256(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
         ).hexdigest()
-        # 创建并返回一个计划修订对象，包含所有构建的计划信息和元数据
         return PlanRevision(
             domain_id=template.domain_id,
             task_type=requested_task_type,
@@ -39,12 +40,24 @@ class TemplatePlanBuilder:
             input_fingerprint=fingerprint,
             replan_reason=replan_reason,
             triggered_by=triggered_by,
+            dispute_tags=dispute_tags,
             steps=steps,
         )
 
     @staticmethod
-    def _instantiate_step(step: TemplateStep, workflow: Dict[str, Any]) -> PlanStep:
-        enabled = TemplatePlanBuilder._condition_matches(step.condition, workflow)
+    def _instantiate_step(
+        step: TemplateStep,
+        workflow: Dict[str, Any],
+        dispute_tags: list[str],
+    ) -> PlanStep:
+        enabled = TemplatePlanBuilder._condition_matches(
+            step.condition, workflow, dispute_tags,
+        )
+        condition = step.condition or {}
+        condition_tags = list(dict.fromkeys([
+            *condition.get("dispute_tag_any", []),
+            *condition.get("dispute_tag_all", []),
+        ]))
         return PlanStep(
             step_id=step.step_id,
             name=step.name,
@@ -57,13 +70,44 @@ class TemplatePlanBuilder:
             verification_policy_ids=step.verification_policy_ids,
             on_failure=step.on_failure,
             arguments=step.arguments,
+            triggered_by_tags=(
+                [tag for tag in condition_tags if tag in dispute_tags]
+                if enabled else []
+            ),
         )
 
     @staticmethod
-    def _condition_matches(condition: Dict[str, Any] | None, workflow: Dict[str, Any]) -> bool:
+    def _condition_matches(
+        condition: Dict[str, Any] | None,
+        workflow: Dict[str, Any],
+        dispute_tags: list[str],
+    ) -> bool:
         if not condition:
             return True
+        supported = {"fact_present", "enabled", "dispute_tag_any", "dispute_tag_all"}
+        unknown_keys = set(condition) - supported
+        if unknown_keys:
+            raise ValueError(f"模板步骤包含不支持的条件: {sorted(unknown_keys)}")
+        checks = []
         fact_name = condition.get("fact_present")
         if fact_name:
-            return bool((workflow.get("facts") or {}).get(fact_name))
-        return bool(condition.get("enabled", False))
+            checks.append(bool((workflow.get("facts") or {}).get(fact_name)))
+        if "enabled" in condition:
+            checks.append(bool(condition["enabled"]))
+        any_tags = set(condition.get("dispute_tag_any", []))
+        if any_tags:
+            checks.append(bool(any_tags.intersection(dispute_tags)))
+        all_tags = set(condition.get("dispute_tag_all", []))
+        if all_tags:
+            checks.append(all_tags.issubset(dispute_tags))
+        return all(checks) if checks else False
+
+    @staticmethod
+    def _validate_dispute_tags(
+        template: PlanTemplate, workflow: Dict[str, Any],
+    ) -> list[str]:
+        tags = list(dict.fromkeys(workflow.get("dispute_tags") or []))
+        unknown = set(tags) - set(template.allowed_dispute_tags)
+        if unknown:
+            raise ValueError(f"模板不允许争议标签: {sorted(unknown)}")
+        return tags

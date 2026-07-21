@@ -2,11 +2,11 @@
 
 更新时间：2026-07-21 +08:00
 
-本文件是后续项目解析和项目修改前需要优先阅读的最新汇总。它基于 `D:\项目\law\raw\项目解析报告.md` 与当前仓库只读检查生成。后续远程仓库更新或用户要求重新解析时，覆盖更新本文件，不再生成多个解析副本。
+本文件是当前完整项目状态的权威汇总；以当前源码为准。后续远程仓库更新或用户要求重新解析时，覆盖更新本文件，不再生成多个解析副本。
 
 ## 解析来源
 
-- `D:\项目\law\raw\项目解析报告.md`
+- 当前源码与相关有效规划；`raw/archive/项目解析报告-20260610.md` 仅作历史对照。
 - `D:\项目\law\flask_app\app.py`
 - `D:\项目\law\flask_app\routers\__init__.py`
 - `D:\项目\law\flask_app\core\config.py`
@@ -34,7 +34,7 @@
 
 - Agent 负责案件分流、材料和事实、证据、计划、工具、法源、计算、文书、审批和审计。
 - 数字人负责通俗问答、逐个追问、材料上传引导、任务状态解释、语音和表现反馈。
-- 两者在架构上解耦，在用户入口上逐步融合。当前普通数字人聊天仍不会自动启动 Agent，该能力属于后续规划，不能对外描述为已实现。
+- 两者在架构上解耦，在用户入口上逐步融合。通用普通聊天不会无条件启动任意法律 Agent；但已支持的劳动场景会创建/绑定 Matter、执行 Triage、校验 `recommended_task_type`、启动对应劳动 Agent Run，并同步 Workspace。非劳动领域的通用自动分流仍未实现。
 
 LangGraph 与 Plan 的后续边界已经明确：
 
@@ -46,11 +46,9 @@ LangGraph 与 Plan 的后续边界已经明确：
 
 下一阶段按以下顺序实施：
 
-1. 劳动案件分流与劳动关系判断，重点覆盖实习、兼职和初入职场场景。
-2. 增加欠薪、解除和补偿模板，建立“主模板 + 争议标签 + 白名单可选步骤”的组合式 Plan。
-3. 深化事实、证据、法源、规则和评测闭环，完成待复核官方来源和青年就业旗舰案例评测。
-4. 打通普通聊天、Matter 和 Agent Run；数字人一次只追问一个问题，并用通俗语言展示等待、阻断、审批和结果。
-5. 核心闭环稳定后再增加基础语音、流式输出和打断；复杂口型、Live2D 和新法律领域后置。
+1. 完成 3.7B REVIEW；随后深化事实、证据、法源、规则和青年就业评测（3.7C）。
+2. 深化已打通的劳动数字人入口：一次一问、通俗状态/审批/法源阻断解释、运行进度、流式文字、取消和基础语音（3.7D）。
+3. 3.5 生产可信化暂缓但仍是未来必补项；复杂口型、Live2D 和新法律领域后置。
 
 比赛版本只突出“青年就业劳动权益”旗舰闭环；合同、模拟法庭、知识图谱和其他旧页面保留为扩展能力，不与主线并列宣传。
 
@@ -64,6 +62,15 @@ LangGraph 与 Plan 的后续边界已经明确：
 - 新增 `GET/POST /api/digital-human/agent/matters/{matter_id}/labor/triage`。
 - 阶段 3.7A.1 已打通聊天会话、Matter、分流、Agent Run 与右侧工作台：Matter 持久绑定 `session_id`；前端共享当前 Matter/Triage/Run；分流完成后校验并消费 `recommended_task_type`，分别启动劳动咨询、劳动关系判断或劳动案件分析模板；缺失事实、高风险和非劳动场景保持失败关闭。
 - 完整数字人 Agent 测试 45/45、前端类型检查和隔离生产构建通过；同步修复阶段 3.4 测试 Provider 使用固定历史抓取时间导致七天后自然失效的问题。
+
+### 阶段 3.7B：劳动争议组合式 Plan（2026-07-21）
+
+- 当前仍只有一套 `CapabilityRuntimeGraph`。劳动案件按交付目的使用 `labor_case_analysis` 或 `labor_arbitration_application` 主模板，欠薪、解除、经济补偿由 `dispute_tags` 启用模板内白名单步骤，不创建独立 Graph、Domain Package 或无共享状态 Agent。
+- 新增 `wage_arrears`、`termination`、`economic_compensation` 稳定标签和中文请求归一化；未知标签失败关闭。公共证据、统一期限/法源分析、审批和文书步骤在每份 Plan 中均只出现一次。
+- 未启用问题步骤持久化为 `skipped` 并保存 `skip_reason`；Plan JSON 同时保存争议标签、组合契约版本和步骤触发标签，运行快照已同步这些字段。
+- Capability Registry 新增定制后校验，禁止 Adapter 插步、删步、换工具、改依赖或削弱审批。用户补充事实使标签变化时，同一 Run 创建新的不可变 revision，并保留父 Plan 和原因。
+- 三个问题工具只生成初步、需人工复核的结构化结果；最终期限和法源仍走公共劳动分析，经济补偿沿用项目既有估算公式。更完整的解除、工资、补偿实体规则属于 3.7C，本阶段没有提前实施。
+- 新增阶段 3.7B 组合、安全与 revision 测试；完整数字人 Agent 回归 49/49、Python compileall 和前端 `tsc --noEmit` 通过。未新增表或列，无需数据库迁移。
 
 ## 后端怎么看
 
@@ -231,7 +238,7 @@ npm run dev
 
 ### 阶段 3.1：劳动纠纷 Runtime 融合
 
-- 新增 `runtime/labor_graph.py` 与 `runtime/labor_runtime.py`，现有阶段 1 模拟 `AgentGraph` 保持兼容；劳动纠纷任务使用独立 `task_type=cn_labor_dispute`，但共享统一 Repository、ToolRegistry 和审计模型。
+- 历史阶段曾新增 `runtime/labor_graph.py` 与 `runtime/labor_runtime.py`；这两份旧内核已在阶段 3.6 删除，当前以唯一 `CapabilityRuntimeGraph` 为准。
 - `AgentState` 已增加任务类型、风险级别、计划版本、当前步骤序号、缺失事实、用户问题、阻断原因和最终交付物 ID；运行状态增加等待法域、等待信息、验证、来源阻断、重新规划和人工接管。
 - LangGraph 现会确定性执行法域检查、事实完整性检查、动态计划落库、证据清单工具、劳动纠纷分析工具、来源阻断、用户审批和草稿工具；三步计划真实写入 `AgentStep`，每次工具执行写入 `ToolCall`。
 - 新增劳动纠纷统一继续动作：`confirm_jurisdiction`、`provide_information`、`retry_authority`、`approve`。等待节点和来源阻断均从 PostgreSQL 恢复，不依赖进程内 Graph 实例。

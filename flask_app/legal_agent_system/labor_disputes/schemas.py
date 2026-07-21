@@ -17,8 +17,13 @@ class LaborDisputeFacts(BaseModel):
     monthly_salary: Optional[float] = Field(default=None, gt=0)
     work_location: Optional[str] = None
     claim_types: List[str] = Field(default_factory=list)
+    dispute_tags: List[str] = Field(default_factory=list)
     demands: Optional[str] = None
     termination_reason: Optional[str] = None
+    wage_arrears_amount: Optional[float] = Field(default=None, gt=0)
+    wage_arrears_months: Optional[int] = Field(default=None, ge=1, le=1200)
+    wage_arrears_start_date: Optional[date] = None
+    wage_arrears_end_date: Optional[date] = None
     employment_active: Optional[bool] = None
     limitation_interruption_dates: List[date] = Field(default_factory=list)
     limitation_suspension_days: int = Field(default=0, ge=0, le=3650)

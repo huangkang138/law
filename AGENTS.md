@@ -1,43 +1,37 @@
 # YYS-Law 仓库协作入口
 
-> 本文件是本仓库唯一的 AI Agent 入口：先从这里确定规则、当前任务与工作模式，再进入源码。
+本文件是仓库唯一 AI Agent 入口；用户当前明确指令高于 `CURRENT_TASK` 和其他协作状态。
 
 ## 协作导航
 
-| 目的 | 唯一入口 | 使用方式 |
-| --- | --- | --- |
-| 硬性代码约束 | `CLAUDE.md` | 代码修改前必读；定义可改范围、禁止项和验证要求。 |
-| 当前任务与工作模式 | `AI_WORKFLOW/` | 先读 `README.md`，再读 `CURRENT_TASK.md`、`NEXT_STEP.md`，按 `modes/` 选择执行方式。 |
-| 当前完整项目状态 | `newModify/latest-project-analysis.md` | 需要完整架构、运行状态或现状基线时读取。 |
-| 完整历史追溯 | `newModify/modification-log.md` | 只按本次任务检索相关历史；所有修改仍追加至此。 |
-| 长期规划与架构资料 | `raw/` | 按任务选读，不复制进工作流文件。 |
+| 目的 | 权威位置 |
+| --- | --- |
+| 安全修改代码 | `CLAUDE.md` |
+| 当前任务、状态流与 Mode | `AI_WORKFLOW/` |
+| 当前完整项目事实 | `newModify/latest-project-analysis.md` |
+| 完整修改历史 | `newModify/modification-log.md` |
+| 长期规划和有效架构资料 | `raw/` |
+| 被替代的历史资料 | `raw/archive/`（默认不读取） |
 
-`AI_WORKFLOW/` 是轻量协作面板，不替代上述权威资料：它不保存完整项目解析，也不保存普通修改历史。
+## 进入任务
 
-本文件适用于整个 `D:\项目\law` 仓库。开始分析、排查或修改前，必须先读取并遵守以下文件：
+1. 读取本文件、`CLAUDE.md`、`AI_WORKFLOW/CURRENT_TASK.md` 和对应 Mode。
+2. 检查 Git 状态，核对用户目标与 `CURRENT_TASK`；不一致时标记 `CURRENT_TASK_MISMATCH`，优先服从用户目标，并按 `AI_WORKFLOW/README.md` 执行 Promote 或交接。
+3. 再读取与任务直接相关的源码。
 
-1. `CLAUDE.md`（代码修改的技术约束——哪些能改、哪些不能改、改完怎么验证）
-2. `PROJECT_CONTEXT_RULES.md`
-3. `PROJECT_MODIFICATION_RULES.md`
-4. `raw/` 下与当前任务相关的项目解析或方案文档
-5. `newModify/latest-project-analysis.md`
-6. `newModify/modification-log.md` 中与当前任务相关的历史记录
+条件读取：跨模块、架构或需要整体状态时读取 `latest-project-analysis.md`；涉及长期方向时读取相关 `raw/` 文档；需要追溯历史或已有相关未提交改动时，按关键词检索 `modification-log.md`。不默认全文读取 `raw/` 或历史日志。
 
-对于代码任务，完成后优先交付一张“开发者记忆卡”；详细改动仍写入 `newModify/modification-log.md`，不要默认输出逐文件审计报告。
+## 修改前检查
 
-完成上述上下文读取后，再检查当前 Git 状态并阅读实际源码；解析文档与源码不一致时，以当前源码为准。
+- 明确允许修改范围，保留工作树既有用户改动。
+- 不读取、输出或写入 `.env`、密码、API Key 等敏感信息。
+- 从只读分析转为代码修改时，重新检查 Git 状态和必要上下文。
 
-## 修改前检查点
+## 修改后检查
 
-- 明确本次允许修改的文件和范围，保留工作树中已有的用户改动。
-- 如果任务从只读分析、方案讨论或故障诊断转为代码修改，必须重新执行上述上下文读取和 Git 状态检查。
-- 不读取、输出或写入 `.env`、数据库密码、API Key 等敏感信息。
+- 执行与风险相称的语法、类型、构建、接口或视觉验证。
+- 每次代码、配置、文档或结构修改后，追加 `newModify/modification-log.md`。
+- 影响结构、启动、接口、数据模型、关键配置或业务流程时，更新 `newModify/latest-project-analysis.md`。
+- 最终确认未修改任务范围外的用户代码。
 
-## 修改后检查点
-
-- 对改动执行与风险相称的语法、类型、构建或接口验证。
-- 每次代码、配置、文档或结构修改后，必须追加更新 `newModify/modification-log.md`。
-- 如果改动影响项目结构、启动方式、接口、数据模型、关键配置或业务流程，必须同步覆盖更新 `newModify/latest-project-analysis.md`。
-- 最终回复前核对实际改动文件，确认没有修改任务范围之外的用户代码。
-
-用户在当前请求中的明确指令优先于本文件；如有冲突，应先遵守用户指令，并在修改记录中说明。
+代码任务默认交付“开发者记忆卡”；完整历史留在修改日志，除非用户要求否则不默认逐文件审计。

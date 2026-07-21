@@ -1,4 +1,4 @@
-"""中国劳动领域的首个方案 C 能力包。"""
+"""中国劳动领域能力包：主模板通过争议标签组合白名单步骤。"""
 
 from legal_agent_system.capabilities.contracts import (
     DomainPackage,
@@ -7,16 +7,26 @@ from legal_agent_system.capabilities.contracts import (
     TemplateStep,
     VerificationPolicy,
 )
+from legal_agent_system.labor_disputes.dispute_tags import (
+    ALLOWED_DISPUTE_TAGS,
+    ECONOMIC_COMPENSATION,
+    TERMINATION,
+    WAGE_ARREARS,
+)
 
 
 COMMON_STEP_TYPES = [
     "relationship_assessment", "evidence_analysis", "timeline_analysis",
+    "wage_analysis", "termination_analysis", "compensation_analysis",
     "legal_analysis", "document_drafting",
 ]
 COMMON_TOOLS = [
     "assess_labor_relationship",
     "generate_evidence_checklist",
     "build_case_timeline",
+    "analyze_wage_arrears",
+    "analyze_labor_termination",
+    "analyze_economic_compensation",
     "analyze_labor_dispute",
     "analyze_labor_consultation",
     "analyze_labor_case",
@@ -35,10 +45,51 @@ def _evidence_step() -> TemplateStep:
     )
 
 
-def _analysis_step(depends_on: list[str], tool_name: str = "analyze_labor_dispute") -> TemplateStep:
+def _issue_steps() -> list[TemplateStep]:
+    return [
+        TemplateStep(
+            step_id="wage_arrears_analysis",
+            name="分析欠薪期间与金额",
+            step_type="wage_analysis",
+            tool_name="analyze_wage_arrears",
+            depends_on=["evidence_check"],
+            optional=True,
+            condition={"dispute_tag_any": [WAGE_ARREARS]},
+            skip_reason="争议标签不包含欠薪，本次不执行欠薪分析",
+            verification_policy_ids=["global.tool_result", "labor.issue"],
+            on_failure="request_context",
+        ),
+        TemplateStep(
+            step_id="termination_analysis",
+            name="分析解除事实、依据与程序",
+            step_type="termination_analysis",
+            tool_name="analyze_labor_termination",
+            depends_on=["evidence_check"],
+            optional=True,
+            condition={"dispute_tag_any": [TERMINATION]},
+            skip_reason="争议标签不包含解除，本次不执行解除分析",
+            verification_policy_ids=["global.tool_result", "labor.issue"],
+            on_failure="request_context",
+        ),
+        TemplateStep(
+            step_id="economic_compensation_analysis",
+            name="估算经济补偿或赔偿",
+            step_type="compensation_analysis",
+            tool_name="analyze_economic_compensation",
+            depends_on=["evidence_check"],
+            optional=True,
+            condition={"dispute_tag_any": [ECONOMIC_COMPENSATION]},
+            skip_reason="争议标签不包含经济补偿，本次不执行补偿估算",
+            verification_policy_ids=["global.tool_result", "labor.issue"],
+            on_failure="request_context",
+        ),
+    ]
+
+
+def _analysis_step(depends_on: list[str], tool_name: str) -> TemplateStep:
     return TemplateStep(
         step_id="labor_analysis",
-        name="计算期限并验证法律来源",
+        name="统一计算期限并验证法律来源",
         step_type="legal_analysis",
         tool_name=tool_name,
         depends_on=depends_on,
@@ -48,7 +99,7 @@ def _analysis_step(depends_on: list[str], tool_name: str = "analyze_labor_disput
 
 
 def build_labor_domain_package() -> DomainPackage:
-    relationship = PlanTemplate(#劳动关系评估
+    relationship = PlanTemplate(
         template_id="labor_relationship_assessment",
         version="1.0.0",
         domain_id="cn_labor",
@@ -63,15 +114,22 @@ def build_labor_domain_package() -> DomainPackage:
             on_failure="handoff",
         )],
     )
-    arbitration = PlanTemplate(#劳动仲裁申请
+
+    arbitration_issues = _issue_steps()
+    arbitration = PlanTemplate(
         template_id="labor_arbitration_application",
-        version="1.0.0",
+        version="2.0.0",
         domain_id="cn_labor",
         task_type="labor_arbitration_application",
         allowed_step_types=COMMON_STEP_TYPES,
+        allowed_dispute_tags=list(ALLOWED_DISPUTE_TAGS),
         steps=[
             _evidence_step(),
-            _analysis_step(["evidence_check"]),
+            *arbitration_issues,
+            _analysis_step(
+                [step.step_id for step in arbitration_issues],
+                "analyze_labor_dispute",
+            ),
             TemplateStep(
                 step_id="arbitration_draft",
                 name="经审批生成劳动仲裁申请书草稿",
@@ -84,20 +142,28 @@ def build_labor_domain_package() -> DomainPackage:
             ),
         ],
     )
-    consultation = PlanTemplate(#劳动法律咨询
+
+    consultation = PlanTemplate(
         template_id="labor_consultation",
-        version="1.0.0",
+        version="1.1.0",
         domain_id="cn_labor",
         task_type="labor_consultation",
         allowed_step_types=COMMON_STEP_TYPES,
-        steps=[_evidence_step(), _analysis_step(["evidence_check"], "analyze_labor_consultation")],
+        allowed_dispute_tags=list(ALLOWED_DISPUTE_TAGS),
+        steps=[
+            _evidence_step(),
+            _analysis_step(["evidence_check"], "analyze_labor_consultation"),
+        ],
     )
-    case_analysis = PlanTemplate(#劳动案件分析
+
+    case_issues = _issue_steps()
+    case_analysis = PlanTemplate(
         template_id="labor_case_analysis",
-        version="1.0.0",
+        version="2.0.0",
         domain_id="cn_labor",
         task_type="labor_case_analysis",
         allowed_step_types=COMMON_STEP_TYPES,
+        allowed_dispute_tags=list(ALLOWED_DISPUTE_TAGS),
         steps=[
             TemplateStep(
                 step_id="case_timeline",
@@ -111,12 +177,14 @@ def build_labor_domain_package() -> DomainPackage:
                 on_failure="request_context",
             ),
             _evidence_step(),
-            _analysis_step(["evidence_check"], "analyze_labor_case"),
+            *case_issues,
+            _analysis_step([step.step_id for step in case_issues], "analyze_labor_case"),
         ],
     )
+
     return DomainPackage(
         domain_id="cn_labor",
-        version="1.0.0",
+        version="1.1.0",
         routing_rules=[
             RoutingRule(
                 task_type="labor_arbitration_application",
@@ -134,6 +202,7 @@ def build_labor_domain_package() -> DomainPackage:
         tool_names=COMMON_TOOLS,
         verification_policies=[
             VerificationPolicy(policy_id="labor.evidence", layer="task"),
+            VerificationPolicy(policy_id="labor.issue", layer="task"),
             VerificationPolicy(policy_id="labor.authority", layer="domain"),
             VerificationPolicy(policy_id="labor.analysis", layer="task"),
             VerificationPolicy(policy_id="labor.draft", layer="task"),

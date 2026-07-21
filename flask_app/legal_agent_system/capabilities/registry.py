@@ -2,7 +2,7 @@
 import logging
 from typing import Dict, List, NamedTuple, Tuple
 
-from .contracts import DomainPackage, PlanTemplate
+from .contracts import DomainPackage, PlanRevision, PlanTemplate
 from .domain_adapter import DomainRuntimeAdapter
 
 
@@ -78,6 +78,32 @@ class CapabilityRegistry:
             return self._adapters[domain_id]
         except KeyError as exc:
             raise ValueError(f"领域运行适配器不存在: {domain_id}") from exc
+
+    def validate_plan(self, revision: PlanRevision) -> None:
+        """Adapter 定制后再次校验，禁止换工具、插步骤或削弱审批。"""
+        template = self.get_template(revision.template_id)
+        if revision.domain_id != template.domain_id or revision.template_version != template.version:
+            raise ValueError("运行计划与注册模板身份不一致")
+        if set(revision.dispute_tags) - set(template.allowed_dispute_tags):
+            raise ValueError("运行计划包含模板未允许的争议标签")
+        if len(revision.steps) != len(template.steps):
+            raise ValueError("运行计划不得插入或删除模板步骤")
+        if len({step.step_id for step in revision.steps}) != len(revision.steps):
+            raise ValueError("运行计划步骤不得重复")
+        declared_tools = set(self._domains[revision.domain_id].tool_names)
+        for step, declared in zip(revision.steps, template.steps):
+            if (
+                step.step_id != declared.step_id
+                or step.tool_name != declared.tool_name
+                or step.step_type != declared.step_type
+                or step.depends_on != declared.depends_on
+                or step.requires_approval != declared.requires_approval
+                or step.verification_policy_ids != declared.verification_policy_ids
+                or step.on_failure != declared.on_failure
+            ):
+                raise ValueError(f"运行计划越过模板白名单: {step.step_id}")
+            if step.tool_name not in declared_tools:
+                raise ValueError(f"运行计划使用未声明工具: {step.tool_name}")
 
     def list_domains(self) -> List[DomainPackage]:
         return list(self._domains.values())

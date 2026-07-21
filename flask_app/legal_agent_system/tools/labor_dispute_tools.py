@@ -3,7 +3,7 @@
 from legal_agent_system.runtime.schemas import AgentTool, ToolResult
 
 
-def register_labor_dispute_tools(registry, service) -> None:
+def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
     """注册证据分析、法律校验和草稿工具，业务规则仍由领域 Service 维护。"""
 
     def analyze(call_id, arguments, _attempt):
@@ -45,6 +45,55 @@ def register_labor_dispute_tools(registry, service) -> None:
         "version": "1.0.0", "supported_jurisdictions": ["CN"],
         "max_retries": 0, "timeout_seconds": 30,
     }
+
+    def issue_handler(method, *, require_complete=False):
+        def handler(call_id, arguments, _attempt):
+            data = method(arguments["matter_id"], arguments["client_id"])
+            missing = list(data.get("missing_facts") or [])
+            if require_complete and missing:
+                return ToolResult(
+                    tool_call_id=call_id,
+                    success=False,
+                    data=data,
+                    error_code="INFORMATION_REQUIRED",
+                    error_message=f"当前问题步骤缺少事实: {', '.join(missing)}",
+                    retryable=False,
+                    warnings=list(data.get("warnings") or []),
+                )
+            return ToolResult(
+                tool_call_id=call_id,
+                success=True,
+                data=data,
+                warnings=list(data.get("warnings") or []),
+            )
+        return handler
+
+    issue_schema = {
+        "type": "object",
+        "required": ["matter_id", "client_id"],
+    }
+    registry.register(AgentTool(
+        name="analyze_wage_arrears",
+        description="在主劳动计划中整理欠薪期间、金额和待复核事实",
+        input_schema=issue_schema,
+        risk_level="L1",
+        **common,
+    ), issue_handler(issue_analysis.wage_arrears))
+    registry.register(AgentTool(
+        name="analyze_labor_termination",
+        description="在主劳动计划中整理解除事实、依据和程序缺口",
+        input_schema=issue_schema,
+        risk_level="L1",
+        **common,
+    ), issue_handler(issue_analysis.termination))
+    registry.register(AgentTool(
+        name="analyze_economic_compensation",
+        description="在主劳动计划中估算经济补偿并保留人工复核边界",
+        input_schema=issue_schema,
+        risk_level="L1",
+        **common,
+    ), issue_handler(issue_analysis.economic_compensation, require_complete=True))
+
     registry.register(AgentTool(
         name="analyze_labor_dispute", description="校验劳动纠纷事实、期限、证据和法律来源",
         input_schema={"type": "object", "required": ["matter_id", "client_id"]},

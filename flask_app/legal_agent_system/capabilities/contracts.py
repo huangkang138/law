@@ -44,10 +44,13 @@ class PlanTemplate(BaseModel):
     domain_id: str
     task_type: str
     allowed_step_types: List[str]
+    allowed_dispute_tags: List[str] = Field(default_factory=list)
     steps: List[TemplateStep]
 
     @model_validator(mode="after")
     def validate_steps(self):
+        if len(self.allowed_dispute_tags) != len(set(self.allowed_dispute_tags)):
+            raise ValueError("模板 allowed_dispute_tags 不得重复")
         known: set[str] = set()
         for step in self.steps:
             if step.step_id in known:
@@ -57,6 +60,12 @@ class PlanTemplate(BaseModel):
             unknown_dependencies = set(step.depends_on) - known
             if unknown_dependencies:
                 raise ValueError(f"步骤依赖必须指向前序步骤: {sorted(unknown_dependencies)}")
+            condition_tags = set((step.condition or {}).get("dispute_tag_any", [])) | set(
+                (step.condition or {}).get("dispute_tag_all", [])
+            )
+            unknown_tags = condition_tags - set(self.allowed_dispute_tags)
+            if unknown_tags:
+                raise ValueError(f"步骤条件使用了模板未允许的争议标签: {sorted(unknown_tags)}")
             known.add(step.step_id)
         return self
 
@@ -83,6 +92,7 @@ class PlanStep(BaseModel):
     verification_policy_ids: List[str] = Field(default_factory=list)
     on_failure: str = "reject"
     arguments: Dict[str, Any] = Field(default_factory=dict)
+    triggered_by_tags: List[str] = Field(default_factory=list)
 
 
 class PlanRevision(BaseModel):
@@ -96,5 +106,6 @@ class PlanRevision(BaseModel):
     replan_reason: Optional[str] = None
     triggered_by: str = "runtime"
     parent_plan_id: Optional[str] = None
+    dispute_tags: List[str] = Field(default_factory=list)
+    composition_version: str = "dispute-tags-v1"
     steps: List[PlanStep]
-

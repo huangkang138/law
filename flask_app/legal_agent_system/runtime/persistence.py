@@ -450,6 +450,11 @@ class AgentRepository:
             if plan_version:
                 step_query = step_query.filter(AgentStep.plan_version == plan_version)
             steps = step_query.order_by(AgentStep.sequence).all()
+            plan_id = (run.state_json or {}).get("plan_id")
+            current_plan = db.get(AgentPlan, plan_id) if plan_id else None
+            raw_plan_payload = current_plan.plan_json if current_plan else None
+            plan_payload = dict(raw_plan_payload) if isinstance(raw_plan_payload, dict) else {}
+            planned_steps = list(plan_payload.get("steps") or [])
             approval = db.get(ApprovalRequest, run.pending_approval_id) if run.pending_approval_id else None
             return {
                 "run_id": run.id, "matter_id": run.matter_id, "status": run.status,
@@ -457,19 +462,25 @@ class AgentRepository:
                 "steps": [{
                     "id": s.id, "name": s.name, "status": s.status, "tool_name": s.tool_name,
                     "step_type": s.step_type, "skip_reason": s.skip_reason,
+                    "triggered_by_tags": (
+                        planned_steps[index].get("triggered_by_tags", [])
+                        if index < len(planned_steps) else []
+                    ),
                     "requires_approval": bool(s.requires_approval),
                     "verification_policy_ids": list(s.verification_policy_ids or []),
                     "observation": s.observation_json, "verification": s.verification_json,
                     "decision": s.decision_json,
-                } for s in steps],
+                } for index, s in enumerate(steps)],
                 "approval": ({"id": approval.id, "prompt": approval.prompt, "status": approval.status} if approval else None),
                 "task_type": (run.state_json or {}).get("task_type", "mock_case_summary"),
                 "domain_id": (run.state_json or {}).get("domain_id"),
                 "template_id": (run.state_json or {}).get("template_id"),
                 "template_version": (run.state_json or {}).get("template_version"),
-                "plan_id": (run.state_json or {}).get("plan_id"),
+                "plan_id": plan_id,
                 "plan_revision": (run.state_json or {}).get("plan_revision", plan_version),
                 "replan_reason": (run.state_json or {}).get("replan_reason"),
+                "dispute_tags": list(plan_payload.get("dispute_tags") or []),
+                "composition_version": plan_payload.get("composition_version"),
                 "plan_version": (run.state_json or {}).get("plan_version", 0),
                 "missing_facts": (run.state_json or {}).get("missing_facts", []),
                 "questions": (run.state_json or {}).get("questions", []),

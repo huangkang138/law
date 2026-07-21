@@ -25,7 +25,12 @@ from .jurisdictions.authority_importer import TrustedAuthorityImporter
 from .jurisdictions.authority_provider import OfficialCnLaborProvider
 from .jurisdictions.authority_governance import AuthorityGovernanceService
 from .jurisdictions import MatterJurisdictionService, get_jurisdiction_registry
-from .labor_disputes import LaborCaseTriageService, LaborDisputeService, LaborFactSuggestionService
+from .labor_disputes import (
+    LaborCaseTriageService,
+    LaborDisputeService,
+    LaborFactSuggestionService,
+    LaborIssueAnalysisService,
+)
 from . import models as _agent_models  # noqa: F401，注册新增 Agent 表元数据
 
 
@@ -44,6 +49,7 @@ class LegalAgentFacade:
         self.auto_sync_authorities = auto_sync_authorities
         self.jurisdictions = MatterJurisdictionService()
         self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
+        self.labor_issue_analysis = LaborIssueAnalysisService(self.labor_disputes)
         self.labor_triage = LaborCaseTriageService(self.materials)
         self.labor_suggestions = LaborFactSuggestionService(self.materials, llm_fact_extractor)
         self.registry = ToolRegistry()
@@ -51,7 +57,9 @@ class LegalAgentFacade:
         register_material_tools(self.registry, self.materials)
         register_authority_verification_tools(self.registry, self.authorities)
         register_labor_tools(self.registry)
-        register_labor_dispute_tools(self.registry, self.labor_disputes)
+        register_labor_dispute_tools(
+            self.registry, self.labor_disputes, self.labor_issue_analysis,
+        )
         register_labor_triage_tools(self.registry, self.labor_triage)
         self.capabilities = CapabilityRegistry(self.registry)
         self.capabilities.register(

@@ -572,3 +572,63 @@
 - 实际改动：追加本记录；外部资料副本不属于当前 Git 仓库。
 - 验证：复制后核对目标文件树、文件计数和关键 Markdown 文件存在性。
 - 风险与后续：该副本包含当前项目的状态与历史，迁用到新项目时应保留规则与模式，替换项目状态、历史和 `raw/` 架构资料。
+
+## 2026-07-21 21:24:29 +08:00
+
+- 会话 ID：`019f84d2-0fd1-7812-85f9-027376a7c162`。
+- 分支/Git 状态：当前分支 `master`；工作树已有业务、迁移、测试、前端、图件和输出物等未提交或未跟踪改动，本次全部保留，仅修改 `AI_WORKFLOW/` 与本日志中的 Markdown。
+- 用户请求：进入 FEATURE 模式并执行 `CURRENT_TASK`。
+- 修改前阅读：`AGENTS.md`、`CLAUDE.md`、项目上下文/修改规则、`AI_WORKFLOW` 入口、当前任务、下一步、FEATURE 模式、关键决策、开发者记忆卡、总体规划、最新项目分析、相关修改历史和当前 Git 状态。
+- 修改思路：当前任务限定为协作体系整理，且六种模式、导航、决策和记忆卡已经落地；因此完成正式收尾并把唯一当前任务推进到已完成架构分析的阶段 3.7B，不越权修改业务代码。
+- 具体方案：将 `CURRENT_TASK.md` 覆盖为 3.7B 的目标、范围、禁止项和验收；将 `NEXT_STEP.md` 更新为“3.7B 当前、3.7C 下一步”；补充组合式 Plan 的长期决策与 3.7B 接力定位。
+- 实际改动：`AI_WORKFLOW/CURRENT_TASK.md`、`AI_WORKFLOW/NEXT_STEP.md`、`AI_WORKFLOW/DECISIONS.md`、`AI_WORKFLOW/DEVELOPER_MEMORY.md`、`newModify/modification-log.md`。
+- 验证：核对六种模式文件、工作流标题和相对链接；执行限定范围 `git diff --check`；确认未修改业务代码、配置、数据库、迁移或前后端源码。
+- 风险与后续：3.7B 现在是唯一当前任务，但业务实现仍未开始；下一次执行应按代码任务检查点重新核对脏工作树和真实源码，并保持唯一 Runtime Graph 边界。
+
+## 2026-07-21 21:44:38 +08:00
+
+- 会话 ID：`019f84d2-0fd1-7812-85f9-027376a7c162`。
+- 分支/Git 状态：当前分支 `master`；修改前工作树已有阶段 3.7A/3.7A.1、前端工作台、迁移、测试、图件、上传材料和输出物等未提交或未跟踪改动，本次全部保留，仅增量修改 3.7B 核心模块、契约、测试和规定文档。
+- 用户请求：进入 FEATURE 模式，按已确认的“主 PlanTemplate + dispute_tags + 白名单可选步骤”实现阶段 3.7B；不得复制 Runtime Graph，不得进入 3.7C。
+- 修改前阅读：`AGENTS.md`、`CLAUDE.md`、项目上下文/修改规则、FEATURE 模式、`CURRENT_TASK.md`、`NEXT_STEP.md`、总体规划、实际 Agent 流程、最新项目分析、3.6/3.7A 相关历史，以及当前能力契约、Planner、Registry、劳动 Domain Package/Adapter/Verifier、劳动 Service/Tool、Runtime、持久化和专项测试。
+- 修改思路：按交付目的保留 `labor_case_analysis` 与 `labor_arbitration_application` 两个主模板；欠薪、解除、经济补偿只作为模板内固定白名单步骤。Planner 只启用或跳过已声明步骤，Adapter 定制后由 Registry 再次核验，Runtime Graph 拓扑保持不变。
+- 具体方案：新增三个稳定争议标签及中文归一化；新增三个只输出初步结果并保留人工复核标记的问题分析工具；公共证据、统一期限/法源分析、审批和草稿步骤去重；Plan 保存标签、组合版本和步骤触发标签；未知标签及插步、换工具、改依赖、削弱审批统一失败关闭；补充事实后在同一 Run 创建新 revision。
+- 实际改动：能力契约/Planner/Registry；劳动 `package.py`、Adapter、Verifier、Facade、Schema、工具；新增 `labor_disputes/dispute_tags.py` 与 `issue_analysis.py`；Runtime 失败关闭、错误码和快照；前端快照类型；新增阶段 3.7B 测试并更新受模板版本影响的阶段 3.1/3.4 断言；同步 Agent README、实际流程、总体规划、最新项目分析与 `AI_WORKFLOW` 状态。
+- 验证：系统默认 Python 因缺少 SQLAlchemy 未用于项目测试；改用项目既有 Anaconda Runtime。阶段 3.6+3.7A+3.7B 专项 16/16 通过；完整数字人 Agent 回归 49/49 通过；Python `compileall` 通过；前端 `npx tsc --noEmit` 通过；最终执行 `git diff --check` 和限定文件复核。
+- 风险与后续：三个问题步骤当前是可审计的初步结构化分析，经济补偿沿用项目既有估算公式，尚未覆盖工资上限、完整解除规则或真实金标；这些属于 3.7C，本次明确未进入。未新增数据库表或列，因此无需 Alembic migration。
+
+## 2026-07-21 22:10:00 +08:00
+
+- 会话 ID：当前环境未暴露；本地追踪标识 `ai-workflow-handoff-fix-20260721`。
+- 分支/Git 状态：当前分支 `master`；工作树已有阶段 3.7A/3.7A.1、业务、迁移、测试、前端和图件改动，本次全部保留，仅修改协作工作流 Markdown。
+- 用户请求：修复 AI_WORKFLOW 的任务状态流转与模式交接，防止 ARCHITECTURE 分析目标被旧 CURRENT_TASK 截断；同步对应资料到 `D:\ProfileManage\HKC-Law-AI-Collaboration-Template`。
+- 修改前阅读：仓库入口、硬约束、上下文/修改规则、AI_WORKFLOW 全部文件、总体规划、当前项目分析、相关修改历史、当前 Git 状态和外部模板目录。
+- 修改思路：不创建第二套工作流；在既有导航、状态文件和六种模式中补上目标一致性、显式 Promote、任务状态语义、Architecture Handoff、Review 实物验收和结束路由。
+- 具体方案：AGENTS 仅增加导航；README 定义状态、Promote、主状态流和常用指令；CURRENT_TASK 按完整字段重写且将 3.7B 标为 PLANNED；各模式加入最小的目标一致性和交接规则；DECISIONS 记录长期原则。
+- 实际改动：仅修改 `AGENTS.md`、`AI_WORKFLOW/README.md`、`CURRENT_TASK.md`、`NEXT_STEP.md`、`DECISIONS.md`、六种模式文档，并追加本日志；未修改业务代码、配置、数据库、迁移、测试或 3.7B 实现。
+- 规则级模拟：3.7B 分析与旧任务不一致时标记 CURRENT_TASK_MISMATCH；“方案确认并实施”先初始化 3.7B CURRENT_TASK 再进 FEATURE；若无 3.7B 业务代码，REVIEW 必须为 FAILED_REVIEW 并退回 FEATURE。
+- 验证：检查必需状态、Promote、Architecture Handoff、FEATURE 启动检查和 REVIEW 未通过规则均存在；执行 Markdown 文件范围复核与 `git diff --check`。
+- 风险与后续：流程规则依赖 Agent 严格遵守，非自动化状态机；3.7B 仍是 PLANNED，必须等用户明确确认实施后再改业务代码。
+
+## 2026-07-21 23:00:00 +08:00
+
+- 会话 ID：当前环境未暴露；本地追踪标识 `markdown-governance-20260721`。
+- 分支/Git 状态：当前分支 `master`；工作树已有 3.7B 业务、测试、前端、迁移和图件改动，本次全部保留，仅治理 Markdown。
+- 用户请求：统一协作体系、项目状态和规划资料，归档被替代资料，不修改任何业务代码。
+- 修改前阅读：入口、硬约束、现有工作流、最新项目分析、总体规划、历史规则、相关历史日志、Markdown 引用与当前源码文件存在性。
+- 发现：旧 PROJECT 规则仍被入口引用；CLAUDE 含旧 Runtime 和固定行数；状态流缺少 READY_FOR_ACCEPTANCE；最新解析同时存在“普通聊天未接入”和劳动入口已接入的歧义；三份 raw 文档已过时。
+- 实际改动：收敛入口和硬约束；完善工作流状态、决策表、记忆卡和 LEARN；更新当前状态为 3.7B `VERIFYING`；修正最新解析与总体规划；将三份旧方案及两份 PROJECT 规则移至 `raw/archive/` 并标注状态。
+- 验证：检查有效规则不再依赖 PROJECT 文件、旧 Runtime 不在当前规则中、归档资料带状态声明、3.7B/3.7A.1/3.7C 状态一致，并执行 `git diff --check`。
+- 风险与后续：3.7B 尚待 REVIEW；archive 中历史描述可能与当前源码不同，只能用于演进追溯；工作流是语义规则，仍需要 Agent 遵守。
+
+## 2026-07-21 21:46:00 +08:00（3.7B 最终验证补充）
+
+- 会话 ID：`019f84d2-0fd1-7812-85f9-027376a7c162`。
+- 分支/Git 状态：`master`；保留全部既有用户改动，3.7B 详细实施记录见本文件 `2026-07-21 21:44:38 +08:00`。
+- 用户请求：完成阶段 3.7B 业务实现、测试和收尾，不进入后续阶段。
+- 修改前阅读：同上述 3.7B 详细实施记录，并复核后续新增的 AI_WORKFLOW 交接规则。
+- 修改思路：在最终交付前重新执行完整回归，并将任务状态停在 `IMPLEMENTED_AWAITING_REVIEW`。
+- 具体方案：补强旧格式 Plan 快照兼容；复跑完整数字人 Agent 测试、TypeScript 检查和差异检查。
+- 实际改动：`runtime/persistence.py` 兼容历史列表型 `plan_json`；AI_WORKFLOW 明确 3.7B 已实现待验收；未进入 3.7C。
+- 验证：完整数字人 Agent 回归 49/49、`npx tsc --noEmit`、Python compileall、`git diff --check` 全部通过；仅有既有 CRLF 转换提示。
+- 风险与后续：3.7B 等待 REVIEW 验收；实体规则深化继续保持暂缓。
