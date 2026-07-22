@@ -10,6 +10,7 @@ from legal_agent_system.capabilities.contracts import (
 from legal_agent_system.labor_disputes.dispute_tags import (
     ALLOWED_DISPUTE_TAGS,
     ECONOMIC_COMPENSATION,
+    OVERTIME_PAY,
     PROBATION,
     TERMINATION,
     WAGE_ARREARS,
@@ -29,6 +30,7 @@ COMMON_TOOLS = [
     "analyze_labor_termination",
     "analyze_economic_compensation",
     "analyze_probation",
+    "analyze_overtime_pay",
     "analyze_labor_dispute",
     "analyze_labor_consultation",
     "analyze_labor_case",
@@ -74,6 +76,18 @@ def _issue_steps() -> list[TemplateStep]:
             optional=True,
             condition={"dispute_tag_any": [WAGE_ARREARS]},
             skip_reason="争议标签不包含欠薪，本次不执行欠薪分析",
+            verification_policy_ids=["global.tool_result", "labor.issue"],
+            on_failure="request_context",
+        ),
+        TemplateStep(
+            step_id="overtime_pay_analysis",
+            name="核算工作日、休息日和法定节假日加班费",
+            step_type="wage_analysis",
+            tool_name="analyze_overtime_pay",
+            depends_on=["evidence_check"],
+            optional=True,
+            condition={"dispute_tag_any": [OVERTIME_PAY]},
+            skip_reason="争议标签不包含加班费，本次不执行加班费核算",
             verification_policy_ids=["global.tool_result", "labor.issue"],
             on_failure="request_context",
         ),
@@ -136,7 +150,7 @@ def build_labor_domain_package() -> DomainPackage:
     arbitration_issues = _issue_steps()
     arbitration = PlanTemplate(
         template_id="labor_arbitration_application",
-        version="3.0.0",
+        version="3.1.0",
         domain_id="cn_labor",
         task_type="labor_arbitration_application",
         allowed_step_types=COMMON_STEP_TYPES,
@@ -177,7 +191,7 @@ def build_labor_domain_package() -> DomainPackage:
     case_issues = _issue_steps()
     case_analysis = PlanTemplate(
         template_id="labor_case_analysis",
-        version="3.0.0",
+        version="3.1.0",
         domain_id="cn_labor",
         task_type="labor_case_analysis",
         allowed_step_types=COMMON_STEP_TYPES,
@@ -202,7 +216,7 @@ def build_labor_domain_package() -> DomainPackage:
 
     return DomainPackage(
         domain_id="cn_labor",
-        version="1.2.0",
+        version="1.3.0",
         routing_rules=[
             RoutingRule(
                 task_type="labor_arbitration_application",

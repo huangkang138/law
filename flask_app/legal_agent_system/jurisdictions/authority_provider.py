@@ -248,13 +248,13 @@ class OfficialCnLaborProvider:
             external_id="samr-labor-law-wages",
             authority_type="statute",
             title="中华人民共和国劳动法",
-            provision="第五十条、第九十一条",
+            provision="第四十四条、第五十条、第九十一条",
             canonical_url="https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/bgt/art/2023/art_d9aa750028b14b99a776cb93726a360d.html",
             fallback_urls=("https://www.npc.gov.cn/zgrdw/npc/zt/2006-03/20/content_347911.htm",),
             issuing_body="全国人民代表大会常务委员会",
             effective_from="2018-12-29T00:00:00+00:00",
-            article_numbers=("五十", "九十一"),
-            topic_tags=("欠薪", "工资支付", "劳动报酬"),
+            article_numbers=("四十四", "五十", "九十一"),
+            topic_tags=("欠薪", "工资支付", "劳动报酬", "加班费", "延长工作时间"),
         ),
     )
 
@@ -286,6 +286,9 @@ class OfficialCnLaborProvider:
                 self.last_errors.append(f"{spec.external_id}: {'; '.join(errors)}")
                 continue
             content_hash = hashlib.sha256(source.content).hexdigest()
+            authority_version = hashlib.sha256(
+                f"{spec.external_id}\n{spec.provision}\n{provision_text}\n{spec.effective_from}".encode("utf-8")
+            ).hexdigest()[:16]
             payloads.append(AuthorityPayload(
                 external_id=spec.external_id,
                 country_code="CN",
@@ -297,7 +300,7 @@ class OfficialCnLaborProvider:
                 issuing_body=spec.issuing_body,
                 effective_from=datetime.fromisoformat(spec.effective_from),
                 topic_tags=list(spec.topic_tags),
-                version=content_hash[:16],
+                version=authority_version,
                 retrieved_at=source.retrieved_at,
                 media_type=source.media_type,
                 source_content_hash=content_hash,

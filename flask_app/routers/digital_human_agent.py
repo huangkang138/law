@@ -164,7 +164,9 @@ def start_labor_dispute_run(matter_id):
 @router.route("/digital-human/agent/capabilities", methods=["GET"])
 def list_agent_capabilities():
     """查询当前已注册领域和计划模板。"""
-    return _response(lambda: get_legal_agent_facade().list_agent_capabilities())
+    return _response(lambda: {
+        "capabilities": get_legal_agent_facade().list_agent_capabilities(),
+    })
 
 
 @router.route("/digital-human/agent/matters/<matter_id>/labor-dispute/suggestions", methods=["GET"])

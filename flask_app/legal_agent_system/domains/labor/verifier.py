@@ -24,6 +24,7 @@ class LaborResultVerifier:
         report = LaborVerification()
         issue_tools = {
             "analyze_wage_arrears",
+            "analyze_overtime_pay",
             "analyze_probation",
             "analyze_labor_termination",
             "analyze_economic_compensation",

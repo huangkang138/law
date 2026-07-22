@@ -7,12 +7,14 @@ WAGE_ARREARS = "wage_arrears"
 TERMINATION = "termination"
 ECONOMIC_COMPENSATION = "economic_compensation"
 PROBATION = "probation"
+OVERTIME_PAY = "overtime_pay"
 
 ALLOWED_DISPUTE_TAGS = (
     WAGE_ARREARS,
     TERMINATION,
     ECONOMIC_COMPENSATION,
     PROBATION,
+    OVERTIME_PAY,
 )
 
 _TAG_ALIASES = {
@@ -37,6 +39,11 @@ _TAG_ALIASES = {
     "试用期": PROBATION,
     "试用期工资": PROBATION,
     "试用期解除": PROBATION,
+    OVERTIME_PAY: OVERTIME_PAY,
+    "overtime": OVERTIME_PAY,
+    "加班": OVERTIME_PAY,
+    "加班费": OVERTIME_PAY,
+    "加班工资": OVERTIME_PAY,
 }
 
 

@@ -1,6 +1,7 @@
 """阶段 3 劳动纠纷领域能力的 Runtime 工具适配器。"""
 
 from legal_agent_system.runtime.schemas import AgentTool, ToolResult
+from legal_agent_system.labor_disputes.schemas import describe_missing_facts
 
 
 def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
@@ -90,7 +91,7 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
                     evidence_refs=list(data.get("evidence_refs") or []),
                     authority_refs=list(data.get("authority_refs") or []),
                     error_code="INFORMATION_REQUIRED",
-                    error_message=f"当前问题步骤缺少事实: {', '.join(missing)}",
+                    error_message=f"当前问题步骤缺少事实：{describe_missing_facts(missing)}",
                     retryable=False,
                     warnings=list(data.get("warnings") or []),
                 )
@@ -137,6 +138,13 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
         risk_level="L1",
         **common,
     ), issue_handler(issue_analysis.economic_compensation, require_complete=True))
+    registry.register(AgentTool(
+        name="analyze_overtime_pay",
+        description="按工时类型核算加班费并保留工时制度、基数和证据复核边界",
+        input_schema=issue_schema,
+        risk_level="L1",
+        **common,
+    ), issue_handler(issue_analysis.overtime_pay, require_complete=True))
 
     registry.register(AgentTool(
         name="analyze_labor_dispute", description="校验劳动纠纷事实、期限、证据和法律来源",

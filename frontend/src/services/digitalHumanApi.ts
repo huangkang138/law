@@ -187,6 +187,44 @@ export interface LaborDisputeWorkflow {
   approval_prompt?: string;
 }
 
+export interface LaborRuleDecision {
+  status: 'completed' | 'information_required' | 'authority_required';
+  issue_tag: string;
+  rule_version: string;
+  assessment: string;
+  missing_facts: string[];
+  fact_refs: string[];
+  evidence_refs: string[];
+  authority_refs: string[];
+  calculations: Record<string, unknown>;
+  assumptions: string[];
+  warnings: string[];
+  manual_review_required: boolean;
+  legal_conclusion: false;
+}
+
+export interface LaborAnalysisResult {
+  status?: string;
+  warning?: string;
+  missing_rule_facts?: string[];
+  deadline?: {
+    estimated_deadline: string | null;
+    assumptions: string[];
+    warnings: string[];
+    manual_review_required: boolean;
+  };
+  authorities?: Array<{
+    authority_id: string;
+    title: string;
+    provision: string | null;
+    source_url: string;
+    issuing_body: string;
+    trust_level: string;
+    version: string;
+  }>;
+  rule_decisions?: LaborRuleDecision[];
+}
+
 export interface LaborDisputeDraft {
   artifact_id: string;
   title: string;
@@ -491,6 +529,11 @@ export async function updateLaborDisputeFacts(
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute/facts`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(facts),
   });
+  return readJson(response);
+}
+
+export async function getLaborDisputeWorkflow(matterId: string): Promise<LaborDisputeWorkflow> {
+  const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/labor-dispute`);
   return readJson(response);
 }
 

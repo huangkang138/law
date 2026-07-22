@@ -20,7 +20,7 @@ from .schemas import FIELD_QUESTIONS, LaborDisputeFacts
 from .rules import LaborRuleEngine, RULE_VERSION
 from .dispute_tags import dispute_tags_from_facts
 from .evidence import LaborEvidenceService
-from .labor_rules import CompensationRule, ProbationRule, TerminationRule, WageArrearsRule
+from .labor_rules import CompensationRule, OvertimePayRule, ProbationRule, TerminationRule, WageArrearsRule
 
 
 def _id(prefix: str) -> str:
@@ -42,6 +42,7 @@ class LaborDisputeService:
             "probation": (ProbationRule(), ["试用期"]),
             "termination": (TerminationRule(), ["解除"]),
             "economic_compensation": (CompensationRule(), ["经济补偿"]),
+            "overtime_pay": (OvertimePayRule(), ["延长工作时间"]),
         }
 
     def update_facts(self, matter_id: str, client_id: str, patch: Dict) -> Dict:

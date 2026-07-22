@@ -45,6 +45,13 @@ class LaborDisputeFacts(BaseModel):
     compensation_kind: Optional[Literal["compensation", "damages", "undetermined"]] = None
     prior_probation_with_same_employer: Optional[bool] = None
     attendance_days: Optional[int] = Field(default=None, ge=0, le=366)
+    working_hours_system: Optional[Literal["standard", "comprehensive", "flexible", "unknown"]] = None
+    overtime_monthly_wage_base: Optional[float] = Field(default=None, gt=0)
+    overtime_workday_hours: Optional[float] = Field(default=None, ge=0, le=10000)
+    overtime_rest_day_hours: Optional[float] = Field(default=None, ge=0, le=10000)
+    overtime_statutory_holiday_hours: Optional[float] = Field(default=None, ge=0, le=10000)
+    rest_day_compensatory_leave_hours: Optional[float] = Field(default=None, ge=0, le=10000)
+    overtime_paid_amount: Optional[float] = Field(default=None, ge=0)
 
 
 class LaborEvidenceItem(BaseModel):
@@ -86,3 +93,18 @@ FIELD_QUESTIONS = {
     "demands": "希望通过仲裁解决哪些具体请求？",
     "limitation_start_date": "你从哪一天起知道或应当知道权利受到侵害？",
 }
+
+FIELD_LABELS = {
+    **{name: question.rstrip("？") for name, question in FIELD_QUESTIONS.items()},
+    "wage_arrears_amount_or_salary_and_months": "欠薪金额（或月工资和欠薪月数）",
+    "wage_arrears_period": "欠薪期间",
+    "working_hours_system": "工时制度",
+    "standard_working_hours_system_required": "非标准工时审批材料和计算周期",
+    "overtime_wage_base": "加班费月工资基数",
+    "overtime_hours_by_type": "工作日、休息日或法定节假日加班小时数",
+}
+
+
+def describe_missing_facts(fields: List[str]) -> str:
+    """把机器字段转换为可直接展示的中文名称，机器键仍保留在契约中。"""
+    return "、".join(FIELD_LABELS.get(field, field) for field in fields)

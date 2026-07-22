@@ -18,3 +18,6 @@ class LaborIssueAnalysisService:
 
     def economic_compensation(self, matter_id: str, client_id: str) -> Dict:
         return self.labor_disputes.evaluate_rule(matter_id, client_id, "economic_compensation")
+
+    def overtime_pay(self, matter_id: str, client_id: str) -> Dict:
+        return self.labor_disputes.evaluate_rule(matter_id, client_id, "overtime_pay")
