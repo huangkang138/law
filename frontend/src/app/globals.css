@@ -106,15 +106,28 @@
 .dh-agent-approval button { padding: 5px 8px; border-radius: 7px; background: white; color: #1d4ed8; }
 .dh-agent-result { margin-top: 7px; color: #166534; }
 .dh-matter-workspace { padding: 14px; border: 1px solid #bfdbfe; border-radius: 14px; background: #f8fbff; color: #334155; font-size: 12px; }
-.dh-matter-compact { margin: 0 14px 10px; padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a8a; }
-.dh-matter-compact > div { display: flex; align-items: center; gap: 7px; }
-.dh-matter-compact span { display: flex; flex-direction: column; }
-.dh-matter-compact small { color: #64748b; font-weight: 400; }
-.dh-matter-compact button { flex: 0 0 auto; padding: 7px 9px; border: 0; border-radius: 8px; background: #2563eb; color: white; font-weight: 700; cursor: pointer; }
 .dh-matter-heading { display: flex; align-items: center; gap: 8px; color: #1e3a8a; }
 .dh-matter-heading div { display: flex; flex-direction: column; }
 .dh-matter-heading strong { font-size: 14px; }
 .dh-matter-heading small { color: #64748b; font-weight: 400; }
+.dh-matter-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #dbeafe; }
+.dh-matter-actions { display: flex; gap: 7px; }
+.dh-matter-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; color: #1d4ed8; background: #fff; border: 1px solid #bfdbfe; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.dh-matter-actions button.primary { color: #fff; background: #2563eb; border-color: #2563eb; }
+.dh-case-browser { margin-top: 10px; padding: 10px; border: 1px solid #bfdbfe; border-radius: 10px; background: #fff; box-shadow: 0 8px 22px rgba(30, 64, 175, .08); }
+.dh-case-browser > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dh-case-browser > div > button { padding: 3px 6px; color: #64748b; background: transparent; border: 0; cursor: pointer; }
+.dh-case-browser > p { margin: 8px 0; color: #64748b; text-align: center; }
+.dh-case-browser article { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 6px; margin-top: 6px; }
+.dh-case-browser article > button { border: 1px solid #dbeafe; border-radius: 8px; background: #f8fbff; color: #334155; cursor: pointer; }
+.dh-case-browser article > button:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 8px 10px; text-align: left; }
+.dh-case-browser article span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dh-case-browser article small { flex: none; color: #2563eb; }
+.dh-current-case { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 10px; background: #fff; }
+.dh-current-case > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dh-current-case span { color: #64748b; font-size: 11px; }
+.dh-current-case strong { overflow: hidden; color: #1e3a8a; text-overflow: ellipsis; white-space: nowrap; }
+.dh-current-case em { flex: none; padding: 4px 8px; color: #166534; background: #dcfce7; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 700; }
 .dh-matter-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 11px 0; }
 .dh-matter-steps span { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #94a3b8; font-weight: 700; }
 .dh-matter-steps span::before { content: ''; position: absolute; }

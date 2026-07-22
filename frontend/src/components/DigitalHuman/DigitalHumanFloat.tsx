@@ -271,24 +271,6 @@ export default function DigitalHumanFloat() {
           white-space: nowrap;
         }
 
-        .dh-header-actions .dh-new-conversation {
-          width: auto;
-          grid-auto-flow: column;
-          gap: 5px;
-          padding: 0 10px;
-          color: #245995;
-          background: transparent;
-          border: 1px solid transparent;
-          font-size: 12px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-
-        .dh-header-actions .dh-new-conversation:hover {
-          background: rgba(255, 255, 255, .72);
-          border-color: rgba(147, 197, 253, .42);
-        }
-
         .dh-panel-expanded .dh-workspace-switch {
           color: #1d4ed8;
           background: #fff;
@@ -706,15 +688,6 @@ export default function DigitalHumanFloat() {
 
           .dh-panel-expanded .dh-workspace-column {
             padding: 14px;
-          }
-
-          .dh-header-actions .dh-new-conversation span {
-            display: none;
-          }
-
-          .dh-header-actions .dh-new-conversation {
-            width: 34px;
-            padding: 0;
           }
 
           .dh-portrait-stage {
