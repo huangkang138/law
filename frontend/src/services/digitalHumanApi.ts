@@ -100,6 +100,13 @@ export interface MatterMaterial {
   fragment_count: number;
 }
 
+export interface OrganizedMatterMaterial {
+  filename: string;
+  media_type: string;
+  text: string;
+  character_count: number;
+}
+
 export interface LocatedLegalFact {
   fact_id: string;
   fact_type: string;
@@ -475,13 +482,26 @@ export async function confirmMatterJurisdiction(matterId: string, subdivisionCod
 }
 
 export async function addMatterMaterial(
-  matterId: string, filename: string, text: string,
+  matterId: string, filename: string, text: string, mediaType = 'text/plain',
 ): Promise<MatterMaterial> {
   const response = await request(`/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/materials`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename, text, media_type: 'text/plain' }),
+    body: JSON.stringify({ filename, text, media_type: mediaType }),
   });
   return readJson(response);
+}
+
+export async function organizeMatterMaterial(
+  matterId: string, file: File,
+): Promise<OrganizedMatterMaterial> {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await request(
+    `/api/digital-human/agent/matters/${encodeURIComponent(matterId)}/materials/organize`,
+    { method: 'POST', body },
+    180000,
+  );
+  return (await readJson<{ material: OrganizedMatterMaterial }>(response)).material;
 }
 
 export async function analyzeMatterMaterial(

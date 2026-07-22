@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from core.logger import app_logger
 from legal_agent_system import get_legal_agent_facade
 from legal_agent_system.runtime.errors import AgentRuntimeError
+from services.material_extraction import MaterialExtractionError, extract_material_text
 
 
 router = Blueprint("digital_human_agent", __name__)
@@ -92,6 +93,21 @@ def add_material(matter_id):
         return get_legal_agent_facade().add_material(
             matter_id, _client_id(), data.get("filename"), data.get("text"), data.get("media_type", "text/plain"),
         )
+    return _response(action)
+
+
+@router.route("/digital-human/agent/matters/<matter_id>/materials/organize", methods=["POST"])
+def organize_material(matter_id):
+    """识别上传文件并返回可编辑预览；用户确认前不写入 Matter。"""
+    def action():
+        get_legal_agent_facade().get_matter(matter_id, _client_id())
+        uploaded = request.files.get("file")
+        if uploaded is None:
+            raise AgentRuntimeError("请选择需要整理的材料", "INVALID_INPUT")
+        try:
+            return {"material": extract_material_text(uploaded.filename or "", uploaded.stream)}
+        except MaterialExtractionError as exc:
+            raise AgentRuntimeError(str(exc), "INVALID_INPUT") from exc
     return _response(action)
 
 

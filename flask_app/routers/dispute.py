@@ -9,22 +9,7 @@ import json
 from pathlib import Path
 from flask import Blueprint, request, jsonify
 from core.logger import app_logger
-
-# 导入媒体处理库
-try:
-    import whisper
-    WHISPER_AVAILABLE = True
-except Exception as e:
-    WHISPER_AVAILABLE = False
-    app_logger.warning(f"whisper 加载失败，音频文件处理功能不可用: {str(e)}")
-
-try:
-    import pytesseract
-    from PIL import Image
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
-    app_logger.warning("pytesseract 或 Pillow 未安装，图片文件处理功能不可用")
+from services.material_extraction import extract_material_text
 
 try:
     import cv2
@@ -50,19 +35,9 @@ def transcribe_audio(file_path: str) -> str:
     Returns:
         转录的文本内容
     """
-    if not WHISPER_AVAILABLE:
-        return f"[音频文件: {os.path.basename(file_path)}]"
-    
-    try:
-        app_logger.info(f"开始转录音频文件: {file_path}")
-        model = whisper.load_model("base")
-        result = model.transcribe(file_path)
-        transcript = result["text"]
-        app_logger.info(f"音频转录成功，文本长度: {len(transcript)}")
-        return f"[音频转录内容]: {transcript}"
-    except Exception as e:
-        app_logger.error(f"音频转录失败: {str(e)}")
-        return f"[音频文件: {os.path.basename(file_path)}]"
+    with open(file_path, "rb") as source:
+        result = extract_material_text(os.path.basename(file_path), source)
+    return f"[音频转录内容]: {result['text']}"
 
 
 def extract_text_from_image(file_path: str) -> str:
@@ -75,18 +50,9 @@ def extract_text_from_image(file_path: str) -> str:
     Returns:
         提取的文本内容
     """
-    if not OCR_AVAILABLE:
-        return f"[图片文件: {os.path.basename(file_path)}]"
-    
-    try:
-        app_logger.info(f"开始从图片提取文本: {file_path}")
-        image = Image.open(file_path)
-        text = pytesseract.image_to_string(image, lang='chi_sim')
-        app_logger.info(f"图片文本提取成功，文本长度: {len(text)}")
-        return f"[图片文本内容]: {text}"
-    except Exception as e:
-        app_logger.error(f"图片文本提取失败: {str(e)}")
-        return f"[图片文件: {os.path.basename(file_path)}]"
+    with open(file_path, "rb") as source:
+        result = extract_material_text(os.path.basename(file_path), source)
+    return f"[图片文本内容]: {result['text']}"
 
 
 def extract_frames_from_video(file_path: str) -> list:
@@ -139,28 +105,9 @@ def process_video(file_path: str) -> str:
     Returns:
         处理后的文本内容
     """
-    frames = extract_frames_from_video(file_path)
-    
-    if not frames:
-        return f"[视频文件: {os.path.basename(file_path)}]"
-    
-    # 对每一帧进行OCR
-    frame_texts = []
-    for frame_path in frames:
-        text = extract_text_from_image(frame_path)
-        if text and "[图片文本内容]" in text:
-            frame_texts.append(text)
-        
-        # 清理临时帧文件
-        try:
-            os.remove(frame_path)
-        except:
-            pass
-    
-    if frame_texts:
-        return f"[视频内容]: {'; '.join(frame_texts)}"
-    else:
-        return f"[视频文件: {os.path.basename(file_path)}]"
+    with open(file_path, "rb") as source:
+        result = extract_material_text(os.path.basename(file_path), source)
+    return f"[视频转录内容]: {result['text']}"
 
 
 def _invoke_llm_streaming(messages: list) -> str:

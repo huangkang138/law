@@ -146,6 +146,12 @@
 .dh-file-picker { justify-content: center; padding: 9px; border: 1px dashed #60a5fa; border-radius: 9px; color: #2563eb !important; cursor: pointer; }
 .dh-file-picker input { display: none; }
 .dh-material-help { margin: 0; padding: 9px 11px; color: #475569; background: #eff6ff; border-radius: 9px; font-size: 12px; line-height: 1.65; }
+.dh-material-kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: 10px; background: #eff6ff; }
+.dh-material-kinds button { border: 0; border-radius: 8px; padding: 8px 6px; background: transparent; color: #64748b; font-weight: 650; cursor: pointer; }
+.dh-material-kinds button.active { background: white; color: #1d4ed8; box-shadow: 0 1px 4px rgb(30 64 175 / 12%); }
+.dh-material-format-hint { color: #64748b; }
+.dh-material-preview { display: flex; flex-direction: column; gap: 7px; padding: 10px; border: 1px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; }
+.dh-material-preview label { color: #166534; }
 .dh-result-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .dh-result-summary span { padding: 7px 4px; border-radius: 8px; background: #dbeafe; text-align: center; color: #475569; }
 .dh-result-summary b { display: block; color: #1d4ed8; font-size: 16px; }

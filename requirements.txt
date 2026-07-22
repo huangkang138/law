@@ -45,6 +45,7 @@ whisper>=1.0.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
 opencv-python>=4.8.0
+# 运行环境还需提供 FFmpeg 与含 chi_sim/eng 数据的 Tesseract；Conda 环境会从 sys.prefix 自动发现。
 
 
 # Vector Database and Embeddings
