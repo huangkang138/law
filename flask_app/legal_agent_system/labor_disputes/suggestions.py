@@ -14,7 +14,9 @@ FIELD_LABELS = {
     "employee_name": "申请人姓名",
     "employer_name": "用人单位",
     "employment_start_date": "入职日期",
+    "termination_date": "解除日期",
     "limitation_start_date": "知道权利受损日期",
+    "termination_reason": "解除原因",
     "monthly_salary": "月工资",
     "work_location": "实际工作地点",
     "claim_types": "争议类型",
@@ -50,7 +52,9 @@ class LaborFactSuggestionService:
                     self._put(suggestions, "employee_name", self._employee(sentence), 0.82, source)
                     self._put(suggestions, "employer_name", self._employer(sentence), 0.82, source)
                     self._put(suggestions, "employment_start_date", self._date_near(sentence, ("入职", "建立劳动关系")), 0.9, source)
+                    self._put(suggestions, "termination_date", self._termination_date(sentence), 0.9, source)
                     self._put(suggestions, "limitation_start_date", self._date_near(sentence, ("收到", "知道", "通知")), 0.78, source)
+                    self._put(suggestions, "termination_reason", self._termination_reason(sentence), 0.84, source)
                     self._put(suggestions, "monthly_salary", self._salary(sentence), 0.88, source)
                     self._put(suggestions, "work_location", self._location(sentence), 0.84, source)
                     self._put(suggestions, "demands", self._demand(sentence), 0.72, source)
@@ -133,6 +137,26 @@ class LaborFactSuggestionService:
         if not match:
             return None
         return f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
+
+    @staticmethod
+    def _termination_date(sentence: str) -> Optional[str]:
+        patterns = (
+            r"劳动关系于\s*(20\d{2})[年/-](\d{1,2})[月/-](\d{1,2})日?\s*(?:解除|终止)",
+            r"(20\d{2})[年/-](\d{1,2})[月/-](\d{1,2})日?\s*(?:解除|终止)(?:劳动关系|劳动合同)?",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, sentence)
+            if match:
+                return f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
+        return None
+
+    @staticmethod
+    def _termination_reason(sentence: str) -> Optional[str]:
+        match = re.search(
+            r"(?:解除)?理由(?:为|是|[：:])\s*[“\"']?([^”\"'，。；\n]+)",
+            sentence,
+        )
+        return match.group(1).strip() if match else None
 
     @staticmethod
     def _salary(sentence: str) -> Optional[float]:
