@@ -66,6 +66,13 @@ export default function DigitalHumanChat() {
     }, 420);
   };
 
+  const handleNewConversation = () => {
+    if (isLoading) cancelRequest();
+    startNewConversation();
+    setHistoryOpen(false);
+    setWorkspaceExpanded(false);
+  };
+
   return (
     <section className={`dh-panel ${workspaceExpanded ? 'dh-panel-expanded' : ''}`} role="dialog" aria-label="法小助数字人智能助手">
       <header className="dh-panel-header">
@@ -77,6 +84,16 @@ export default function DigitalHumanChat() {
           <p>{workspaceExpanded ? '案件工作台 · 材料、事实与法源' : EMOTION_LABELS[emotion]}</p>
         </div>
         <div className="dh-header-actions">
+          <button
+            type="button"
+            className="dh-new-conversation"
+            onClick={handleNewConversation}
+            aria-label="新建会话"
+            title="新建会话"
+          >
+            <Plus size={16} />
+            <span>新建会话</span>
+          </button>
           <button
             type="button"
             className="dh-workspace-switch"
@@ -117,8 +134,7 @@ export default function DigitalHumanChat() {
         <button
           type="button"
           onClick={() => {
-            startNewConversation();
-            setHistoryOpen(false);
+            handleNewConversation();
           }}
           aria-label="开始新对话"
           title="新对话"
