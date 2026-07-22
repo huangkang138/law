@@ -486,7 +486,7 @@ class AgentRepository:
                 "questions": (run.state_json or {}).get("questions", []),
                 "blocked_reason": (run.state_json or {}).get("blocked_reason"),
                 "final_artifact_ids": (run.state_json or {}).get("final_artifact_ids", []),
-                "max_steps": (run.state_json or {}).get("max_steps", 6),
+                "max_steps": (run.state_json or {}).get("max_steps", 8),
                 "max_tool_calls": (run.state_json or {}).get("max_tool_calls", 8),
                 "tool_call_count": (run.state_json or {}).get("tool_call_count", 0),
                 "budget_wallclock_seconds": (run.state_json or {}).get("budget_wallclock_seconds", 300),

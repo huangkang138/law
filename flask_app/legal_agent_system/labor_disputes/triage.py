@@ -11,14 +11,17 @@ from legal_agent_system.runtime.errors import AgentRuntimeError
 
 from .triage_rules import LaborTriageDecisionEngine
 from .triage_schemas import LaborTriageFacts
+from .evidence import LaborEvidenceService
 
 
 class LaborCaseTriageService:
     """保存分流事实、版本和结果，并校验 Matter 归属。"""
 
-    def __init__(self, materials) -> None:
+    def __init__(self, materials, authorities=None) -> None:
         self.materials = materials
+        self.authorities = authorities
         self.engine = LaborTriageDecisionEngine()
+        self.evidence = LaborEvidenceService(materials)
 
     def update(self, matter_id: str, client_id: str, patch: Dict) -> Dict:
         self.materials.get_matter(matter_id, client_id)
@@ -72,7 +75,33 @@ class LaborCaseTriageService:
             db.close()
 
     def assess(self, matter_id: str, client_id: str) -> Dict:
-        return self.get(matter_id, client_id)["result"]
+        workflow = self.get(matter_id, client_id)
+        facts = workflow["facts"]
+        result = dict(workflow["result"])
+        fields = (
+            "scenario_type", "student_status", "school_arranged", "employment_intent",
+            "employer_qualified", "paid_labor", "management_control", "business_integrated",
+            "agreement_type", "regular_schedule",
+        )
+        evidence = self.evidence.build(matter_id, client_id, facts, fields)
+        authorities = []
+        if self.authorities is not None and not result.get("missing_facts"):
+            jurisdiction = self.materials.get_confirmed_jurisdiction(matter_id, client_id)
+            authorities = self.authorities.search("CN", jurisdiction["effective_at"], ["劳动关系"])
+        status = (
+            "information_required" if result.get("missing_facts")
+            else "authority_required" if not authorities
+            else "completed"
+        )
+        return {
+            **result,
+            "status": status,
+            "facts": {name: facts.get(name) for name in fields},
+            "fact_refs": evidence["fact_refs"],
+            "evidence_refs": evidence["evidence_refs"],
+            "authority_refs": [item["authority_id"] for item in authorities],
+            "evidence_conflicts": evidence["conflicts"],
+        }
 
     @staticmethod
     def _record_assertions(db, matter_id, client_id, patch, normalized, version) -> None:

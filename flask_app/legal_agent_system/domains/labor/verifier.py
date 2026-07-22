@@ -24,6 +24,7 @@ class LaborResultVerifier:
         report = LaborVerification()
         issue_tools = {
             "analyze_wage_arrears",
+            "analyze_probation",
             "analyze_labor_termination",
             "analyze_economic_compensation",
         }
@@ -51,6 +52,17 @@ class LaborResultVerifier:
                 report.authority_errors.append("分析结果缺少已验证法律来源")
             if not authority_ids.issubset(set(result.authority_refs)):
                 report.authority_errors.append("工具 authority_refs 与分析来源不一致")
+            for decision in data.get("rule_decisions") or []:
+                if decision.get("status") != "completed":
+                    report.fact_errors.append(f"实体规则未完成: {decision.get('issue_tag')}")
+                if decision.get("legal_conclusion") is not False:
+                    report.fact_errors.append("实体规则不得包装为最终法律结论")
+                if not decision.get("fact_refs"):
+                    report.fact_errors.append(f"实体规则缺少事实引用: {decision.get('issue_tag')}")
+                if not decision.get("authority_refs"):
+                    report.authority_errors.append(f"实体规则缺少法源引用: {decision.get('issue_tag')}")
+                if not set(decision.get("authority_refs") or []).issubset(set(result.authority_refs)):
+                    report.authority_errors.append(f"实体规则法源与 ToolResult 不一致: {decision.get('issue_tag')}")
             report.risk_warnings.extend(result.assumptions)
 
         if tool_name == "assess_labor_relationship" and result.success:
@@ -58,7 +70,8 @@ class LaborResultVerifier:
             for key in (
                 "triage_type", "relationship_status", "dispute_tags", "basis",
                 "risk_level", "recommended_next_step", "manual_review_required",
-                "rule_version", "legal_conclusion", "notice",
+                "rule_version", "legal_conclusion", "notice", "status", "facts",
+                "fact_refs", "evidence_refs", "authority_refs",
             ):
                 if key not in data:
                     report.structure_errors.append(f"劳动关系初筛缺少字段: {key}")
@@ -68,22 +81,35 @@ class LaborResultVerifier:
                 report.fact_errors.append("不确定或倾向不成立的劳动关系必须标记人工复核")
             if data.get("student_status") in {"current_student", "graduating"} and data.get("relationship_status") == "likely_established" and not data.get("manual_review_required"):
                 report.fact_errors.append("学生或临近毕业场景的劳动关系初筛必须标记人工复核")
+            if data.get("status") == "completed" and not data.get("fact_refs"):
+                report.fact_errors.append("劳动关系判断缺少已确认事实引用")
+            if data.get("status") == "completed" and not data.get("authority_refs"):
+                report.authority_errors.append("劳动关系判断缺少已验证法源引用")
+            if not set(data.get("authority_refs") or []).issubset(set(result.authority_refs)):
+                report.authority_errors.append("劳动关系数据法源与 ToolResult 引用不一致")
             report.risk_warnings.extend(result.warnings)
 
         if tool_name in issue_tools and result.success:
             data = result.data or {}
             for key in (
                 "status", "issue_tag", "missing_facts", "manual_review_required",
-                "legal_conclusion", "data", "warnings",
+                "legal_conclusion", "facts", "fact_refs", "evidence_refs",
+                "authority_refs", "calculations", "assumptions", "warnings",
             ):
                 if key not in data:
                     report.structure_errors.append(f"劳动问题分析缺少字段: {key}")
-            if data.get("status") != "preliminary":
-                report.structure_errors.append("劳动问题步骤不得包装为最终分析")
+            if data.get("status") != "completed":
+                report.structure_errors.append("劳动问题步骤没有完成受控规则分析")
             if data.get("legal_conclusion") is not False:
                 report.fact_errors.append("劳动问题步骤不得输出最终法律结论")
             if not data.get("manual_review_required"):
                 report.fact_errors.append("劳动问题步骤必须保留人工复核标记")
+            if not data.get("fact_refs"):
+                report.fact_errors.append("劳动问题分析缺少已确认事实引用")
+            if not data.get("authority_refs"):
+                report.authority_errors.append("劳动问题分析缺少已验证法源引用")
+            if not set(data.get("authority_refs") or []).issubset(set(result.authority_refs)):
+                report.authority_errors.append("劳动问题数据法源与 ToolResult 引用不一致")
             report.risk_warnings.extend(data.get("warnings") or [])
 
         if tool_name == "draft_labor_arbitration_application" and result.success:

@@ -111,7 +111,7 @@ class AgentState(BaseModel):
     questions: List[str] = Field(default_factory=list)
     final_artifact_ids: List[str] = Field(default_factory=list)
     blocked_reason: Optional[str] = None
-    max_steps: int = Field(default=6, ge=1, le=30)
+    max_steps: int = Field(default=8, ge=1, le=30)
     max_tool_calls: int = Field(default=8, ge=0, le=100)
     tool_call_count: int = Field(default=0, ge=0)
     approved: Optional[bool] = None

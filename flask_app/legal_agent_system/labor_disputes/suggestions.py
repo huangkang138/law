@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 from core.database import SessionLocal
 from models.db_models import AgentDocument, LegalFact
+from .material_adapters import LaborMaterialAdapterRegistry
 
 
 FIELD_LABELS = {
@@ -21,6 +22,16 @@ FIELD_LABELS = {
     "work_location": "实际工作地点",
     "claim_types": "争议类型",
     "demands": "具体仲裁请求",
+    "contract_term_months": "劳动合同期限（月）",
+    "probation_period_months": "试用期期限（月）",
+    "probation_salary": "试用期工资",
+    "regular_salary": "转正工资",
+    "termination_notice_date": "解除通知日期",
+    "termination_basis": "解除依据",
+    "attendance_days": "出勤天数",
+    "wage_arrears_amount": "欠薪金额",
+    "wages_paid_through": "工资已支付至",
+    "wage_payment_day": "约定发薪日",
 }
 
 
@@ -32,6 +43,7 @@ class LaborFactSuggestionService:
     def __init__(self, materials, llm_extractor=None) -> None:
         self.materials = materials
         self.llm_extractor = llm_extractor
+        self.adapters = LaborMaterialAdapterRegistry()
 
     def suggest(self, matter_id: str, client_id: str) -> Dict:
         self.materials.get_matter(matter_id, client_id)
@@ -46,6 +58,7 @@ class LaborFactSuggestionService:
             ).order_by(LegalFact.created_at).all()
             fact_by_text = {fact.fact_text: fact for fact in facts}
             suggestions: Dict[str, Dict] = {}
+            document_types = {}
             for document in documents:
                 for sentence in self._sentences(document.content):
                     source = self._source(document.id, sentence, fact_by_text.get(sentence))
@@ -67,6 +80,17 @@ class LaborFactSuggestionService:
                             "value": merged, "confidence": 0.8,
                             "sources": list((current or {}).get("sources", [])) + [source],
                         }
+                adapted = self.adapters.extract(document.filename, document.content)
+                document_types[document.id] = adapted["document_type"]
+                for item in adapted["candidates"]:
+                    self._put(suggestions, item.field, item.value, item.confidence, {
+                        "document_id": document.id,
+                        "fact_id": None,
+                        "quote": item.quote,
+                        "start_offset": item.start_offset,
+                        "end_offset": item.end_offset,
+                        "document_type": item.document_type,
+                    })
                 if self.llm_extractor:
                     extracted = self.llm_extractor.extract(document.content)
                     for candidate in extracted["candidates"]:
@@ -77,6 +101,7 @@ class LaborFactSuggestionService:
                 "matter_id": matter_id,
                 "suggested_facts": {name: item["value"] for name, item in suggestions.items()},
                 "fields": list(suggestions.values()),
+                "document_types": document_types,
                 "warning": "以上内容仅是带原文定位的候选值；采用前必须由用户确认。",
             }
         finally:
@@ -102,7 +127,7 @@ class LaborFactSuggestionService:
         if current and current["confidence"] >= confidence:
             return
         target[field] = {
-            "field": field, "label": FIELD_LABELS[field], "value": value,
+            "field": field, "label": FIELD_LABELS.get(field, field), "value": value,
             "confidence": confidence, "sources": [source],
         }
 

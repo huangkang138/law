@@ -18,6 +18,9 @@ from legal_agent_system.models import MatterFactAssertion
 from legal_agent_system.runtime.errors import AgentRuntimeError
 from .schemas import FIELD_QUESTIONS, LaborDisputeFacts
 from .rules import LaborRuleEngine, RULE_VERSION
+from .dispute_tags import dispute_tags_from_facts
+from .evidence import LaborEvidenceService
+from .labor_rules import CompensationRule, ProbationRule, TerminationRule, WageArrearsRule
 
 
 def _id(prefix: str) -> str:
@@ -33,6 +36,13 @@ class LaborDisputeService:
         self.materials = materials
         self.authorities = authorities
         self.rules = LaborRuleEngine()
+        self.evidence = LaborEvidenceService(materials)
+        self.substantive_rules = {
+            "wage_arrears": (WageArrearsRule(), ["劳动报酬"]),
+            "probation": (ProbationRule(), ["试用期"]),
+            "termination": (TerminationRule(), ["解除"]),
+            "economic_compensation": (CompensationRule(), ["经济补偿"]),
+        }
 
     def update_facts(self, matter_id: str, client_id: str, patch: Dict) -> Dict:
         """合并用户确认事实，并按当前目标动态生成下一轮追问。"""
@@ -95,6 +105,29 @@ class LaborDisputeService:
         authorities = self._verified_authorities(jurisdiction["effective_at"])
         if not authorities:
             return {**workflow, "status": "blocked_authority", "warning": "未找到可验证且当前有效的劳动法律来源，已阻止确定性结论和文书生成。"}
+        rule_decisions = [
+            self.evaluate_rule(matter_id, client_id, tag)
+            for tag in dispute_tags_from_facts(facts)
+        ]
+        blocked_rules = [item["issue_tag"] for item in rule_decisions if item["status"] == "authority_required"]
+        if blocked_rules:
+            return {
+                **workflow,
+                "status": "blocked_authority",
+                "rule_decisions": rule_decisions,
+                "warning": f"实体规则法源覆盖不足: {', '.join(blocked_rules)}；已阻止确定性结论和文书生成。",
+            }
+        missing_rule_facts = list(dict.fromkeys(
+            name for item in rule_decisions for name in item.get("missing_facts", [])
+        ))
+        if missing_rule_facts:
+            return {
+                **workflow,
+                "status": "awaiting_information",
+                "missing_rule_facts": missing_rule_facts,
+                "rule_decisions": rule_decisions,
+                "warning": "实体规则关键事实仍不完整，已停止后续确定性分析。",
+            }
         fact_refs = self._fact_refs(matter_id)
         deadline = self.rules.limitation(facts, authorities, fact_refs)
         checklist = self.materials.evidence_checklist(matter_id, client_id)
@@ -103,8 +136,22 @@ class LaborDisputeService:
             "deadline": deadline,
             "evidence_checklist": checklist,
             "authorities": authorities,
+            "rule_decisions": rule_decisions,
             "approval_prompt": "事实、期限和来源已整理。是否确认基于这些信息生成劳动仲裁申请书草稿？",
         }
+
+    def evaluate_rule(self, matter_id: str, client_id: str, issue_tag: str) -> Dict:
+        """执行单个版本化实体规则，并绑定事实、材料和当前有效法源。"""
+        workflow = self.get_workflow(matter_id, client_id)
+        facts = workflow["facts"]
+        entry = self.substantive_rules.get(issue_tag)
+        if entry is None:
+            raise AgentRuntimeError(f"未注册的劳动实体规则: {issue_tag}", "INVALID_INPUT")
+        rule, terms = entry
+        jurisdiction = self.materials.get_confirmed_jurisdiction(matter_id, client_id)
+        authorities = self.authorities.search("CN", jurisdiction["effective_at"], terms)
+        evidence = self.evidence.build(matter_id, client_id, facts, rule.fields)
+        return rule.evaluate(facts, evidence, authorities)
 
     def create_draft(self, matter_id: str, client_id: str, approved: bool) -> Dict:
         """只有用户明确确认且来源验证通过时才持久化草稿。"""
@@ -114,9 +161,24 @@ class LaborDisputeService:
         if analysis["status"] != "awaiting_draft_approval":
             raise AgentRuntimeError("当前事实或法律来源不足，不能生成草稿", "INVALID_STATE")
         facts = analysis["facts"]
-        authority_ids = [item["authority_id"] for item in analysis["authorities"]]
+        authority_ids = list(dict.fromkeys([
+            *[item["authority_id"] for item in analysis["authorities"]],
+            *[
+                authority_id
+                for decision in analysis.get("rule_decisions", [])
+                for authority_id in decision.get("authority_refs", [])
+            ],
+        ]))
         content = self._draft_text(facts, analysis["deadline"], analysis["authorities"])
-        fingerprint = hashlib.sha256(json.dumps({"facts": facts, "authorities": [(a["authority_id"], a.get("version")) for a in analysis["authorities"]], "rule": analysis["deadline"]["rule_version"], "type": "labor_arbitration_application"}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps({
+            "facts": facts,
+            "authority_ids": authority_ids,
+            "rule_versions": [
+                analysis["deadline"]["rule_version"],
+                *[item["rule_version"] for item in analysis.get("rule_decisions", [])],
+            ],
+            "type": "labor_arbitration_application",
+        }, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
         db = SessionLocal()
         try:
             existing = db.query(AgentArtifact).filter(
@@ -132,7 +194,17 @@ class LaborDisputeService:
                     "authority_refs": list(existing.authority_refs_json or []),
                     "deduplicated": True,
                 }
-            evidence_ids = analysis["deadline"]["fact_refs"] or [row.id for row in db.query(LegalFact.id).filter(LegalFact.matter_id == matter_id).all()]
+            evidence_ids = list(dict.fromkeys([
+                *analysis["deadline"]["fact_refs"],
+                *[
+                    ref
+                    for decision in analysis.get("rule_decisions", [])
+                    for ref in [
+                        *decision.get("fact_refs", []),
+                        *decision.get("evidence_refs", []),
+                    ]
+                ],
+            ])) or [row.id for row in db.query(LegalFact.id).filter(LegalFact.matter_id == matter_id).all()]
             latest = db.query(AgentArtifact).filter(AgentArtifact.matter_id == matter_id, AgentArtifact.artifact_type == "labor_arbitration_application").order_by(AgentArtifact.version.desc()).first()
             artifact = AgentArtifact(
                 id=_id("artifact"), matter_id=matter_id, client_id=client_id,

@@ -50,7 +50,7 @@ class LegalAgentFacade:
         self.jurisdictions = MatterJurisdictionService()
         self.labor_disputes = LaborDisputeService(self.materials, self.authorities)
         self.labor_issue_analysis = LaborIssueAnalysisService(self.labor_disputes)
-        self.labor_triage = LaborCaseTriageService(self.materials)
+        self.labor_triage = LaborCaseTriageService(self.materials, self.authorities)
         self.labor_suggestions = LaborFactSuggestionService(self.materials, llm_fact_extractor)
         self.registry = ToolRegistry()
         register_mock_tools(self.registry)

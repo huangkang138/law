@@ -6,11 +6,13 @@ from typing import Iterable, List
 WAGE_ARREARS = "wage_arrears"
 TERMINATION = "termination"
 ECONOMIC_COMPENSATION = "economic_compensation"
+PROBATION = "probation"
 
 ALLOWED_DISPUTE_TAGS = (
     WAGE_ARREARS,
     TERMINATION,
     ECONOMIC_COMPENSATION,
+    PROBATION,
 )
 
 _TAG_ALIASES = {
@@ -30,6 +32,11 @@ _TAG_ALIASES = {
     "经济补偿": ECONOMIC_COMPENSATION,
     "补偿金": ECONOMIC_COMPENSATION,
     "赔偿金": ECONOMIC_COMPENSATION,
+    PROBATION: PROBATION,
+    "probation_period": PROBATION,
+    "试用期": PROBATION,
+    "试用期工资": PROBATION,
+    "试用期解除": PROBATION,
 }
 
 

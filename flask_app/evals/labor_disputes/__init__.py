@@ -11,4 +11,14 @@ def run_dataset(*args, **kwargs):
     return _run_dataset(*args, **kwargs)
 
 
-__all__ = ["load_cases", "run_dataset"]
+def load_flagship_cases(*args, **kwargs):
+    from .flagship import load_flagship_cases as _load
+    return _load(*args, **kwargs)
+
+
+def run_flagship_dataset(*args, **kwargs):
+    from .flagship import run_flagship_dataset as _run
+    return _run(*args, **kwargs)
+
+
+__all__ = ["load_cases", "run_dataset", "load_flagship_cases", "run_flagship_dataset"]

@@ -14,9 +14,28 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
                 error_code="AUTHORITY_REQUIRED", retryable=False,
                 warnings=[result["warning"]],
             )
+        if result["status"] == "awaiting_information":
+            return ToolResult(
+                tool_call_id=call_id, success=False, data=result,
+                error_code="INFORMATION_REQUIRED", retryable=False,
+                assumptions=[
+                    assumption
+                    for item in result.get("rule_decisions", [])
+                    for assumption in item.get("assumptions", [])
+                ],
+                warnings=[result.get("warning", "实体规则关键事实不足")],
+            )
+        rule_authority_refs = [
+            authority_id
+            for item in result.get("rule_decisions", [])
+            for authority_id in item.get("authority_refs", [])
+        ]
         return ToolResult(
             tool_call_id=call_id, success=True, data=result,
-            authority_refs=[item["authority_id"] for item in result.get("authorities", [])],
+            authority_refs=list(dict.fromkeys([
+                *[item["authority_id"] for item in result.get("authorities", [])],
+                *rule_authority_refs,
+            ])),
             assumptions=list(result.get("deadline", {}).get("assumptions", [])),
         )
 
@@ -50,11 +69,26 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
         def handler(call_id, arguments, _attempt):
             data = method(arguments["matter_id"], arguments["client_id"])
             missing = list(data.get("missing_facts") or [])
+            if data.get("status") == "authority_required":
+                return ToolResult(
+                    tool_call_id=call_id,
+                    success=False,
+                    data=data,
+                    evidence_refs=list(data.get("evidence_refs") or []),
+                    authority_refs=list(data.get("authority_refs") or []),
+                    error_code="AUTHORITY_REQUIRED",
+                    error_message="当前实体规则缺少已验证官方法源",
+                    retryable=False,
+                    assumptions=list(data.get("assumptions") or []),
+                    warnings=list(data.get("warnings") or []),
+                )
             if require_complete and missing:
                 return ToolResult(
                     tool_call_id=call_id,
                     success=False,
                     data=data,
+                    evidence_refs=list(data.get("evidence_refs") or []),
+                    authority_refs=list(data.get("authority_refs") or []),
                     error_code="INFORMATION_REQUIRED",
                     error_message=f"当前问题步骤缺少事实: {', '.join(missing)}",
                     retryable=False,
@@ -64,6 +98,9 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
                 tool_call_id=call_id,
                 success=True,
                 data=data,
+                evidence_refs=list(data.get("evidence_refs") or []),
+                authority_refs=list(data.get("authority_refs") or []),
+                assumptions=list(data.get("assumptions") or []),
                 warnings=list(data.get("warnings") or []),
             )
         return handler
@@ -73,19 +110,26 @@ def register_labor_dispute_tools(registry, service, issue_analysis) -> None:
         "required": ["matter_id", "client_id"],
     }
     registry.register(AgentTool(
+        name="analyze_probation",
+        description="核对试用期期限、工资和解除条件并返回可追溯结果",
+        input_schema=issue_schema,
+        risk_level="L1",
+        **common,
+    ), issue_handler(issue_analysis.probation, require_complete=True))
+    registry.register(AgentTool(
         name="analyze_wage_arrears",
         description="在主劳动计划中整理欠薪期间、金额和待复核事实",
         input_schema=issue_schema,
         risk_level="L1",
         **common,
-    ), issue_handler(issue_analysis.wage_arrears))
+    ), issue_handler(issue_analysis.wage_arrears, require_complete=True))
     registry.register(AgentTool(
         name="analyze_labor_termination",
         description="在主劳动计划中整理解除事实、依据和程序缺口",
         input_schema=issue_schema,
         risk_level="L1",
         **common,
-    ), issue_handler(issue_analysis.termination))
+    ), issue_handler(issue_analysis.termination, require_complete=True))
     registry.register(AgentTool(
         name="analyze_economic_compensation",
         description="在主劳动计划中估算经济补偿并保留人工复核边界",

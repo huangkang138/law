@@ -10,6 +10,7 @@ from legal_agent_system.capabilities.contracts import (
 from legal_agent_system.labor_disputes.dispute_tags import (
     ALLOWED_DISPUTE_TAGS,
     ECONOMIC_COMPENSATION,
+    PROBATION,
     TERMINATION,
     WAGE_ARREARS,
 )
@@ -27,6 +28,7 @@ COMMON_TOOLS = [
     "analyze_wage_arrears",
     "analyze_labor_termination",
     "analyze_economic_compensation",
+    "analyze_probation",
     "analyze_labor_dispute",
     "analyze_labor_consultation",
     "analyze_labor_case",
@@ -45,8 +47,24 @@ def _evidence_step() -> TemplateStep:
     )
 
 
+
 def _issue_steps() -> list[TemplateStep]:
+    # 欠薪分析
+    # 解除分析
+    # 经济补偿分析
     return [
+        TemplateStep(
+            step_id="probation_analysis",
+            name="分析试用期约定、工资与解除条件",
+            step_type="legal_analysis",
+            tool_name="analyze_probation",
+            depends_on=["evidence_check"],
+            optional=True,
+            condition={"dispute_tag_any": [PROBATION]},
+            skip_reason="争议标签不包含试用期，本次不执行试用期分析",
+            verification_policy_ids=["global.tool_result", "labor.issue"],
+            on_failure="request_context",
+        ),
         TemplateStep(
             step_id="wage_arrears_analysis",
             name="分析欠薪期间与金额",
@@ -118,7 +136,7 @@ def build_labor_domain_package() -> DomainPackage:
     arbitration_issues = _issue_steps()
     arbitration = PlanTemplate(
         template_id="labor_arbitration_application",
-        version="2.0.0",
+        version="3.0.0",
         domain_id="cn_labor",
         task_type="labor_arbitration_application",
         allowed_step_types=COMMON_STEP_TYPES,
@@ -159,7 +177,7 @@ def build_labor_domain_package() -> DomainPackage:
     case_issues = _issue_steps()
     case_analysis = PlanTemplate(
         template_id="labor_case_analysis",
-        version="2.0.0",
+        version="3.0.0",
         domain_id="cn_labor",
         task_type="labor_case_analysis",
         allowed_step_types=COMMON_STEP_TYPES,
@@ -184,7 +202,7 @@ def build_labor_domain_package() -> DomainPackage:
 
     return DomainPackage(
         domain_id="cn_labor",
-        version="1.1.0",
+        version="1.2.0",
         routing_rules=[
             RoutingRule(
                 task_type="labor_arbitration_application",
