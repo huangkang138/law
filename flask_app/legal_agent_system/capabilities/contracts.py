@@ -45,6 +45,7 @@ class PlanTemplate(BaseModel):
     task_type: str
     allowed_step_types: List[str]
     allowed_dispute_tags: List[str] = Field(default_factory=list)
+    max_tool_calls: int = Field(default=8, ge=0, le=100)
     steps: List[TemplateStep]
 
     @model_validator(mode="after")

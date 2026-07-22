@@ -173,24 +173,25 @@ export default function DigitalHumanFloat() {
         .dh-panel-expanded {
           width: min(920px, calc(100vw - 48px));
           height: min(760px, calc(100vh - 64px));
+          grid-template-rows: auto minmax(0, 1fr);
         }
 
         .dh-panel-expanded .dh-panel-body {
-          grid-template-columns: 340px minmax(0, 1fr);
+          grid-template-columns: minmax(0, 1fr);
           grid-template-rows: minmax(0, 1fr);
         }
 
         .dh-panel-expanded .dh-chat-column {
-          border-right: 1px solid rgba(147, 197, 253, .35);
+          display: none;
         }
 
-        .dh-panel-expanded .dh-portrait-stage {
-          height: 126px;
+        .dh-panel-expanded .dh-history-section {
+          display: none;
         }
 
         .dh-panel-expanded .dh-workspace-column {
           overflow-y: auto;
-          padding: 16px;
+          padding: 20px 24px 24px;
           background: rgba(248, 251, 255, .86);
         }
 
@@ -255,6 +256,25 @@ export default function DigitalHumanFloat() {
         .dh-header-actions button:hover {
           color: #1d4ed8;
           background: rgba(147, 197, 253, .18);
+        }
+
+        .dh-header-actions .dh-workspace-switch {
+          width: auto;
+          grid-auto-flow: column;
+          gap: 6px;
+          padding: 0 10px;
+          color: #245995;
+          background: rgba(255, 255, 255, .72);
+          border: 1px solid rgba(147, 197, 253, .42);
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .dh-panel-expanded .dh-workspace-switch {
+          color: #1d4ed8;
+          background: #fff;
+          border-color: rgba(96, 165, 250, .48);
         }
 
         .dh-history-section {
@@ -659,16 +679,15 @@ export default function DigitalHumanFloat() {
 
           .dh-panel-expanded .dh-panel-body {
             grid-template-columns: 1fr;
-            grid-template-rows: minmax(230px, 38%) minmax(0, 1fr);
+            grid-template-rows: minmax(0, 1fr);
           }
 
           .dh-panel-expanded .dh-chat-column {
-            border-right: 0;
-            border-bottom: 1px solid rgba(147, 197, 253, .35);
+            display: none;
           }
 
-          .dh-panel-expanded .dh-portrait-stage {
-            display: none;
+          .dh-panel-expanded .dh-workspace-column {
+            padding: 14px;
           }
 
           .dh-portrait-stage {

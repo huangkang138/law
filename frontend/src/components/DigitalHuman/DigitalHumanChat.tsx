@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, History, Maximize2, Minimize2, Minus, Plus, RotateCcw, Send, Square, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Send, Square, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -74,16 +74,19 @@ export default function DigitalHumanChat() {
             <h2>法小助</h2>
             <span className="dh-online-dot" aria-label="在线" />
           </div>
-          <p>{EMOTION_LABELS[emotion]}</p>
+          <p>{workspaceExpanded ? '案件工作台 · 材料、事实与法源' : EMOTION_LABELS[emotion]}</p>
         </div>
         <div className="dh-header-actions">
           <button
             type="button"
+            className="dh-workspace-switch"
             onClick={() => setWorkspaceExpanded((value) => !value)}
-            aria-label={workspaceExpanded ? '收起案件工作台' : '展开案件工作台'}
-            title={workspaceExpanded ? '收起工作台' : '展开工作台'}
+            aria-label={workspaceExpanded ? '返回对话' : '进入案件工作台'}
+            aria-pressed={workspaceExpanded}
+            title={workspaceExpanded ? '返回对话' : '进入案件工作台'}
           >
-            {workspaceExpanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+            {workspaceExpanded ? <MessageCircle size={16} /> : <FileSearch size={16} />}
+            <span>{workspaceExpanded ? '返回对话' : '案件工作台'}</span>
           </button>
           <button
             type="button"

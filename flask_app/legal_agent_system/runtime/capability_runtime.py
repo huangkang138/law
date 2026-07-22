@@ -133,6 +133,9 @@ class CapabilityRuntime:
 
     def _bind_capability(self, state: AgentState, resolved: ResolvedCapability) -> None:
         """将解析结果绑定到 Run；Graph 只消费结果，不再重复路由。"""
+        default_tool_budget = AgentState.model_fields["max_tool_calls"].default
+        if state.max_tool_calls == default_tool_budget:
+            state.max_tool_calls = resolved.template.max_tool_calls
         binding = (
             resolved.domain.domain_id,
             resolved.template.template_id,

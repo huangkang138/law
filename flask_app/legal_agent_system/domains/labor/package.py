@@ -155,6 +155,7 @@ def build_labor_domain_package() -> DomainPackage:
         task_type="labor_arbitration_application",
         allowed_step_types=COMMON_STEP_TYPES,
         allowed_dispute_tags=list(ALLOWED_DISPUTE_TAGS),
+        max_tool_calls=24,
         steps=[
             _evidence_step(),
             *arbitration_issues,
@@ -196,6 +197,7 @@ def build_labor_domain_package() -> DomainPackage:
         task_type="labor_case_analysis",
         allowed_step_types=COMMON_STEP_TYPES,
         allowed_dispute_tags=list(ALLOWED_DISPUTE_TAGS),
+        max_tool_calls=24,
         steps=[
             TemplateStep(
                 step_id="case_timeline",
