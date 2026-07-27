@@ -1,0 +1,11 @@
+.results { margin-top: 8px; padding: 9px; border: 1px solid #a7f3d0; border-radius: 9px; background: #ecfdf5; color: #065f46; }
+.results article { margin-top: 7px; padding: 8px; border: 1px solid #d1fae5; border-radius: 8px; background: white; color: #334155; }
+.results header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.results header span { color: #047857; font-size: 11px; }
+.results p { margin: 5px 0; }
+.results dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 6px 0; }
+.results dl div { padding: 5px; border-radius: 6px; background: #f8fafc; }
+.results dt { color: #64748b; font-size: 10px; }
+.results dd { margin: 2px 0 0; overflow-wrap: anywhere; font-weight: 700; }
+.results small { display: block; margin-top: 3px; color: #92400e; }
+.results footer { margin-top: 6px; color: #64748b; font-size: 10px; }

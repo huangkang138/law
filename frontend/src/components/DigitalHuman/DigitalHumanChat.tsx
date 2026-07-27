@@ -9,7 +9,7 @@ import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
 import LaborTriageCard from './LaborTriageCard';
 import DigitalHumanMatterWorkspace from './DigitalHumanMatterWorkspace';
-import { isLaborQuestion, useLaborTriage } from './useLaborTriage';
+import { useLaborTriage } from './useLaborTriage';
 
 export default function DigitalHumanChat() {
   const [question, setQuestion] = useState('');
@@ -48,7 +48,6 @@ export default function DigitalHumanChat() {
     if (!value || isLoading) return;
     setQuestion('');
     await sendMessage(value);
-    if (isLaborQuestion(value)) await laborTriage.start(value);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

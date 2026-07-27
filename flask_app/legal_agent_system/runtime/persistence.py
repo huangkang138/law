@@ -85,7 +85,13 @@ class AgentRepository:
         finally:
             db.close()
 
-    def find_or_create_active_run(self, matter_id: str, client_id: str, task_type: str) -> AgentState:
+    def find_or_create_active_run(
+        self,
+        matter_id: str,
+        client_id: str,
+        task_type: str,
+        preferred_run_id: Optional[str] = None,
+    ) -> AgentState:
         """在 PostgreSQL 事务锁内复用或创建 Run，避免并发双击生成两个活动任务。"""
         lock_key = int.from_bytes(
             hashlib.sha256(f"{matter_id}:{client_id}:{task_type}".encode()).digest()[:8],
@@ -100,6 +106,17 @@ class AgentRepository:
                 raise AgentRuntimeError("Matter 不存在", "MATTER_NOT_FOUND")
             if matter.client_id != client_id:
                 raise AgentRuntimeError("无权访问该 Matter", ErrorCode.FORBIDDEN.value)
+            if preferred_run_id:
+                preferred = db.get(AgentRun, preferred_run_id)
+                if preferred is not None:
+                    raw = preferred.state_json or {}
+                    if (
+                        preferred.matter_id != matter_id
+                        or preferred.client_id != client_id
+                        or raw.get("task_type") != task_type
+                    ):
+                        raise AgentRuntimeError("Run 幂等键归属冲突", ErrorCode.FORBIDDEN.value)
+                    return AgentState.model_validate(raw)
             runs = db.query(AgentRun).filter(
                 AgentRun.matter_id == matter_id, AgentRun.client_id == client_id,
             ).order_by(AgentRun.created_at.desc()).all()
@@ -107,7 +124,12 @@ class AgentRepository:
                 raw = run.state_json or {}
                 if raw.get("task_type") == task_type and run.status not in terminal:
                     return AgentState.model_validate(raw)
-            run = AgentRun(id=_id("run"), matter_id=matter.id, client_id=client_id, status=RunStatus.PLANNING.value)
+            run = AgentRun(
+                id=preferred_run_id or _id("run"),
+                matter_id=matter.id,
+                client_id=client_id,
+                status=RunStatus.PLANNING.value,
+            )
             state = AgentState(
                 run_id=run.id, matter_id=matter.id, client_id=client_id,
                 session_id=matter.session_id, goal=matter.goal, task_type=task_type,

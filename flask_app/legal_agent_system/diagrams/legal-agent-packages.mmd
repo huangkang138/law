@@ -1,0 +1,17 @@
+graph TD
+    Router["HTTP Router"] --> Facade["facade.py<br/>统一门面与组装"]
+    Facade --> Cap["Capability Registry<br/>任务路由与模板"]
+    Cap --> LaborAdapter["Labor Adapter<br/>事实、法域、劳动校验"]
+    Cap --> MockAdapter["Mock Adapter<br/>旧 HTTP 兼容能力"]
+    Facade --> Runtime["唯一 Capability Runtime<br/>通用状态循环"]
+    Runtime --> Cap
+    Runtime --> LaborAdapter
+    Runtime --> MockAdapter
+    Runtime --> Tools["tools/<br/>最小可执行动作"]
+    LaborAdapter --> Matter["matters/<br/>案件与材料"]
+    LaborAdapter --> Jurisdiction["jurisdictions/<br/>法域与法源"]
+    LaborAdapter --> Labor["labor_disputes/<br/>劳动业务服务"]
+    Runtime --> Models["数据库模型"]
+    Matter --> Models
+    Jurisdiction --> Models
+    Labor --> Models

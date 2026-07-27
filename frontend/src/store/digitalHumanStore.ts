@@ -146,12 +146,32 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             createdAt: Date.now(),
           };
 
-          set((state) => ({
-            messages: [...state.messages, assistantMessage],
-            sessionId: response.session_id,
-            emotion: response.emotion,
-            isLoading: false,
-          }));
+          set((state) => {
+            const matterId = response.context?.matter_id || null;
+            const runId = response.context?.run_id || null;
+            const laborContextBySession = matterId ? {
+              ...state.laborContextBySession,
+              [response.session_id]: {
+                matterId,
+                runId,
+                triageStarted: response.decision?.route === 'labor_triage'
+                  || response.action?.type === 'start_agent'
+                  || Boolean(state.laborContextBySession[response.session_id]?.triageStarted),
+              },
+            } : state.laborContextBySession;
+            return {
+              messages: [...state.messages, assistantMessage],
+              sessionId: response.session_id,
+              emotion: response.emotion,
+              isLoading: false,
+              currentMatterId: matterId || state.currentMatterId,
+              currentTriage: matterId && matterId !== state.currentMatterId
+                ? null : state.currentTriage,
+              currentAgentRun: matterId && matterId !== state.currentMatterId
+                ? null : state.currentAgentRun,
+              laborContextBySession,
+            };
+          });
           void get().loadSessions();
         } catch (error) {
           const message = error instanceof Error ? error.message : '数字人服务暂时不可用';

@@ -1,0 +1,50 @@
+.card {
+  margin: 4px 0 14px;
+  padding: 12px;
+  color: #294866;
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(30, 64, 175, .08);
+  font-size: 12px;
+}
+
+.medium { border-left-color: #f59e0b; }
+.high { border-left-color: #dc2626; background: #fffafa; }
+
+.header, .header div, .review, .loading, .error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.header { justify-content: space-between; color: #174b8c; }
+.header div { font-size: 14px; }
+.header > span { padding: 3px 7px; border-radius: 999px; background: #eff6ff; font-weight: 700; }
+.relationship { margin: 8px 0; font-weight: 700; }
+.section strong, .next strong { color: #334155; }
+.section ul { margin: 5px 0 8px; padding-left: 18px; }
+.section li { margin: 3px 0; line-height: 1.5; }
+.tags { color: #475569; }
+.next { padding: 8px; border-radius: 8px; background: #eff6ff; }
+.next p { margin: 4px 0 0; line-height: 1.55; }
+.review { color: #9a3412; font-weight: 650; }
+
+.form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #dbeafe; }
+.form > ol { margin: 0; padding-left: 20px; color: #475569; }
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 650; }
+.field input, .field select { width: 100%; box-sizing: border-box; padding: 7px 8px; color: #1e293b; background: white; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; }
+.risks { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 0; padding: 8px; border: 1px solid #dbeafe; border-radius: 8px; }
+.risks legend { padding: 0 4px; color: #475569; font-weight: 650; }
+.risks label { display: flex; align-items: center; gap: 5px; }
+.form > button, .error button { padding: 8px 10px; color: white; background: #2563eb; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.form > button:disabled { opacity: .5; cursor: not-allowed; }
+.error { margin-top: 9px; padding: 8px; color: #b91c1c; background: #fef2f2; border-radius: 8px; }
+.error span { flex: 1; }
+.error button { flex: none; padding: 5px 8px; background: #b91c1c; }
+.loading { margin: 0; color: #2563eb; }
+.loading svg { animation: spin 1s linear infinite; }
+.notice { display: block; margin-top: 9px; color: #64748b; line-height: 1.5; }
+
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,23 @@
+graph TD
+    U["用户 / 数字人"]
+    A["法律 Agent<br/>理解问题 · 安排步骤"]
+    P["能力包<br/>劳动 · 合同 · 案件"]
+    T["工具 + 官方法源<br/>材料 · 计算 · 法条"]
+    G{"安全校验<br/>依据充分吗？"}
+    O["结果<br/>答复 · 报告 · 文书草稿"]
+
+    U --> A --> P --> T --> G
+    G -->|"是"| O
+    G -->|"否：补材料 / 人工确认"| U
+
+    classDef user fill:#E8F3FF,stroke:#2878C8,color:#17324D,stroke-width:2px;
+    classDef core fill:#FFF4DD,stroke:#D08A18,color:#4A3514,stroke-width:2px;
+    classDef resource fill:#EAF7EE,stroke:#3D8B57,color:#173C23,stroke-width:2px;
+    classDef guard fill:#FFF0F0,stroke:#C94A4A,color:#4D1F1F,stroke-width:2px;
+    classDef output fill:#F0ECFF,stroke:#7356B8,color:#2F2452,stroke-width:2px;
+
+    class U user;
+    class A,P core;
+    class T resource;
+    class G guard;
+    class O output;

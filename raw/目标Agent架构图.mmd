@@ -1,0 +1,48 @@
+flowchart TD
+    UX["统一数字人入口<br/>文字/文件/语音/旧功能兼容入口"]
+    GRAPH["全局 Runtime Graph<br/>治理状态与单 Step 循环"]
+    CONTEXT["Context Builder<br/>目标/法域/事实/材料/权限"]
+    ROUTER["Task Router<br/>domain_id + task_type"]
+    PLANNER["Constrained Planner<br/>选择模板/填参/条件步骤"]
+    PLAN["Versioned Run Plan<br/>模板版本/Revision/跳过原因"]
+    EXECUTOR["Policy ToolExecutor<br/>白名单/Schema/权限/预算/幂等"]
+    TOOLS["统一法律工具<br/>检索/解析/计算/审查/分析/文书"]
+    OBSERVE["Step Observer<br/>标准化结果/引用/状态变化"]
+    VERIFY["Layered Verifiers<br/>Global + Domain + Task"]
+    DECIDE["Decision Router<br/>next/retry/context/replan/approval/finish"]
+    GATES["控制门与终态<br/>审批/阻断/人工接管/Final Verify"]
+
+    DOMAIN["Domain Packages<br/>劳动/咨询/合同/纠纷/文书/法域"]
+    REGISTRY["Capability Registry<br/>能力包/模板/工具/策略版本"]
+    DATA["版本化数据、审计与评测<br/>Plan Revision/ToolCall/Event/Tracing/Evals"]
+
+    UX --> GRAPH --> CONTEXT --> ROUTER --> PLANNER --> PLAN
+    PLAN --> EXECUTOR --> TOOLS --> OBSERVE --> VERIFY --> DECIDE --> GATES
+
+    DECIDE -->|next / retry| EXECUTOR
+    DECIDE -->|need_context| CONTEXT
+    DECIDE -->|replan| PLANNER
+    GATES -->|批准后继续| EXECUTOR
+
+    DOMAIN --> REGISTRY
+    REGISTRY -.领域路由.-> ROUTER
+    REGISTRY -.模板约束.-> PLANNER
+    REGISTRY -.工具策略.-> EXECUTOR
+    REGISTRY -.验证策略.-> VERIFY
+
+    PLAN --> DATA
+    OBSERVE --> DATA
+    DECIDE --> DATA
+    GATES --> DATA
+    DATA -.质量门禁.-> REGISTRY
+
+    classDef presentation fill:#e8f2ff,stroke:#2563eb,color:#172554
+    classDef runtime fill:#fff7db,stroke:#d97706,color:#451a03
+    classDef domain fill:#ecfdf5,stroke:#059669,color:#022c22
+    classDef safety fill:#fff1f2,stroke:#e11d48,color:#4c0519
+    classDef data fill:#f3e8ff,stroke:#7e22ce,color:#3b0764
+    class UX presentation
+    class GRAPH,CONTEXT,ROUTER,PLANNER,PLAN,EXECUTOR,OBSERVE,DECIDE runtime
+    class DOMAIN,REGISTRY,TOOLS domain
+    class VERIFY,GATES safety
+    class DATA data

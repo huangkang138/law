@@ -1,0 +1,47 @@
+graph TD
+    U["用户 / 数字人"]
+
+    subgraph AGENT["法律 Agent"]
+        direction TB
+        CORE["Agent 核心<br/>理解 · 规划 · 决策"]
+
+        subgraph L1["内部能力"]
+            direction LR
+            SKILL["能力包<br/>劳动 · 合同 · 案件"]
+            MEMORY["记忆与状态<br/>案件 · 对话 · 执行记录"]
+        end
+
+        subgraph L2["外部资源"]
+            direction LR
+            TOOL["工具<br/>材料 · 计算 · 检索"]
+            KNOW["可信法律知识库<br/>已同步、已审核的官方法源"]
+        end
+
+        GUARD["安全护栏<br/>Verifier · 工具策略 · 人工审批"]
+
+        CORE <--> SKILL
+        CORE <--> MEMORY
+        CORE <--> TOOL
+        CORE <--> KNOW
+        GUARD -. "约束全部动作" .-> CORE
+    end
+
+    O["法律答复 / 报告 / 文书草稿"]
+    WEB["白名单官方网站"]
+    CLI["法源治理 CLI<br/>同步 · 健康检查 · 人工复核"]
+
+    U --> CORE
+    CORE --> O
+    WEB --> CLI --> KNOW
+
+    classDef boundary fill:#E8F3FF,stroke:#2878C8,color:#17324D,stroke-width:2px;
+    classDef core fill:#FFF4DD,stroke:#D08A18,color:#4A3514,stroke-width:3px;
+    classDef ability fill:#EAF7EE,stroke:#3D8B57,color:#173C23,stroke-width:2px;
+    classDef resource fill:#F0ECFF,stroke:#7356B8,color:#2F2452,stroke-width:2px;
+    classDef guard fill:#FFF0F0,stroke:#C94A4A,color:#4D1F1F,stroke-width:2px;
+
+    class U,O,WEB boundary;
+    class CORE core;
+    class SKILL,MEMORY ability;
+    class TOOL,KNOW,CLI resource;
+    class GUARD guard;

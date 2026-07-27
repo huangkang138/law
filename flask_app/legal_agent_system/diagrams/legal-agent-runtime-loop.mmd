@@ -1,0 +1,11 @@
+graph TD
+    Invoke["Graph.invoke()"] --> Dispatch["dispatch"]
+    Dispatch --> Context["ensure_context"]
+    Context --> Plan["build_plan"]
+    Plan --> Select["select_next_step"]
+    Select --> Execute["execute_step"]
+    Execute --> Observe["observe_step"]
+    Observe --> Verify["verify_step"]
+    Verify --> Decide["decide_step"]
+    Decide -->|"next_step / retry"| Select
+    Decide -->|"补信息 / 审批 / 阻断 / 完成"| Stop["保存状态并返回"]

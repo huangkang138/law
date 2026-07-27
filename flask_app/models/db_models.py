@@ -2,7 +2,7 @@
 数据库模型
 """
 
-from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, JSON, Float
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, JSON, Float, UniqueConstraint
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -752,14 +752,44 @@ class DigitalHumanMessage(Base):
     intent = Column(String)
     emotion = Column(String)
     confidence = Column(Float)
+    request_id = Column(String, index=True)
+    estimated_tokens = Column(Integer)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()
     )
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "request_id", "role",
+            name="uq_digital_human_message_request_role",
+        ),
+    )
+
+
+class ConversationMemory(Base):
+    """数字人会话的可治理记忆快照，不等同于 Matter 正式事实。"""
+
+    __tablename__ = "conversation_memories"
+
+    session_id = Column(
+        String,
+        ForeignKey("digital_human_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    schema_version = Column(Integer, nullable=False, default=1)
+    revision = Column(Integer, nullable=False, default=0)
+    structured_json = Column(JSON, nullable=False, default=dict)
+    summary_text = Column(Text)
+    summary_items = Column(JSON, nullable=False, default=list)
+    summary_through_message_id = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class DigitalHumanRequest(Base):
-    """数字人请求幂等记录。"""
+    """数字人请求幂等记录及可恢复动作检查点。"""
 
     __tablename__ = "digital_human_requests"
 
@@ -767,6 +797,11 @@ class DigitalHumanRequest(Base):
     client_id = Column(String, nullable=False, index=True)
     session_id = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False, default="processing")
+    action_type = Column(String)
+    action_resource_json = Column(JSON)
+    checkpoint_json = Column(JSON)
+    lease_token = Column(String)
+    lease_expires_at = Column(DateTime(timezone=True))
     response_json = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(

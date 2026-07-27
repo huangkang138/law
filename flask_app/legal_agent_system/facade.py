@@ -108,9 +108,15 @@ class LegalAgentFacade:
         """向当前客户端所属 Matter 添加授权材料。"""
         return self.materials.ingest_text(matter_id, client_id, filename, text, media_type)
 
-    def create_matter(self, client_id: str, goal: str, session_id: str | None = None):
+    def create_matter(
+        self,
+        client_id: str,
+        goal: str,
+        session_id: str | None = None,
+        matter_id: str | None = None,
+    ):
         """创建阶段 2 材料工作区，不执行阶段 1 模拟任务。"""
-        return self.materials.create_matter(client_id, goal, session_id)
+        return self.materials.create_matter(client_id, goal, session_id, matter_id)
 
     def extract_material_facts(self, matter_id: str, client_id: str, document_id: str):
         """提取带材料位置引用的候选事实。"""
@@ -269,12 +275,27 @@ class LegalAgentFacade:
         """兼容入口；默认映射到 labor_arbitration_application 模板。"""
         return self.start_task(matter_id, client_id, task_type, facts)
 
-    def start_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
+    def start_task(
+        self,
+        matter_id: str,
+        client_id: str,
+        task_type: str,
+        facts=None,
+        run_id: str | None = None,
+        on_reserved=None,
+    ):
         """启动任一已注册任务；Router 新代码统一调用此入口。"""
         logging.info("启动 Agent 任务：%s/%s/%s", matter_id, client_id, task_type)
         if self.auto_sync_authorities:
             self._try_sync_authorities(trigger="task_start", requested_by="runtime")
-        return self.capability_runtime.start_task(matter_id, client_id, task_type, facts)
+        return self.capability_runtime.start_task(
+            matter_id,
+            client_id,
+            task_type,
+            facts,
+            run_id=run_id,
+            on_reserved=on_reserved,
+        )
 
     def start_labor_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
         """兼容旧劳动命名；新代码使用 start_task。"""

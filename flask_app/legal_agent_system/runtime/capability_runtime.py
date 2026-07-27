@@ -17,14 +17,29 @@ class CapabilityRuntime:
         self.authority_sync = authority_sync
         self.execution_lock = RunExecutionLock()
 
-    def start_task(self, matter_id: str, client_id: str, task_type: str, facts=None):
+    def start_task(
+        self,
+        matter_id: str,
+        client_id: str,
+        task_type: str,
+        facts=None,
+        run_id=None,
+        on_reserved=None,
+    ):
         """启动通用任务；一次解析能力，并复用同案件的活动 Run。"""
         logging.info("启动 Agent 任务: matter=%s client=%s task=%s", matter_id, client_id, task_type)
         resolved = self.capability_registry.resolve(task_type)#1找到属于哪个领域、使用哪个模板
         adapter = self.capability_registry.get_adapter(resolved.domain.domain_id)
         updated = adapter.prepare_start(matter_id, client_id, facts, task_type)#2保存领域事实
-        state = self.repository.find_or_create_active_run(matter_id, client_id, task_type)#3找到或创建任务
+        state = self.repository.find_or_create_active_run(
+            matter_id,
+            client_id,
+            task_type,
+            preferred_run_id=run_id,
+        )#3找到或创建任务
         self._bind_capability(state, resolved)
+        if on_reserved is not None:
+            on_reserved(state)
         if state.status == RunStatus.AWAITING_INFORMATION.value and updated:
             state.status = RunStatus.REPLANNING
             state.replan_reason = "用户补充或修正了劳动案件事实"

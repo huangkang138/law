@@ -1,0 +1,38 @@
+flowchart TD
+    UI["数字人前端<br/>聊天 + 案件工作台 + 8态头像"]
+    CHAT["闲聊/意图服务<br/>LLM 仅用于问答与路由"]
+    API["Flask REST Router<br/>digital_human_agent.py"]
+    FACADE["LegalAgentFacade<br/>统一应用入口"]
+    RUNTIME["LaborRuntime + LangGraph<br/>固定三步计划"]
+    REGISTRY["ToolRegistry<br/>白名单工具声明"]
+    VERIFY["四类确定性 Verifier<br/>结构/事实/来源/风险"]
+    DOMAIN["劳动纠纷领域服务<br/>追问/期限/草稿"]
+    SUPPORT["材料与法域服务<br/>分片/事实定位/CN 法域"]
+    AUTH["法律来源表<br/>人工登记 + 状态/日期/哈希校验"]
+    DB[("PostgreSQL<br/>Matter/Run/Step/ToolCall/Approval/Artifact")]
+
+    UI -->|普通对话| CHAT
+    UI -->|案件任务 HTTP| API
+    API --> FACADE
+    FACADE --> RUNTIME
+    RUNTIME --> REGISTRY
+    REGISTRY --> DOMAIN
+    REGISTRY --> SUPPORT
+    DOMAIN --> AUTH
+    RUNTIME --> VERIFY
+    VERIFY -->|通过/阻断| RUNTIME
+    RUNTIME --> DB
+    DOMAIN --> DB
+    SUPPORT --> DB
+    AUTH --> DB
+
+    classDef presentation fill:#e8f2ff,stroke:#2563eb,color:#172554
+    classDef runtime fill:#fff7db,stroke:#d97706,color:#451a03
+    classDef domain fill:#ecfdf5,stroke:#059669,color:#022c22
+    classDef risk fill:#fff1f2,stroke:#e11d48,color:#4c0519
+    classDef data fill:#f3e8ff,stroke:#7e22ce,color:#3b0764
+    class UI,CHAT,API presentation
+    class FACADE,RUNTIME,REGISTRY,VERIFY runtime
+    class DOMAIN,SUPPORT domain
+    class AUTH risk
+    class DB data

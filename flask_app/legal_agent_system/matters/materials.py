@@ -28,7 +28,13 @@ class MaterialService:
     MAX_CHARACTERS = 200_000
     FRAGMENT_SIZE = 1_000
 
-    def create_matter(self, client_id: str, goal: str, session_id: str | None = None) -> Dict:
+    def create_matter(
+        self,
+        client_id: str,
+        goal: str,
+        session_id: str | None = None,
+        matter_id: str | None = None,
+    ) -> Dict:
         """创建独立材料工作区，不触发阶段 1 的模拟 Runtime。"""
         goal = goal.strip() if isinstance(goal, str) else ""
         if not goal:
@@ -41,8 +47,19 @@ class MaterialService:
                     raise AgentRuntimeError("数字人会话不存在", "SESSION_NOT_FOUND")
                 if session.user_id != client_id:
                     raise AgentRuntimeError("无权关联该数字人会话", "FORBIDDEN")
+            if matter_id:
+                existing = db.get(Matter, matter_id)
+                if existing is not None:
+                    if existing.client_id != client_id or existing.session_id != session_id:
+                        raise AgentRuntimeError("Matter 幂等键归属冲突", "FORBIDDEN")
+                    return {
+                        "matter_id": existing.id,
+                        "title": existing.title,
+                        "goal": existing.goal,
+                        "session_id": existing.session_id,
+                    }
             matter = Matter(
-                id=_id("matter"), client_id=client_id, title=goal[:60],
+                id=matter_id or _id("matter"), client_id=client_id, title=goal[:60],
                 goal=goal, session_id=session_id, status="active",
             )
             db.add(matter)

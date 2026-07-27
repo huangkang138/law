@@ -1,0 +1,14 @@
+graph TD
+    Start["新任务 HTTP"] --> FacadeStart["Facade.start_task()"]
+    FacadeStart --> RuntimeStart["Runtime.start_task()"]
+    RuntimeStart --> ResolveStart["Registry.resolve() 一次"]
+    ResolveStart --> Run["查找或创建 Run"]
+    Run --> BindStart["绑定领域和模板"]
+    Continue["继续任务 HTTP"] --> FacadeContinue["Facade.continue_task()"]
+    FacadeContinue --> RuntimeContinue["Runtime.continue_task()"]
+    RuntimeContinue --> Load["读取已有 Run"]
+    Load --> ResolveContinue["Registry.resolve() 一次"]
+    ResolveContinue --> Action["处理用户 action"]
+    BindStart --> Invoke["RuntimeGraph.invoke()"]
+    Action --> Invoke
+    Invoke --> Snapshot["Repository.snapshot()"]

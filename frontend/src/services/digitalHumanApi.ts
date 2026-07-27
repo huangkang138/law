@@ -8,15 +8,42 @@ export type DigitalHumanEmotion =
   | 'error'
   | 'handoff';
 
+export type ConversationRoute =
+  | 'normal_chat' | 'labor_consultation' | 'labor_triage'
+  | 'matter_interaction' | 'agent_continue' | 'workspace_guidance'
+  | 'high_risk_handoff';
+
 export interface DigitalHumanChatResponse {
   success: boolean;
   reply: string;
   intent: string;
+  conversation_route?: ConversationRoute | null;
   emotion: DigitalHumanEmotion;
   confidence: number;
   route: string | null;
   route_label: string | null;
   session_id: string;
+  decision: {
+    route: ConversationRoute;
+    confidence: number;
+    reason_code: string;
+  };
+  action: {
+    type:
+      | 'reply_only' | 'ask_one_key_question' | 'create_matter'
+      | 'guide_to_workspace' | 'start_agent' | 'continue_agent'
+      | 'request_approval' | 'stop_for_risk';
+    status: string;
+    matter_id: string | null;
+    run_id: string | null;
+    question: string | null;
+  };
+  context: {
+    matter_id: string | null;
+    run_id: string | null;
+    run_status: string | null;
+    input_tokens_estimated: number;
+  };
 }
 
 interface ApiErrorResponse {

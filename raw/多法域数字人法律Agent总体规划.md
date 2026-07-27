@@ -1,9 +1,9 @@
 # 多法域数字人法律 Agent 总体规划
 
-更新时间：2026-07-21
+更新时间：2026-07-27
 规划对象：YYS-Law 全局数字人“法小助”  
 规划性质：长期目标架构与分阶段实施基线
-当前决策：采用方案 C“统一 Runtime Graph + 可插拔 Domain Package + 声明式 PlanTemplate + 运行时版本化 Plan”。阶段 3.6、3.7A/3.7A.1与3.7B已完成；3.7C代码已实现并等待4个官方法源版本人工复核，状态 `READY_FOR_ACCEPTANCE`；3.7D尚未开始。阶段3.5的生产可信化待办暂缓；通用非劳动聊天自动分流和其他真实法律领域尚未接入。
+当前决策：采用方案 C“统一 Runtime Graph + 可插拔 Domain Package + 声明式 PlanTemplate + 运行时版本化 Plan”。阶段 3.6、3.7A/3.7A.1与3.7B已完成；3.7C代码已实现并等待4个官方法源版本人工复核，状态 `READY_FOR_ACCEPTANCE`。后续已正式规划为 3.7D Conversation Foundation、3.7E Conversation × Workspace、3.7F Digital Human Interaction、3.7G Voice Interaction、3.7H Agent Engineering & Evaluation，但均未开始实施。阶段3.5的生产可信化待办暂缓；通用非劳动聊天自动分流和其他真实法律领域尚未接入。
 
 当前产品聚焦：以“劳动用工法律服务”为首个长期深耕领域，以大学生实习、兼职和毕业初期青年劳动者为第一批用户入口。该定位只约束首批产品场景，不把 Runtime、领域协议或数据结构写死为校园专用系统。
 
@@ -848,18 +848,530 @@ human_handoff
 - 官方法源范围补入劳动关系和试用期核心条款；五类25条旗舰金标区分合成数据与官方公开案例改写。
 - 阶段3.7C专项5/5、完整数字人Agent回归54/54和Python编译通过；未新增数据库表列，未修改前端或进入3.7D。生产法源4/4当前为 `review_required`，必须人工批准并达到 `ready` 后才完成最终验收。
 
-#### 3.7D：深化已打通的劳动数字人入口
+#### 3.7C → 3.7D～3.7H 演进说明
 
-- 数字人一次只追问一个用户容易回答的问题，并解释为什么需要该信息或材料。
-- 深化既有聊天会话、Matter、Triage、Agent Run 和 Workspace 状态链，使用户不必理解不同技术入口。
-- 把 Agent 步骤、等待信息、法源阻断、审批和结果转换为通俗状态说明。
-- 优先实现文字流式输出、取消和基础语音输入/播报；Live2D、复杂口型和大量动作在核心闭环稳定后实施。
+```text
+旧设计
+→ 3.7D 统一承载一次一问、状态解释、流式文字、取消和基础语音
+
+当前实施结果
+→ 3.7A～3.7C 已完成劳动分流、Matter/Triage/Run/Workspace 最小绑定、
+  组合式 Plan、事实证据、法源与劳动实体规则
+→ 普通聊天仍使用固定最近 6 条历史
+→ 普通 sendMessage 与前端劳动关键词分流仍是分散入口
+→ 尚无 Rolling Summary、Structured Memory、ContextBuilder、
+  统一 Router、Conversation Orchestrator 和会话 Trace
+
+新阶段规划
+→ 将原 3.7D 拆分为 3.7D～3.7H
+→ 先建设统一会话基础，再建设工作台协同、流式数字人、语音和工程化评测
+```
+
+该拆分只细化后续实施顺序，不修改、覆盖或否定阶段 1～3.7C 的历史设计与实施结果。劳动 Agent 业务扩展在本轮冻结，现有 `CapabilityRuntimeGraph`、劳动 Domain Package、Plan、工具、验证、审批和持久化继续作为稳定执行内核。
+
+#### 3.7D Conversation Foundation
+
+目标：在不重写 Agent Runtime 的前提下，建立初始聊天模式和案件陪伴模式共用的会话基础设施，解决长对话、上下文构建和分散分流问题。
+
+为什么现在做：
+
+- `digital_human_messages` 已保存完整原始消息，但当前 LLM 每轮只读取最近 6 条，长对话会丢失用户目标和旧事实修改。
+- 当前没有 Rolling Summary、Structured Memory、Token Budget 或统一 ContextBuilder。
+- 前端仍存在 `sendMessage → isLaborQuestion → laborTriage.start` 的分散控制，普通回复、劳动分流、Matter 创建和 Agent 启动不属于同一个决策入口。
+- Matter 已通过 `session_id` 持久绑定聊天 Session，但前端恢复仍依赖 `laborContextBySession` 本地缓存。
+
+Memory 最终结构：
+
+```text
+Raw Messages
+    +
+Recent Window
+    +
+Rolling Summary
+    +
+Structured Memory
+```
+
+实施顺序必须为：
+
+```text
+Raw Messages
+    ↓
+Recent Window
+    ↓
+Structured Memory
+    ↓
+ContextBuilder
+    ↓
+Rolling Summary
+```
+
+- Raw Messages 继续完整持久化，不把全部历史逐轮发送给模型。
+- Recent Window 从固定消息条数改为 Token Budget。
+- Structured Memory 只保存当前主题、用户目标、会话阶段、Matter 关联、用户陈述、已确认决定和待解决问题等结构化信息。
+- Rolling Summary 在基础 Memory 和 ContextBuilder 稳定后接入，3.7D 完成前必须具备长对话压缩能力，不在第一步构建复杂长期记忆系统。
+- `Conversation Memory ≠ Matter Confirmed Facts`。聊天中的事实只能标记为 `user claim` 或 `candidate fact`；Assistant 历史内容不得成为正式案件事实来源。
+
+统一 ContextBuilder 根据当前是否存在 Matter 自动切换上下文：
+
+```text
+无 Matter：
+System / Guardrails
++ Structured Memory
++ Rolling Summary
++ Recent Messages
++ Current User Message
+
+进入 Matter 后：
+System / Guardrails
++ Current Matter Confirmed Facts
++ Current Agent State
++ Structured Memory
++ Rolling Summary
++ Recent Messages
++ Current User Message
+```
+
+统一优先级：
+
+```text
+安全规则 / 当前输入
+    >
+Matter 已确认事实
+    >
+Agent 真实状态
+    >
+最新用户陈述
+    >
+Structured Memory
+    >
+Rolling Summary
+    >
+较旧聊天历史
+```
+
+- 用户新陈述与 Matter 正式事实冲突时，不静默覆盖；数字人提示用户确认，并引导在工作台修改。
+- 摘要与正式事实冲突时丢弃摘要中的冲突内容。
+- Token 不足时优先压缩旧聊天，不截断安全规则、当前输入、Matter 已确认事实和 Agent 当前状态。
+
+Router 与 Conversation Orchestrator 必须保持独立：
+
+```text
+Router
+→ 判断“当前输入去哪里”
+
+Conversation Orchestrator
+→ 根据 Session、Memory、Matter、Run 和 RouterDecision
+  判断“下一步做什么”
+
+Agent
+→ 真正执行案件分析
+```
+
+Router 采用“高优先级确定性规则 + 模糊场景结构化 LLM”组合，输出限定为：
+
+```text
+normal_chat
+labor_consultation
+labor_triage
+matter_interaction
+agent_continue
+workspace_guidance
+high_risk_handoff
+```
+
+Router 不创建 Matter、不启动 Agent、不执行审批。Orchestrator 统一执行 `reply_only`、`ask_one_key_question`、`create_matter`、`guide_to_workspace`、`start_agent`、`continue_agent`、`request_approval` 和 `stop_for_risk` 等受控动作。
+
+产品规则：
+
+- 普通劳动咨询不因命中关键词立即创建 Matter。
+- 明确进入案件处理或完成最低限度分流后，再创建 Matter。
+- 数字人每轮最多追问一个关键分流问题，并解释询问原因。
+- 大量案件字段、材料和完整 `missing_facts` 统一交给工作台。
+- 高风险、法源不足、审批和外部动作不能被会话层绕过。
+
+预计涉及现有模块：
+
+- `frontend/src/components/DigitalHuman/DigitalHumanChat.tsx`
+- `frontend/src/components/DigitalHuman/useLaborTriage.ts`
+- `frontend/src/store/digitalHumanStore.ts`
+- `frontend/src/services/digitalHumanApi.ts`
+- `flask_app/routers/digital_human.py`
+- `flask_app/services/digital_human_service.py`
+- `flask_app/models/db_models.py`
+
+后续可新增独立 `conversation/` 服务包，分别承载 schemas、memory、token budget、context builder、router、orchestrator 和 actions；`digital_human_service.py` 保留兼容入口，禁止继续扩成超大 Service。
+
+对现有 Agent 的影响：Memory、ContextBuilder、Router 为低风险；Orchestrator 接管调用入口为中风险；不修改现有 Runtime Graph、领域能力、Plan、Tool、Verifier 和持久化协议。
+
+验收：
+
+- 30～50 轮对话后仍能正确识别用户目标，输入 Token 在摘要后趋于稳定。
+- 用户修改旧陈述后不继续使用旧候选值，且不会自动覆盖 Matter 正式事实。
+- Assistant 历史推测进入正式案件事实的数量为 0。
+- 同一句输入只进入一个 Router/Orchestrator 主流程。
+- 普通咨询不自动创建空 Matter；高风险和法源不足场景保持失败关闭。
+
+对应 Agent 知识：Memory、Context Engineering、Token Budget、Router、Orchestrator、事实来源隔离。
+
+#### 3.7E Conversation × Workspace
+
+目标：形成“初始聊天模式 → 当前 Matter 工作台 → 工作台侧边数字人”的连续产品体验，数字人、工作台和 Agent 各自承担明确职责。
+
+产品包含两种交互模式。
+
+**模式一：初始聊天模式**
+
+```text
+数字人完整聊天界面
+    ↓
+普通法律咨询
+    ↓
+理解用户需求
+    ↓
+Router 分流
+    ↓
+必要的关键追问
+    ↓
+满足条件后创建 Matter
+    ↓
+进入案件工作台
+```
+
+数字人负责接待、普通咨询、理解需求、劳动问题识别、关键分流问题、引导建立 Matter 和引导进入工作台。不得在该阶段连续询问大量案件字段。
+
+**模式二：案件陪伴模式**
+
+```text
+完整聊天区域退出或弱化
+    ↓
+工作台成为主要操作区域
+    ↓
+数字人保留在工作台侧边
+    ↓
+围绕当前 Matter 持续沟通
+```
+
+数字人负责：
+
+- 解释案件进度和下一步操作。
+- 解释 Agent 当前状态。
+- 提醒材料或信息缺失。
+- 发起关键确认和审批确认。
+- 回答当前 Matter 相关问题。
+- 简要总结最终结果。
+
+工作台继续负责：
+
+- 大量案件事实和结构化字段。
+- 材料上传、候选事实确认和证据。
+- 时间线、法源、Agent Plan 和完整 `missing_facts`。
+- 文书编辑和导出。
+
+数字人不能变成案件表单录入机器人。
+
+两种模式必须共享同一套：
+
+```text
+Session
+Memory
+Structured Memory
+Rolling Summary
+Recent Window
+ContextBuilder
+Router
+Conversation Orchestrator
+Trace
+```
+
+禁止为工作台侧边数字人建立第二套 Memory、第二套聊天后端或第二套 Orchestrator。UI 可以切换呈现方式，但 Session 和会话状态必须连续。
+
+服务端恢复：
+
+- Session、Matter 和 Agent Run 的数据库关系是权威来源。
+- `laborContextBySession` 只作为前端缓存。
+- 清理 localStorage 或刷新页面后，前端必须能按当前 Session 从服务端恢复 Matter、Triage 和 Run。
+
+Conversation Presenter 采用确定性映射，不让 LLM 自由解释 Agent 状态：
+
+```text
+planning             → 正在整理案件处理步骤
+verifying            → 正在核对法律依据
+awaiting_information → 还有案件信息需要在工作台补充
+blocked_authority    → 缺少可靠法律依据，系统已停止生成结论
+awaiting_approval     → 草稿已经准备好，需要用户确认
+completed             → 本次案件分析已完成
+```
+
+预计涉及现有模块：
+
+- `frontend/src/components/DigitalHuman/DigitalHumanChat.tsx`
+- `frontend/src/components/DigitalHuman/LaborTriageCard.tsx`
+- `frontend/src/components/DigitalHuman/DigitalHumanMatterWorkspace.tsx`
+- `frontend/src/store/digitalHumanStore.ts`
+- `flask_app/routers/digital_human_agent.py`
+- 现有 Matter、Triage、Agent Run 查询与持久化模块
+
+可新增 Conversation Presenter 和轻量状态卡，但不复制 Agent 状态机。
+
+对现有 Agent 的影响：低风险，只读取现有状态并调用既有 Facade。
+
+验收：
+
+- 初始聊天与工作台侧边数字人使用同一 Session，切换后历史和 Memory 连续。
+- 清除 localStorage 后仍能从服务端恢复当前 Matter/Run。
+- 聊天区域只呈现通俗摘要和下一步，内部模板 ID、英文状态和完整步骤留在工作台。
+- 数字人只做关键确认，完整缺失字段仍由工作台处理。
+
+对应 Agent 知识：Conversation Presenter、Human-in-the-loop、状态投影、会话与任务协同。
+
+#### 3.7F Digital Human Interaction
+
+目标：在会话和工作台协同稳定后，补齐文字流式输出和统一数字人状态控制。
+
+当前后端虽调用 `llm.stream()`，但内部聚合完成后才一次性返回；前端动画状态也由多个业务位置直接设置。后续统一采用 Conversation SSE 事件协议和 AvatarController。
+
+建议事件：
+
+```text
+meta
+status
+delta
+presentation
+done
+error
+```
+
+交互状态：
+
+```text
+Request
+→ thinking
+→ Streaming 开始
+→ speaking
+→ Streaming 结束
+→ idle
+```
+
+AvatarController 状态收敛为：
+
+```text
+idle
+listening
+thinking
+speaking
+serious
+success
+```
+
+- 当前 PNG 状态继续作为稳定降级资源。
+- WebM/视频循环动画逐步替换 PNG，但属于表现增强，不阻塞会话闭环。
+- 流式中断后，未完成的 Assistant 文本不得作为正式历史进入下一轮 Context。
+- SSE 只输出状态、可展示内容和结果，不输出模型思维链。
+- 优先采用与当前 Flask 技术栈兼容的直接流式响应，不复制现有模拟法庭的进程内队列作为生产聊天架构。
+
+预计涉及现有模块：
+
+- `frontend/src/components/DigitalHuman/DigitalHumanAvatar.tsx`
+- `frontend/src/components/DigitalHuman/DigitalHumanFloat.tsx`
+- `frontend/src/store/digitalHumanStore.ts`
+- `frontend/src/services/digitalHumanApi.ts`
+- `flask_app/routers/digital_human.py`
+- `flask_app/services/digital_human_service.py`
+
+对现有 Agent 的影响：无影响；只改变 Conversation 输出和前端表现。
+
+验收：
+
+- 首段文本明显早于完整回复到达。
+- 停止操作能终止前端流式显示，未完成回复不污染下一轮上下文。
+- Avatar 状态只通过 AvatarController 驱动。
+- WebM 加载失败时自动退化为现有 PNG。
+
+对应 Agent 知识：Streaming、SSE、事件协议、取消与 UI 状态机。
+
+#### 3.7G Voice Interaction
+
+目标：完成第一版基础语音闭环，语音只作为同一 Conversation Orchestrator 的输入输出方式。
+
+```text
+语音输入
+→ STT
+→ 同一 Conversation Orchestrator
+→ Streaming 文本
+→ TTS
+→ speaking 动画
+```
+
+第一版范围：
+
+- 中文语音转文字。
+- 识别文本进入原有会话流程。
+- 回复可以朗读、停止朗读。
+- 新输入能够打断旧朗读。
+- 不支持语音时自动退化为文字输入。
+- 可复用现有 `VoiceCourtroom.tsx` 中 Web Speech API 和 `speechSynthesis` 的实现经验，但应提取为独立轻量控制器，不引用整个模拟法庭业务组件。
+
+当前阶段不做：
+
+- 高精度实时口型。
+- 复杂音频流。
+- 专业级实时 Barge-in。
+- 独立语音 Agent。
+- 为语音建立第二套 Session、Memory、Router 或 Orchestrator。
+
+对现有 Agent 的影响：无影响。
+
+验收：
+
+- Chrome/Edge 中文语音能够转文字并进入同一 Session。
+- 流式回复能够朗读，停止和新输入可以取消旧 TTS。
+- 不支持 Web Speech 的浏览器不影响文字聊天。
+
+对应 Agent 知识：多模态输入输出适配、STT、TTS、打断与降级。
+
+#### 3.7H Agent Engineering & Evaluation
+
+目标：补齐会话到 Agent 全链路的最小 Trace、Guardrails、固定评测集和端到端验收，形成可持续回归的工程基线。
+
+最小 Trace：
+
+```text
+User Input
+→ Router
+→ Memory
+→ Context
+→ Matter
+→ Agent Run
+→ Step
+→ Tool
+→ Verify
+→ Decision
+→ Response
+```
+
+Trace 至少保存 `trace_id`、`request_id`、`session_id`、`matter_id`、`run_id`、路由、理由代码、Memory 版本、Context 分区、Token 估算、受控动作、耗时、结果和错误码；复用现有 Agent Audit，不保存模型思维链，不默认复制完整敏感材料。
+
+Guardrails：
+
+- Client、Session、Matter 和 Run 归属校验。
+- Router 和 Orchestrator 动作白名单。
+- 审批动作必须明确确认并保持幂等。
+- Assistant 内容禁止成为正式案件事实来源。
+- 高风险场景停止自动推进。
+- 法源不足状态不得被聊天层绕过。
+- 用户文本和上传材料按数据处理，不得覆盖系统安全规则。
+
+固定评测集控制在 20～30 个案例，建议首版 24 个，覆盖：
+
+```text
+普通咨询
+欠薪
+解除
+经济补偿
+实习
+劳动关系不明确
+信息不足
+用户修改旧事实
+长对话
+法源不足
+高风险
+Matter 恢复
+Agent 继续执行
+```
+
+指标至少包括：
+
+```text
+Router 正确率
+重复追问率
+Memory 正确率
+事实污染率
+Matter 事实准确率
+Agent 完成率
+法源阻断正确率
+长对话 Token 增长
+幻觉情况
+```
+
+首版建议门槛：
+
+- Router 固定集正确率不低于 90%。
+- Assistant 内容污染正式事实为 0。
+- 高风险路由和法源阻断正确率为 100%。
+- 重复追问率不高于 5%。
+- Session → Matter 服务端恢复率为 100%。
+- 长对话 Token 在摘要后趋于稳定。
+
+评测分为确定性 Fake LLM 回归和真实模型抽样评测，不把模型随机性混入基础安全回归。
+
+对现有 Agent 的影响：低风险，读取并关联现有 Audit；不修改 Runtime 执行决策。
+
+验收：
+
+- 24 个固定案例能够重复运行并输出结构化报告。
+- 可使用一个 `trace_id` 关联 Router、Memory、Context、Matter 和现有 Agent Audit。
+- 关键事实污染、高风险和法源阻断均有自动化失败用例。
+- 完成数字人初始聊天、Matter 创建、工作台陪伴、Agent 继续、审批、结果总结、流式和语音降级的端到端验收。
+
+对应 Agent 知识：Evaluation、Tracing、Guardrails、可观测性和安全回归。
+
+#### 3.7D～3.7H 正式开发优先级
+
+```text
+P0
+Memory
+ContextBuilder
+Router
+Conversation Orchestrator
+Session → Matter 服务端恢复
+事实来源隔离
+高风险 / 法源阻断保护
+
+P1
+Conversation Presenter
+Streaming
+AvatarController
+Trace
+Guardrails
+Evaluation
+基础 STT / TTS
+
+P2
+更完整 WebM 动画
+更复杂语音体验
+Trace 可视化界面
+```
+
+时间不足时优先缩减表现层。不得牺牲 Memory 正确性、Context 正确性、Router 单一入口、事实污染保护和 Evaluation。
+
+#### 3.7D～3.7H 10～13 天实施安排
+
+| 日期 | 主要目标 | 所属阶段 |
+| --- | --- | --- |
+| Day 1 | 基线、接口契约和数字人/工作台职责边界 | 3.7D |
+| Day 2 | Raw Messages、Recent Window、Structured Memory | 3.7D |
+| Day 3 | ContextBuilder、Token Budget、Rolling Summary | 3.7D |
+| Day 4 | 单一 Router | 3.7D |
+| Day 5 | Conversation Orchestrator | 3.7D |
+| Day 6 | 两种数字人模式和 Conversation Presenter | 3.7E |
+| Day 7 | Session → Matter/Run 服务端恢复与工作台协同 | 3.7E |
+| Day 8 | Streaming/SSE 与 AvatarController | 3.7F |
+| Day 9 | STT/TTS 基础闭环 | 3.7G |
+| Day 10 | Trace 与 Guardrails | 3.7H |
+| Day 11 | 20～30 个固定 Evaluation 案例 | 3.7H |
+| Day 12 | 完整端到端、长对话和回归验收 | 3.7H |
+| Day 13 | 缺陷修复、规划文档和验收收尾 | 3.7H |
+
+允许在源码复杂度明确后合并 Day 1/2、Day 6/7 或 Day 12/13，将工期压缩到 10 天；不得改变 Memory → ContextBuilder → Router → Orchestrator → Workspace → Streaming → Voice → Evaluation 的依赖顺序。
 
 阶段 3.7 验收：同一青年就业入口可以正确分流简单咨询、劳动关系判断和正式纠纷；复合劳动问题生成去重且可审计的 Plan；每个关键结论可追溯到事实、材料、证据和有效法源；数字人可从聊天引导到 Matter 和 Agent Run，但不能绕过确认、审批和人工接管。
 
 ### 阶段 4：实时 2D 数字人
 
 目标：把成熟的 Agent 闭环接入自然语音互动。
+
+阶段边界说明：保留阶段 4 的长期高级交互目标。3.7F/3.7G 只交付可降级的基础 Streaming、AvatarController 和浏览器 STT/TTS；阶段 4 再处理更高质量实时音频、专业级打断、口型、弱网体验和无障碍增强，避免与 3.7D～3.7H 重复建设会话基础设施。
 
 - 流式 STT/TTS、字幕、轮次检测和打断。
 - 2D listening/thinking/tool-running/approval/speaking 状态。
@@ -915,8 +1427,18 @@ human_handoff
    ↓
 阶段3.6 统一 Runtime Graph + Capability Registry
    ↓
-阶段3.7 劳动用工深化 + 数字人最小融合
-   ├────────→ 阶段4 实时 2D 数字人
+阶段3.7A～3.7C 劳动用工深化 + 数字人最小融合
+   ↓
+阶段3.7D Conversation Foundation
+   ↓
+阶段3.7E Conversation × Workspace
+   ↓
+阶段3.7F Digital Human Interaction
+   ↓
+阶段3.7G Voice Interaction
+   ↓
+阶段3.7H Agent Engineering & Evaluation
+   ├────────→ 阶段4 高级实时 2D 数字人
    └────────→ 阶段5 多领域 Domain Package
                       ↓
                 阶段6 第二法域
@@ -924,9 +1446,9 @@ human_handoff
                 阶段7 跨境与多 Agent
 ```
 
-阶段 4 可在阶段 3 稳定后与阶段 5 并行；第二法域必须建立在法域协议和来源验证稳定之后。
+阶段 4 可在阶段 3.7H 验收后与阶段 5 并行；第二法域必须建立在法域协议和来源验证稳定之后。
 
-当前优先完成阶段 3.7，再决定阶段 4 的表现深度和阶段 5 的第二业务领域。比赛版本以青年就业劳动闭环为主线，其他旧平台功能只作为扩展能力展示。
+当前优先按 3.7D～3.7H 完成统一会话、工作台协同、基础交互和工程化评测，再决定阶段 4 的表现深度和阶段 5 的第二业务领域。比赛版本以青年就业劳动闭环为主线，其他旧平台功能只作为扩展能力展示。
 
 ## 14. 数据与审计要求
 
@@ -1010,7 +1532,8 @@ human_handoff
 阶段 3.4A～3.4E 和阶段 3.6 已落地，阶段 3.5 仍有生产可信化待办。下一步执行入口：
 
 1. 继续完成法源复核、规则金标、定时同步告警、权限和长期运行等阶段 3.5 安全门槛。
-2. 阶段3.7C代码已完成，先完成4个官方法源版本人工复核；验收通过后可按新任务进入3.7D，深化既有劳动聊天—Matter—Triage—Run—Workspace入口。
-3. 不自动启动3.7D，仍需用户明确确认范围后实施。
-4. 阶段 3.5 暂缓但必须在生产化前补齐法源复核、规则金标、定时同步告警、权限和长期运行保障。
-5. 比赛主线稳定后，再按“只读合同审查 → 一般纠纷 → 文书 → 其他工具”的顺序接入新领域；新领域必须实现 `DomainPackage + DomainRuntimeAdapter + 领域评测`，不得复制 Runtime Graph。
+2. 阶段3.7C代码已完成，先完成4个官方法源版本人工复核；阶段1～3.7C历史规划和实施结果继续保留。
+3. 后续按 3.7D Conversation Foundation → 3.7E Conversation × Workspace → 3.7F Digital Human Interaction → 3.7G Voice Interaction → 3.7H Agent Engineering & Evaluation 实施，整体控制在10～13天。
+4. 当前只完成后续规划更新，不自动启动3.7D或任何 Memory、Router、Orchestrator、Streaming、STT/TTS 实现；开始开发仍需进入独立实施任务。
+5. 阶段 3.5 暂缓但必须在生产化前补齐法源复核、规则金标、定时同步告警、权限和长期运行保障。
+6. 比赛主线稳定后，再按“只读合同审查 → 一般纠纷 → 文书 → 其他工具”的顺序接入新领域；新领域必须实现 `DomainPackage + DomainRuntimeAdapter + 领域评测`，不得复制 Runtime Graph。

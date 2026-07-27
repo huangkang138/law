@@ -785,3 +785,54 @@
 - 实际改动：抽取共享材料识别服务，支持 TXT、PDF、DOCX、PNG/JPG、MP3/WAV/M4A、MP4/MOV/AVI，限制单文件25MB；旧纠纷整理与新工作台共用图片、音频和视频识别实现。工作台新增四类格式选择，先生成可编辑整理稿，用户确认后才按原文件媒体类型保存到当前 Matter 并继续事实定位、证据和仲裁分析。
 - 安全边界：识别预览不落库，无法识别时明确失败，不再用“文件名占位符”冒充材料内容；不保存上传二进制，不引入实时语音会话，也不改变法源、审批或人工复核门禁。
 - 验证：材料识别与预览接口测试4/4、与阶段3.7C规则回归合计13项及13个子测试通过；前端 `npx tsc --noEmit` 与差异空白检查通过。当前 `law` 环境已补齐 Tesseract 与 Whisper base 模型，代码可自动发现 Conda 内的 Tesseract、中文数据和 FFmpeg；使用真实PNG经运行中的8001接口识别出663字，临时Matter随即删除。任务保持 `READY_FOR_ACCEPTANCE`，等待用户完成多格式文件的实际环境体验验收。
+
+## 2026-07-27（数字人 Agent 目录与完整流程导读）
+
+- 用户请求：按 `flask_app/legal_agent_system` 路径分层说明每个包和每个 `.py` 文件，并提供一个可直观看懂的完整流程案例。
+- 实际改动：新增 `flask_app/legal_agent_system/数字人Agent目录与完整流程导读.md`，覆盖当前8个主要职责包、71个Python文件；按根目录、能力、领域、Runtime、工具、案件、法域、劳动业务、材料适配器和实体规则逐层解释。
+- 完整案例：使用“加班费劳动仲裁”串联数字人聊天、劳动初筛、Matter、法域、材料、候选事实、Capability Registry、Plan revision、Runtime单步循环、加班费规则、法源验证、三类暂停、用户审批和仲裁草稿。
+- 可发现性：在 `legal_agent_system/README.md` 增加新导读入口；未修改任何业务代码、数据库结构或当前任务状态。
+
+## 2026-07-27（阶段3.7D进入ARCHITECTURE）
+
+- 用户请求：进入ARCHITECTURE模式并开始阶段3.7D。
+- 状态推进：用户新目标覆盖3.7C待验收任务；3.7C开发测试成果视为阶段基线，正式环境法源重新同步和法律专业复核要求继续保留。`CURRENT_TASK`已初始化为阶段3.7D并进入 `DESIGNING`。
+- 架构结论：按最新总体规划，3.7D仅建设Conversation Foundation，不包含流式、实时取消和语音；新增独立Conversation服务包，建立Raw Messages、Token Budget Recent Window、Structured Memory、ContextBuilder、Rolling Summary、单一Router与Conversation Orchestrator。
+- 安全边界：Conversation Memory不等于Matter正式事实；Assistant内容不得成为案件事实；Router只决策，Orchestrator只经现有Matter/Triage/Agent Facade执行；不修改Runtime Graph、劳动Domain、Plan、Tool、Verifier、法源或审批协议。
+- 文档改动：新增 `newModify/阶段3.7D架构设计.md`，同步更新 `AI_WORKFLOW/CURRENT_TASK.md`、`NEXT_STEP.md`、`DECISIONS.md` 和最新项目分析。当前只完成架构设计，未修改业务代码、数据库或API。
+
+## 2026-07-27（3.7D Rolling Summary冲突治理补充）
+
+- 用户指出：若Rolling Summary仅保存大段自然语言，无法安全处理“工资6500更正为7200”等局部事实冲突。
+- 架构调整：Rolling Summary明确拆为可读 `summary_text` 与结构化 `summary_items`；重要事实、目标、决定和待办条目保存类型、来源消息、状态和替代关系。
+- 冲突规则：ContextBuilder只按结构化条目判断冲突；旧条目标记 `superseded`，新条目引用当前用户消息并指向旧条目，再由有效条目重建 `summary_text`。禁止通过自然语言字符串切片治理事实。
+- 状态与范围：同步更新3.7D架构、CURRENT_TASK和关键决策；任务保持 `DESIGNING`，未修改业务代码或数据库。
+
+## 2026-07-27（阶段3.7D方案批准并进入FEATURE）
+
+- 用户确认阶段3.7D架构方案，可以进入FEATURE实施。
+- 状态推进：任务由 `DESIGNING` 经 `APPROVED` 进入 `IMPLEMENTING`。
+- 实施顺序：会话存储与Token Budget → Structured Memory/ContextBuilder → 双层Rolling Summary → Router/Orchestrator → 前端单入口与完整回归。
+
+## 2026-07-27（阶段3.7D Conversation Foundation实现）
+
+- 后端结构：新增独立 `services/conversation/`，拆分契约、Token预算、Repository、Memory、ContextBuilder、Router、Actions、Orchestrator和跨进程Session锁；`DigitalHumanService`改为兼容Facade并删除固定最近6条与重复持久化代码。
+- 数据与迁移：`digital_human_messages`新增 `request_id`、`estimated_tokens` 和请求角色唯一约束；新增 `conversation_memories` 保存版本化Structured Memory及 `summary_text + summary_items`；Alembic `20260727_0009`已应用到本地实库。
+- 摘要治理：重要事实和目标保存类型、来源消息、状态及替代关系；旧值通过 `superseded` 失效后重建摘要文本。修复专项测试发现的“目标原句夹带旧工资6500”问题，目标现只保存非事实语义，金额只能进入可治理fact条目。
+- 单一入口：Router使用确定性高风险/劳动/当前Matter规则与封闭Schema LLM回退；Orchestrator统一执行受控动作。普通咨询不创建Matter，明确案件请求才创建；同一Session串行，同一请求重试返回缓存，失败重试复用已有Matter。
+- 冲突与安全：Matter正式事实优先；聊天候选冲突时排除并引导工作台确认。高风险、`blocked_authority`、人工接管和审批状态均不能由会话层绕过；Assistant内容不能进入用户事实。
+- 前端：聊天提交移除 `isLaborQuestion → laborTriage.start` 双入口，改为消费后端 `decision/action/context` 并同步当前Matter/Run缓存；工作台事实补录能力保持不变。
+- 验证：阶段3.7D专项8项和架构边界4项通过；完整数字人回归70/70通过；Python `compileall`、前端 `npx tsc --noEmit`、Alembic current/heads（均为 `20260727_0009`）及 `git diff --check` 通过。任务进入 `READY_FOR_ACCEPTANCE`。
+
+## 2026-07-27（阶段3.7D REVIEW 三项P1修复）
+
+- 路由授权：`labor_triage`新增服务端确定性副作用授权；LLM强制建议但当前输入无明确建案意图时降级普通对话。Actions执行前再次校验授权；用户Structured Memory和Rolling Summary改为不可信user上下文。
+- 锁与并发：会话advisory lock缩短为request领取、检查点和完成写入三个数据库临界区，LLM与业务执行期间不持有锁连接；request租约令牌保持跨进程同会话互斥并阻止失效执行者覆盖。
+- 恢复幂等：新增迁移 `20260727_0010`，在原request表记录动作、Matter/Run资源、检查点及租约。Matter支持指定ID幂等创建；Run在执行前记录实际ID；动作、assistant或request完成失败后使用相同request_id恢复，禁止重新创建Matter/Run。
+- 验证：新增LLM越权、咨询误建案、慢LLM锁释放、同会话并发、Run预留后中断、Run完成后assistant/request失败及assistant已保存恢复测试。3.7D专项12/12、数字人阶段回归70/70、完整后端测试78/78、Python语法检查通过。
+
+## 2026-07-27（阶段3.7D验收收尾）
+
+- 用户确认进行3.7D收尾，任务状态由 `READY_FOR_ACCEPTANCE` 更新为 `COMPLETED`。
+- 收尾依据：Conversation Foundation功能已完成；REVIEW三个P1全部关闭；3.7D专项12/12、数字人阶段回归70/70、完整后端测试78/78通过。
+- 下一阶段未自动启动；3.7E仅保留为候选，等待用户明确指令。生产部署仍需执行Alembic `20260727_0010`。
