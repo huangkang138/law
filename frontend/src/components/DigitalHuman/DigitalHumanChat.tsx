@@ -1,18 +1,19 @@
 'use client';
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Send, Square, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
+import ConversationComposer from './ConversationComposer';
+import DigitalHumanCompanion from './DigitalHumanCompanion';
 import LaborTriageCard from './LaborTriageCard';
 import DigitalHumanMatterWorkspace from './DigitalHumanMatterWorkspace';
 import { useLaborTriage } from './useLaborTriage';
 
 export default function DigitalHumanChat() {
-  const [question, setQuestion] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -20,7 +21,6 @@ export default function DigitalHumanChat() {
   const laborTriage = useLaborTriage();
   const {
     close,
-    cancelRequest,
     deleteSession,
     emotion,
     historyError,
@@ -28,7 +28,6 @@ export default function DigitalHumanChat() {
     messages,
     loadSession,
     refreshHistory,
-    sendMessage,
     setEmotion,
     sessions,
     sessionId,
@@ -41,21 +40,6 @@ export default function DigitalHumanChat() {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
   }, [messages, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading]);
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    const value = question.trim();
-    if (!value || isLoading) return;
-    setQuestion('');
-    await sendMessage(value);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      event.currentTarget.form?.requestSubmit();
-    }
-  };
 
   const handleRoute = (route: string) => {
     setEmotion('handoff');
@@ -210,34 +194,16 @@ export default function DigitalHumanChat() {
         />
       </div>
 
-      <form className="dh-composer" onSubmit={handleSubmit}>
-        <textarea
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="告诉法小助，你想解决什么问题…"
-          rows={1}
-          maxLength={1000}
-          disabled={isLoading}
-          aria-label="输入问题"
-        />
-        {isLoading ? (
-          <button type="button" className="dh-send-button" onClick={cancelRequest} aria-label="停止等待">
-            <Square size={15} />
-          </button>
-        ) : <button
-          type="submit"
-          className="dh-send-button"
-          disabled={!question.trim() || isLoading}
-          aria-label="发送问题"
-        >
-          <Send size={18} />
-        </button>}
-      </form>
+      <ConversationComposer />
       <p className="dh-disclaimer">回答仅供参考，重要法律事项请咨询专业律师</p>
       </div>
-      {workspaceExpanded && <div className="dh-workspace-column">
-        <DigitalHumanMatterWorkspace />
+      {workspaceExpanded && <div className="dh-workspace-layout">
+        <div className="dh-workspace-column">
+          <DigitalHumanMatterWorkspace />
+        </div>
+        <div className="dh-companion-column">
+          <DigitalHumanCompanion />
+        </div>
       </div>}
       </div>
     </section>

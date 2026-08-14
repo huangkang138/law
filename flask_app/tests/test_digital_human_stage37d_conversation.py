@@ -328,6 +328,14 @@ class ConversationOrchestratorIntegrationTest(unittest.TestCase):
                 db.query(Matter).filter(Matter.client_id == self.client_id).count(),
                 1,
             )
+            request_record = db.get(
+                DigitalHumanRequest,
+                self.request_ids[1],
+            )
+            self.assertEqual(
+                request_record.checkpoint_json["workspace_version"],
+                0,
+            )
         finally:
             db.close()
 

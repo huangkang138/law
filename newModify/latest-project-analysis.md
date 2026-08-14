@@ -89,7 +89,7 @@ LangGraph 与 Plan 的后续边界已经明确：
 
 ### 阶段 3.7D：Conversation Foundation（2026-07-27）
 
-- 3.7D已由用户确认收尾，状态为 `COMPLETED`；下一阶段尚未启动。
+- 3.7D已由用户确认收尾，状态为 `COMPLETED`。
 - 新增独立 `services/conversation/`，按 schemas、token budget、repository、memory、context builder、router、actions、orchestrator和session lock拆分；`DigitalHumanService`缩减为兼容入口，不再保留固定最近6条和重复持久化实现。
 - `digital_human_messages`新增请求关联和Token估算；新增一会话一行的 `conversation_memories`，通过Alembic `20260727_0009`落地。`20260727_0010`为 `digital_human_requests` 增加动作类型、Matter/Run资源、恢复检查点和执行租约；相同请求通过持久化状态恢复，不删除已产生副作用的请求。
 - Rolling Summary采用 `summary_text + summary_items`：文本只作可读投影；事实、目标等条目保存类型、来源消息、状态和替代关系。“不是6500，是7200”会将旧工资条目标记为 `superseded` 并重建文本；Assistant内容不能生成用户事实。
@@ -98,6 +98,13 @@ LangGraph 与 Plan 的后续边界已经明确：
 - Session advisory lock仅覆盖request领取、状态校验、检查点和完成写入，LLM及业务执行期间不持有锁连接；跨进程同会话顺序由短锁内申请的持久化租约保证。Matter使用预留ID幂等创建，Run在执行前记录实际ID，失败重试恢复原资源。
 - 前端移除 `sendMessage → isLaborQuestion → laborTriage.start` 副作用，改为消费后端 `decision/action/context`；现有工作台事实补录继续复用。
 - 本地测试库已应用 `20260727_0010` 等价列变更；阶段3.7D专项12/12、数字人阶段回归70/70、完整后端测试78/78及Python语法检查通过。
+
+### 阶段 3.7E：Conversation × Workspace（2026-07-27，架构中）
+
+- 用户已明确进入3.7E ARCHITECTURE；当前状态为 `ARCHITECTURE`，推荐方案已完成，尚未修改业务代码。
+- 当前恢复缺口是：消息可按Session从服务端读取，但Matter/Triage/Run仍依赖前端 `laborContextBySession`；Session与Matter为一对多且没有当前Matter权威指针。
+- 推荐新增每Session一行的Conversation Workspace State、只读Workspace Context聚合接口和无LLM的确定性Conversation Presenter；全量聊天与工作台侧边陪伴复用同一Store、Session和发送入口。
+- `client_id`目前存于localStorage，清空全部localStorage会改变匿名身份。为满足恢复验收，推荐以HttpOnly匿名身份Cookie兼容现有请求头；完整账号、跨设备恢复和权限体系仍不纳入3.7E。
 
 ## 后端怎么看
 
@@ -414,3 +421,13 @@ npm run dev
 - 每次远程仓库更新后，覆盖刷新本文件。
 - 每次修改后，追加更新 `D:\项目\law\newModify\modification-log.md`。
 - 涉及后端时，优先从 `flask_app/app.py` 和 `flask_app/routers` 进入，再追踪到 `services`、`models`、`core` 和 `sql`。
+## 阶段 3.7E：Conversation × Workspace（2026-07-27）
+
+- 新增每个 Session 一行的 `ConversationWorkspaceState`，由服务端保存当前 Matter；当前 Run、Triage 和用户态 Presenter 均从该指针确定性恢复，显式清空后不会猜测旧案件。
+- 数字人匿名身份改为 HttpOnly Cookie 优先、旧 `X-Digital-Human-Client-ID` 请求头兼容，解决清空 localStorage 后同浏览器无法恢复历史会话的问题；这只是匿名身份连续性，不替代阶段 3.5 的正式账号与权限系统。
+- 新增 Workspace Context 查询/选择接口和无 LLM 的 Presenter 映射。Conversation Repository、案件创建与删除均接入同一权威指针，未复制 Runtime Graph 或放松法源、审批、人工复核边界。
+- 前端会话加载改为消息与 Workspace Context 原子恢复，快速切换使用序列保护；localStorage 仅保留 Session ID，Matter/Triage/Run 不再作为权威状态。
+- 工作台新增侧边数字人陪伴区，复用主对话的 Store、消息线程、发送动作和 Presenter；完整事实、材料、法源、步骤与审批继续留在左侧工作台。移动端改为上下分区。
+- LAW-REVIEW 返修后，Matter 创建具备稳定幂等恢复并直接返回权威 Workspace 快照；跨 Session 历史 Matter 会精确恢复；聊天和案件切换使用取消序列、Workspace 版本、Session 行锁与前端顺序队列防止旧响应倒灌。首次进入工作台可独立创建 Session，当前 Matter 删除与回退在同一事务完成。
+- 第二轮 LAW-REVIEW 进一步将聊天请求领取时的 Workspace 版本写入可恢复检查点；后台动作遇到版本变化不再抢回当前指针。Workspace Context 改为在 Session 行锁保护的单一事务中读取指针、版本和关联投影，避免并发切换产生混合快照。
+- 数据库迁移已升级至 `20260727_0011`。验证通过：后端全量 97/97（另有 13 个子测试）、TypeScript、Python compileall、Alembic current/heads、`git diff --check`，以及桌面端和 375×812 移动端真实浏览器复核。

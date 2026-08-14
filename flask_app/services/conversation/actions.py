@@ -7,6 +7,10 @@ from legal_agent_system import get_legal_agent_facade
 from legal_agent_system.runtime.errors import AgentRuntimeError
 
 from .schemas import ConversationAction, RouterDecision
+from .workspace import (
+    WorkspaceVersionConflict,
+    get_conversation_workspace_service,
+)
 
 
 CLAIM_MAPPINGS = (
@@ -30,6 +34,7 @@ class ConversationActions:
         resources: Optional[Dict] = None,
         checkpoint_resource: Optional[Callable[..., None]] = None,
         recovering: bool = False,
+        expected_workspace_version: Optional[int] = None,
     ) -> ConversationAction:
         if decision.route in {"normal_chat", "labor_consultation"}:
             return ConversationAction("reply_only")
@@ -59,6 +64,7 @@ class ConversationActions:
                 resources or {},
                 checkpoint_resource,
                 recovering,
+                expected_workspace_version,
             )
         return ConversationAction("reply_only")
 
@@ -70,6 +76,7 @@ class ConversationActions:
         resources: Dict,
         checkpoint_resource: Optional[Callable[..., None]],
         recovering: bool,
+        expected_workspace_version: Optional[int],
     ) -> ConversationAction:
         facade = get_legal_agent_facade()
         matter = None
@@ -92,6 +99,17 @@ class ConversationActions:
                 session_id,
                 matter_id=planned_matter_id,
             )
+        if expected_workspace_version is not None:
+            try:
+                get_conversation_workspace_service().select_matter(
+                    session_id,
+                    matter["matter_id"],
+                    client_id,
+                    expected_workspace_version,
+                )
+            except WorkspaceVersionConflict:
+                # 用户已在请求执行期间切换案件；后台动作不得抢回指针。
+                pass
         if checkpoint_resource is not None:
             checkpoint_resource(matter_id=matter["matter_id"])
         snapshot = facade.update_labor_case_triage(

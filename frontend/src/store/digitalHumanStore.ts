@@ -5,11 +5,16 @@ import {
   DigitalHumanAgentRun,
   DigitalHumanEmotion,
   DigitalHumanSessionSummary,
+  ConversationPresentation,
+  DigitalHumanWorkspaceContext,
   LaborTriageSnapshot,
+  createDigitalHumanWorkspaceSession,
   deleteDigitalHumanSession,
   getDigitalHumanMessages,
   getDigitalHumanSessions,
+  getDigitalHumanWorkspace,
   resetDigitalHumanSession,
+  selectDigitalHumanWorkspaceMatter,
   sendDigitalHumanMessage,
 } from '@/services/digitalHumanApi';
 
@@ -35,6 +40,10 @@ interface DigitalHumanStore {
   currentAgentRun: DigitalHumanAgentRun | null;
   laborTriageLoading: boolean;
   laborTriageError: string;
+  workspacePresentation: ConversationPresentation | null;
+  workspaceVersion: number;
+  workspaceLoading: boolean;
+  workspaceError: string;
   laborContextBySession: Record<string, {
     matterId: string;
     runId: string | null;
@@ -47,7 +56,10 @@ interface DigitalHumanStore {
   sendMessage: (question: string) => Promise<void>;
   reset: () => Promise<void>;
   loadSessions: () => Promise<void>;
-  loadSession: (sessionId: string) => Promise<void>;
+  ensureWorkspaceSession: () => Promise<string>;
+  loadSession: (sessionId: string) => Promise<boolean>;
+  refreshWorkspace: (sessionId: string) => Promise<boolean>;
+  applyWorkspaceContext: (workspace: DigitalHumanWorkspaceContext) => boolean;
   deleteSession: (sessionId: string) => Promise<void>;
   refreshHistory: () => Promise<void>;
   startNewConversation: () => void;
@@ -59,11 +71,20 @@ interface DigitalHumanStore {
     loading?: boolean;
     error?: string;
   }) => void;
-  selectCurrentMatter: (matterId: string | null) => void;
+  selectCurrentMatter: (matterId: string | null) => Promise<void>;
   setCurrentAgentRun: (run: DigitalHumanAgentRun | null) => void;
 }
 
 let activeRequest: AbortController | null = null;
+let hydrationSequence = 0;
+let conversationOperationSequence = 0;
+let workspaceSelectionTail: Promise<void> = Promise.resolve();
+
+function invalidateConversationRequest() {
+  conversationOperationSequence += 1;
+  activeRequest?.abort();
+  activeRequest = null;
+}
 
 const WELCOME_MESSAGE: DigitalHumanMessage = {
   id: 'digital-human-welcome',
@@ -91,16 +112,28 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       currentAgentRun: null,
       laborTriageLoading: false,
       laborTriageError: '',
+      workspacePresentation: null,
+      workspaceVersion: 0,
+      workspaceLoading: false,
+      workspaceError: '',
       laborContextBySession: {},
 
       open: () => {
+        const openOperation = conversationOperationSequence;
         set((state) => ({
           isOpen: true,
           emotion: state.messages.length === 0 ? 'welcome' : state.emotion,
           messages: state.messages.length === 0 ? [WELCOME_MESSAGE] : state.messages,
         }));
-        void get().loadSessions();
-        if (get().sessionId) void get().loadSession(get().sessionId as string);
+        void get().loadSessions().then(async () => {
+          if (openOperation !== conversationOperationSequence) return;
+          const sessions = get().sessions;
+          const current = get().sessionId;
+          const target = sessions.some((item) => item.id === current)
+            ? current
+            : sessions[0]?.id || null;
+          if (target) await get().loadSession(target);
+        });
       },
 
       close: () => set({ isOpen: false, emotion: 'idle' }),
@@ -132,11 +165,14 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           emotion: 'thinking',
         }));
 
+        const operation = ++conversationOperationSequence;
+        const controller = new AbortController();
         try {
-          activeRequest = new AbortController();
+          activeRequest = controller;
           const response = await sendDigitalHumanMessage(
-            question, get().sessionId, `dhr_${crypto.randomUUID()}`, activeRequest.signal,
+            question, get().sessionId, `dhr_${crypto.randomUUID()}`, controller.signal,
           );
+          if (operation !== conversationOperationSequence) return;
           const assistantMessage: DigitalHumanMessage = {
             id: createMessageId('assistant'),
             role: 'assistant',
@@ -173,7 +209,9 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             };
           });
           void get().loadSessions();
+          void get().refreshWorkspace(response.session_id);
         } catch (error) {
+          if (operation !== conversationOperationSequence) return;
           const message = error instanceof Error ? error.message : '数字人服务暂时不可用';
           set((state) => ({
             messages: [
@@ -189,11 +227,12 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             isLoading: false,
           }));
         } finally {
-          activeRequest = null;
+          if (activeRequest === controller) activeRequest = null;
         }
       },
 
       reset: async () => {
+        invalidateConversationRequest();
         const sessionId = get().sessionId;
         if (sessionId) {
           try {
@@ -211,6 +250,9 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           currentTriage: null,
           currentAgentRun: null,
           laborTriageError: '',
+          workspacePresentation: null,
+          workspaceVersion: 0,
+          workspaceError: '',
         });
         void get().loadSessions();
       },
@@ -227,10 +269,35 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         }
       },
 
+      ensureWorkspaceSession: async () => {
+        const existing = get().sessionId;
+        if (existing) return existing;
+        const workspace = await createDigitalHumanWorkspaceSession();
+        set({
+          sessionId: workspace.session_id,
+          currentMatterId: null,
+          currentTriage: null,
+          currentAgentRun: null,
+          workspacePresentation: workspace.presentation,
+          workspaceVersion: workspace.workspace_version,
+          workspaceLoading: false,
+          workspaceError: '',
+        });
+        void get().loadSessions();
+        return workspace.session_id;
+      },
+
       loadSession: async (sessionId) => {
+        invalidateConversationRequest();
+        const sequence = ++hydrationSequence;
+        set({ isLoading: false, workspaceLoading: true, workspaceError: '' });
         try {
-          const history = await getDigitalHumanMessages(sessionId);
-          const context = get().laborContextBySession[sessionId];
+          const [history, workspace] = await Promise.all([
+            getDigitalHumanMessages(sessionId),
+            getDigitalHumanWorkspace(sessionId),
+          ]);
+          if (sequence !== hydrationSequence) return false;
+          const matterId = workspace.matter?.matter_id || null;
           set({
             sessionId,
             messages: history.length ? history.map((item) => ({
@@ -238,20 +305,96 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
               createdAt: item.created_at ? Date.parse(item.created_at) : 0,
             })) : [WELCOME_MESSAGE],
             emotion: 'idle',
-            currentMatterId: context?.matterId || null,
-            currentTriage: null,
-            currentAgentRun: null,
+            currentMatterId: matterId,
+            currentTriage: workspace.triage,
+            currentAgentRun: workspace.run,
             laborTriageError: '',
+            workspacePresentation: workspace.presentation,
+            workspaceVersion: workspace.workspace_version,
+            workspaceLoading: false,
+            workspaceError: '',
+            laborContextBySession: matterId ? {
+              ...get().laborContextBySession,
+              [sessionId]: {
+                matterId,
+                runId: workspace.run?.run_id || null,
+                triageStarted: workspace.triage !== null,
+              },
+            } : get().laborContextBySession,
           });
-        } catch { /* 会话可能已从其他页面删除 */ }
+          return true;
+        } catch (error) {
+          if (sequence === hydrationSequence) {
+            set({
+              workspaceLoading: false,
+              workspaceError: error instanceof Error
+                ? `案件状态恢复失败：${error.message}`
+                : '案件状态恢复失败',
+            });
+          }
+          return false;
+        }
+      },
+
+      refreshWorkspace: async (sessionId) => {
+        try {
+          const workspace = await getDigitalHumanWorkspace(sessionId);
+          return get().applyWorkspaceContext(workspace);
+        } catch (error) {
+          if (get().sessionId === sessionId) {
+            set({
+              workspaceError: error instanceof Error
+                ? `案件状态恢复失败：${error.message}`
+              : '案件状态恢复失败',
+            });
+          }
+          return false;
+        }
+      },
+
+      applyWorkspaceContext: (workspace) => {
+        const sessionId = workspace.session_id;
+        const state = get();
+        if (
+          state.sessionId !== sessionId
+          || workspace.workspace_version < state.workspaceVersion
+        ) return false;
+        const matterId = workspace.matter?.matter_id || null;
+        set((current) => {
+          const contexts = { ...current.laborContextBySession };
+          if (matterId) {
+            contexts[sessionId] = {
+              matterId,
+              runId: workspace.run?.run_id || null,
+              triageStarted: workspace.triage !== null,
+            };
+          } else {
+            delete contexts[sessionId];
+          }
+          return {
+            currentMatterId: matterId,
+            currentTriage: workspace.triage,
+            currentAgentRun: workspace.run,
+            workspacePresentation: workspace.presentation,
+            workspaceVersion: workspace.workspace_version,
+            workspaceLoading: false,
+            workspaceError: '',
+            laborTriageError: '',
+            laborContextBySession: contexts,
+          };
+        });
+        return true;
       },
 
       deleteSession: async (sessionId) => {
+        if (get().sessionId === sessionId) invalidateConversationRequest();
         await deleteDigitalHumanSession(sessionId);
         if (get().sessionId === sessionId) {
           set({
             sessionId: null, messages: [WELCOME_MESSAGE], emotion: 'welcome',
             currentMatterId: null, currentTriage: null, currentAgentRun: null,
+            workspacePresentation: null, workspaceError: '',
+            workspaceVersion: 0,
           });
         }
         set((state) => {
@@ -269,6 +412,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       },
 
       startNewConversation: () => {
+        invalidateConversationRequest();
+        hydrationSequence += 1;
         set({
           sessionId: null,
           messages: [WELCOME_MESSAGE],
@@ -278,12 +423,15 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           currentTriage: null,
           currentAgentRun: null,
           laborTriageError: '',
+          workspacePresentation: null,
+          workspaceVersion: 0,
+          workspaceLoading: false,
+          workspaceError: '',
         });
       },
 
       cancelRequest: () => {
-        activeRequest?.abort();
-        activeRequest = null;
+        invalidateConversationRequest();
         set({ isLoading: false, emotion: 'idle' });
       },
 
@@ -312,30 +460,88 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         };
       }),
 
-      selectCurrentMatter: (matterId) => set((state) => {
-        if (matterId && state.currentMatterId === matterId) return { currentMatterId: matterId };
-        const contexts = { ...state.laborContextBySession };
-        if (state.sessionId && matterId) {
-          contexts[state.sessionId] = { matterId, runId: null, triageStarted: false };
+      selectCurrentMatter: (matterId) => {
+        invalidateConversationRequest();
+        const sessionId = get().sessionId;
+        if (!sessionId) {
+          set({
+            currentMatterId: matterId,
+            currentTriage: null,
+            currentAgentRun: null,
+            laborTriageError: '',
+            isLoading: false,
+            emotion: 'idle',
+          });
+          return Promise.resolve();
         }
-        if (state.sessionId && !matterId) delete contexts[state.sessionId];
-        return {
-          currentMatterId: matterId,
-          currentTriage: null,
-          currentAgentRun: null,
-          laborTriageError: '',
-          laborContextBySession: contexts,
+        const select = async () => {
+          if (get().sessionId !== sessionId) return;
+          set({
+            workspaceLoading: true,
+            workspaceError: '',
+            isLoading: false,
+            emotion: 'idle',
+          });
+          try {
+            const workspace: DigitalHumanWorkspaceContext =
+              await selectDigitalHumanWorkspaceMatter(
+                sessionId,
+                matterId,
+                get().workspaceVersion,
+              );
+            if (get().sessionId !== sessionId) return;
+            const selectedId = workspace.matter?.matter_id || null;
+            set((state) => {
+              const contexts = { ...state.laborContextBySession };
+              if (selectedId) {
+                contexts[sessionId] = {
+                  matterId: selectedId,
+                  runId: workspace.run?.run_id || null,
+                  triageStarted: workspace.triage !== null,
+                };
+              } else {
+                delete contexts[sessionId];
+              }
+              return {
+                currentMatterId: selectedId,
+                currentTriage: workspace.triage,
+                currentAgentRun: workspace.run,
+                workspacePresentation: workspace.presentation,
+                workspaceVersion: workspace.workspace_version,
+                workspaceLoading: false,
+                workspaceError: '',
+                laborTriageError: '',
+                laborContextBySession: contexts,
+              };
+            });
+          } catch (error) {
+            if (get().sessionId === sessionId) {
+              set({
+                workspaceLoading: false,
+                workspaceError: error instanceof Error
+                  ? `案件切换失败：${error.message}`
+                  : '案件切换失败',
+              });
+            }
+            throw error;
+          }
         };
-      }),
+        const result = workspaceSelectionTail.then(select, select);
+        workspaceSelectionTail = result.catch(() => undefined);
+        return result;
+      },
 
-      setCurrentAgentRun: (run) => get().setLaborContext({ run }),
+      setCurrentAgentRun: (run) => {
+        get().setLaborContext({ run });
+        const sessionId = get().sessionId;
+        if (sessionId) void get().refreshWorkspace(sessionId);
+      },
 
     }),
     {
       name: 'yys-law-digital-human',
       partialize: (state) => ({
         sessionId: state.sessionId,
-        laborContextBySession: state.laborContextBySession,
       }),
     },
   ),

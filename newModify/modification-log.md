@@ -836,3 +836,67 @@
 - 用户确认进行3.7D收尾，任务状态由 `READY_FOR_ACCEPTANCE` 更新为 `COMPLETED`。
 - 收尾依据：Conversation Foundation功能已完成；REVIEW三个P1全部关闭；3.7D专项12/12、数字人阶段回归70/70、完整后端测试78/78通过。
 - 下一阶段未自动启动；3.7E仅保留为候选，等待用户明确指令。生产部署仍需执行Alembic `20260727_0010`。
+
+## 2026-07-27（阶段3.7E ARCHITECTURE启动）
+
+- 用户明确进入下一阶段并指定ARCHITECTURE模式；CURRENT_TASK由已完成的3.7D切换为3.7E Conversation × Workspace，状态推进到 `ARCHITECTURE`，未修改业务代码。
+- 现状缺口：`loadSession()`只恢复消息，Matter/Triage/Run依赖localStorage中的 `laborContextBySession`；Session与Matter一对多但缺少当前Matter权威指针；工作台没有确定性Conversation Presenter和侧边陪伴模式。
+- 推荐方案：新增每Session一行的Workspace State、服务端Workspace Context聚合接口、无LLM的Presenter和前端原子Hydration；聊天与陪伴模式复用同一Session、Store、消息线程和发送动作。
+- 身份边界：现有匿名client_id也存于localStorage，清空后无法读取旧数据；推荐用HttpOnly匿名身份Cookie兼容现有请求头，仅解决同浏览器身份连续性，不扩展为完整账号系统。
+- 新增 `newModify/阶段3.7E架构设计.md`，记录模块边界、数据结构、接口投影、实施切片和验收矩阵；等待用户批准后再进入FEATURE实现。
+
+## 2026-07-27（阶段3.7E方案批准并进入LAW-DEV）
+
+- 用户确认3.7E架构无问题并要求执行；任务由 `ARCHITECTURE` 经 `APPROVED` 进入 `IMPLEMENTING`。
+- 批准D010/D011：服务端Workspace State维护当前Matter；HttpOnly匿名身份Cookie兼容现有请求头。
+- 实施顺序保持为：身份与数据状态 → 聚合恢复/Presenter → 前端原子恢复 → 工作台侧边陪伴 → 回归与视觉验收。
+
+## 2026-07-27（LAW-DEV / LAW-REVIEW 双工作流）
+
+- 用户请求：建立 `LAW-DEV` 日常开发与 `LAW-REVIEW` 阶段验收两个独立工作流，分离实现和正式验收职责。
+- 实际改动：新增两份工作流正文；`LAW-DEV` 固化最小修改、实际测试、Diff 和法律安全闭环，`LAW-REVIEW` 固化默认只读、阶段边界检查及 P0/P1/P2 证据要求。
+- 路由接入：根 `AGENTS.md`、`AI_WORKFLOW/WORKFLOW.md` 和索引已接入自然语言路由；未修改业务源码、3.7E 架构方案或 Runtime 安全边界。
+
+## 2026-07-27（数据库表中文注释脚本）
+
+- 用户请求：为数据库表补充易于区分用途的中文注释，并明确可直接提供 Navicat 执行 SQL。
+- 实际改动：新增 `sql/postgresql_table_comments.sql`，覆盖当前 72 张 ORM 业务表；默认操作 PostgreSQL `public` schema，不存在的表自动跳过，末尾附带表注释查询。
+- 范围控制：未修改 ORM 模型、Alembic 迁移或业务代码，未直接持久化修改本地数据库。
+- 验证：SQL 表名与 ORM 表名集合完全一致；脚本已在真实 PostgreSQL 事务内执行成功并回滚。
+- 实库补充：根据 Navicat 截图和实库只读核对，补充 7 张仅存在于历史 SQL 的表及 `alembic_version`；最终脚本覆盖实库全部 80 张表。
+## 2026-07-27（阶段 3.7E Conversation × Workspace 实现）
+
+- 根据用户批准的架构执行 LAW-DEV：新增匿名身份兼容层、`ConversationWorkspaceState`、Workspace 聚合服务、确定性 Presenter 及 GET/PUT Workspace API。
+- Conversation Repository、案件创建/恢复/删除接入服务端当前 Matter 指针；显式清空、多案件切换、跨客户隔离及旧请求头兼容均有专项测试。
+- 前端改为消息与 Workspace Context 原子 Hydration，移除 localStorage 中 Matter/Triage/Run 权威缓存；聊天与工作台侧边数字人共享同一 Session、消息流和发送入口。
+- 新增迁移 `20260727_0011` 并应用到本地数据库。全量后端测试 84/84、TypeScript、Python compileall、Alembic current/heads 和 `git diff --check` 通过。
+- 真实浏览器完成桌面端与 375×812 移动端复核；修正无会话时 Presenter 持续显示“正在恢复”的空状态问题。任务进入 `READY_FOR_ACCEPTANCE`。
+## 2026-07-27（阶段 3.7E LAW-REVIEW 返修启动）
+
+- LAW-REVIEW 自动测试全部通过，但只读审查发现三类 P1：Matter/Workspace 部分提交、跨 Session 恢复错误 Matter、在途请求与快速选择响应倒灌。
+- 用户确认进入 LAW-DEV 返修；任务由 `READY_FOR_ACCEPTANCE` 返回 `IMPLEMENTING`，不扩大到 Runtime、法源或审批协议。
+
+## 2026-07-27（阶段 3.7E LAW-REVIEW 返修完成）
+
+- 创建一致性：案件创建增加客户端稳定幂等键和服务端确定性 Matter ID；失败重试复用同一案件，创建响应直接携带权威 Workspace 快照，避免基于旧版本二次选择。
+- 恢复与竞态：跨 Session 历史案件先加载目标会话再显式选择目标 Matter；聊天请求增加操作序列与取消保护；案件选择增加 Workspace 版本校验、Session 行锁和前端顺序队列。
+- 生命周期：新增无 LLM 的空 Session 创建接口；当前 Matter 删除、回退选择和 Workspace 版本更新合并到同一事务，并与案件选择共享锁顺序。
+- 验证：阶段 3.7E 专项 11/11、完整后端 95/95（另有 13 个子测试）、`npx tsc --noEmit`、Python `compileall`、Alembic current/heads `20260727_0011` 和 `git diff --check` 均通过。任务恢复为 `READY_FOR_ACCEPTANCE`。
+
+## 2026-07-27（阶段 3.7E 第二轮 LAW-REVIEW 返修启动）
+
+- 第二轮只读验收发现两项 P1：聊天后台建案未携带 Workspace 版本，可能晚到覆盖用户选择；Workspace Context 分两个事务读取 Matter 与版本，可能形成不一致快照。
+- 用户批准进入 LAW-DEV 最小返修；范围仅限 Conversation Actions/Orchestrator、Workspace 聚合服务、前端选择取消保护及并发回归测试。
+
+## 2026-07-27（阶段 3.7E 第二轮 LAW-REVIEW 返修完成）
+
+- 后台动作版本保护：Conversation Orchestrator 在请求领取时读取 Workspace 版本并写入动作检查点；首次执行与恢复均复用该版本。重复选择同一 Matter 保持幂等，版本已变化且指针不同则不覆盖用户的新选择。
+- 一致性快照：Workspace Context、当前 Matter 解析和版本读取统一使用 Session 行锁；指针、版本、Matter、Triage 与 Run ID 在同一事务内完成投影。
+- 前端保护：同 Session 案件选择会使在途聊天操作失效并清理 loading 状态，防止已失效响应短暂覆盖当前案件。
+- 验证：新增后台动作 CAS 和真实线程交错快照测试；3.7D/3.7E 联合回归 25/25、3.7E 专项 13/13、完整后端 97/97（另有 13 个子测试）、TypeScript、Python compileall、Alembic current/heads `20260727_0011` 均通过。
+
+## 2026-07-27（新增验收导读模式）
+
+- 用户希望把“完整故事 + LAW-DEV验收报告结构”的只读讲解固化到工作流，避免 `REVIEW / LEARN` 被路由成简短结论或逐函数拆解。
+- 新增 `ACCEPTANCE_GUIDE`：先执行 LAW-REVIEW 核实事实，再一次讲完目标、完整业务故事、状态/数据库变化、Before → After、安全边界、测试证据、人工验收表和关键文件入口。
+- 自动路由已接入“验收导读、讲清最终效果、怎么人工验收、完整故事一次讲完”等自然语言；该模式保持只读，REVIEW 失败时必须先报告阻断问题。

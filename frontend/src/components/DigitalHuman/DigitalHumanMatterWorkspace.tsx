@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { Calculator, CheckCircle2, ChevronDown, ChevronUp, Download, FileSearch, FileText, History, MapPin, Plus, Trash2, Upload } from 'lucide-react';
 
 import { exportAsPDF, exportAsWord } from '@/lib/exportUtils';
@@ -90,12 +90,22 @@ function matterStatusLabel(
 }
 
 export default function DigitalHumanMatterWorkspace() {
+  const pendingCreate = useRef<{
+    goal: string;
+    sessionId: string | null;
+    key: string;
+  } | null>(null);
   const {
     currentMatterId: matterId,
     currentAgentRun: laborRun,
+    applyWorkspaceContext,
+    ensureWorkspaceSession,
     sessionId,
+    loadSession,
+    refreshWorkspace,
     selectCurrentMatter,
     setCurrentAgentRun,
+    workspaceVersion,
   } = useDigitalHumanStore();
   const [step, setStep] = useState<Step>('start');
   const [goal, setGoal] = useState('');
@@ -178,10 +188,32 @@ export default function DigitalHumanMatterWorkspace() {
     if (!goal.trim()) return;
     setLoading(true); setError('');
     try {
-      const matter = await createDigitalHumanMatter(goal.trim(), sessionId);
+      const normalizedGoal = goal.trim();
+      const activeSessionId = sessionId || await ensureWorkspaceSession();
+      if (
+        !pendingCreate.current
+        || pendingCreate.current.goal !== normalizedGoal
+        || pendingCreate.current.sessionId !== activeSessionId
+      ) {
+        pendingCreate.current = {
+          goal: normalizedGoal,
+          sessionId: activeSessionId,
+          key: `dhm_${crypto.randomUUID()}`,
+        };
+      }
+      const matter = await createDigitalHumanMatter(
+        normalizedGoal,
+        activeSessionId,
+        workspaceVersion,
+        pendingCreate.current.key,
+      );
+      if (!matter.workspace || !applyWorkspaceContext(matter.workspace)) {
+        throw new Error('案件已创建，但工作区状态恢复失败，请刷新后继续');
+      }
+      pendingCreate.current = null;
       setLaborFacts({ ...EMPTY_LABOR_DISPUTE_FORM }); setSalary(''); setLaborDraft(null);
       setWorkflowStatus(null);
-      selectCurrentMatter(matter.matter_id); setStep('jurisdiction'); void refreshMatters();
+      setStep('jurisdiction'); void refreshMatters();
     } catch (err) { setError(err instanceof Error ? err.message : '创建案件失败'); }
     finally { setLoading(false); }
   };
@@ -315,7 +347,12 @@ export default function DigitalHumanMatterWorkspace() {
     setLoading(true); setError('');
     try {
       const detail = await getDigitalHumanMatter(matter.matter_id);
-      selectCurrentMatter(detail.matter_id); setGoal(detail.goal);
+      if (detail.session_id && detail.session_id !== sessionId) {
+        const loaded = await loadSession(detail.session_id);
+        if (!loaded) throw new Error('目标案件所属会话恢复失败');
+      }
+      await selectCurrentMatter(detail.matter_id);
+      setGoal(detail.goal);
       if (detail.jurisdiction?.confirmed_by_user) {
         const area = detail.jurisdiction.subdivision_code?.replace(/^CN-/, '') || '';
         setSubdivision(area); setConfirmed(true); setJurisdictionLabel(`中国${area ? ` / ${area}` : ''}`);
@@ -330,8 +367,8 @@ export default function DigitalHumanMatterWorkspace() {
     finally { setLoading(false); }
   };
 
-  const startNewMatter = () => {
-    selectCurrentMatter(null);
+  const startNewMatter = async () => {
+    await selectCurrentMatter(null);
     setStep('start'); setGoal(''); setSubdivision(''); setConfirmed(false);
     setFilename(''); setText(''); setResult(null); setExpandedFact(null);
     setMaterialKind('text'); setMediaType('text/plain'); setSelectedFile(null);
@@ -344,7 +381,11 @@ export default function DigitalHumanMatterWorkspace() {
 
   const removeMatter = async (matterIdToDelete: string) => {
     await deleteDigitalHumanMatter(matterIdToDelete);
-    if (matterId === matterIdToDelete) { selectCurrentMatter(null); setStep('start'); setResult(null); }
+    if (matterId === matterIdToDelete) {
+      const restored = sessionId ? await refreshWorkspace(sessionId) : true;
+      if (!restored && sessionId) await loadSession(sessionId);
+      setResult(null);
+    }
     await refreshMatters();
   };
 
@@ -359,7 +400,7 @@ export default function DigitalHumanMatterWorkspace() {
     <section className="dh-matter-workspace" aria-label="案件材料工作区">
       <div className="dh-matter-topbar">
         <div className="dh-matter-heading"><FileSearch size={17} /><div><strong>案件工作台</strong><small>材料、事实与法源</small></div></div>
-        <div className="dh-matter-actions"><button type="button" onClick={() => setCaseListOpen((open) => !open)} aria-expanded={caseListOpen}><History size={14} />历史案件{matters.length ? `（${matters.length}）` : ''}</button><button type="button" className="primary" onClick={startNewMatter}><Plus size={14} />新建案件</button></div>
+        <div className="dh-matter-actions"><button type="button" onClick={() => setCaseListOpen((open) => !open)} aria-expanded={caseListOpen}><History size={14} />历史案件{matters.length ? `（${matters.length}）` : ''}</button><button type="button" className="primary" onClick={() => void startNewMatter()}><Plus size={14} />新建案件</button></div>
       </div>
       {mattersError && <p className="dh-matter-error">{mattersError} <button type="button" onClick={() => void refreshMatters()}>重新读取</button></p>}
       {caseListOpen && <section className="dh-case-browser" aria-label="历史案件列表"><div><strong>历史案件</strong><button type="button" onClick={() => setCaseListOpen(false)}>收起</button></div>{matters.length === 0 ? <p>暂无历史案件</p> : matters.map((matter) => <article key={matter.matter_id}><button type="button" onClick={() => void restoreMatter(matter)}><span>{matter.title}</span><small>{matter.matter_id === matterId ? '当前案件' : '继续处理'}</small></button><button type="button" aria-label={`删除案件：${matter.title}`} onClick={() => void removeMatter(matter.matter_id)}><Trash2 size={13} /></button></article>)}</section>}

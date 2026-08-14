@@ -65,6 +65,24 @@ export interface DigitalHumanHistoryMessage {
   created_at: string | null;
 }
 
+export interface ConversationPresentation {
+  version: '1.0';
+  state_key:
+    | 'idle' | 'matter_ready' | 'preparing' | 'processing'
+    | 'needs_jurisdiction' | 'needs_information' | 'blocked_authority'
+    | 'needs_approval' | 'needs_human' | 'completed' | 'stopped' | 'unknown';
+  headline: string;
+  summary: string;
+  requires_user_action: boolean;
+  next_action: {
+    type:
+      | 'none' | 'open_workspace' | 'confirm_jurisdiction'
+      | 'provide_information' | 'review_authority' | 'review_approval'
+      | 'view_result' | 'restart';
+    label: string;
+  };
+}
+
 export type AgentRunStatus =
   | 'planning' | 'awaiting_jurisdiction' | 'awaiting_information'
   | 'executing' | 'observing' | 'verifying' | 'deciding' | 'retrying' | 'awaiting_approval'
@@ -181,6 +199,20 @@ export interface DigitalHumanMatterDetail {
     effective_at: string;
     confirmed_by_user: boolean;
   };
+}
+
+export interface DigitalHumanWorkspaceContext {
+  session_id: string;
+  workspace_version: number;
+  matter: null | {
+    matter_id: string;
+    session_id: string;
+    title: string;
+    goal: string;
+  };
+  triage: LaborTriageSnapshot | null;
+  run: DigitalHumanAgentRun | null;
+  presentation: ConversationPresentation;
 }
 
 export interface LaborCompensationResult {
@@ -390,6 +422,7 @@ async function request(path: string, init: RequestInit = {}, timeoutMs = 45000) 
   try {
     return await fetch(path, {
       ...init,
+      credentials: 'include',
       signal: controller.signal,
       headers: {
         'X-Digital-Human-Client-ID': getClientId(),
@@ -448,9 +481,44 @@ export async function getDigitalHumanSessions(): Promise<DigitalHumanSessionSumm
   return (await readJson<{ success: boolean; sessions: DigitalHumanSessionSummary[] }>(response)).sessions;
 }
 
+export async function createDigitalHumanWorkspaceSession(): Promise<DigitalHumanWorkspaceContext> {
+  const response = await request('/api/digital-human/sessions', {
+    method: 'POST',
+  });
+  return readJson(response);
+}
+
 export async function getDigitalHumanMessages(sessionId: string): Promise<DigitalHumanHistoryMessage[]> {
   const response = await request(`/api/digital-human/sessions/${encodeURIComponent(sessionId)}/messages`);
   return (await readJson<{ success: boolean; messages: DigitalHumanHistoryMessage[] }>(response)).messages;
+}
+
+export async function getDigitalHumanWorkspace(
+  sessionId: string,
+): Promise<DigitalHumanWorkspaceContext> {
+  const response = await request(
+    `/api/digital-human/sessions/${encodeURIComponent(sessionId)}/workspace`,
+  );
+  return readJson(response);
+}
+
+export async function selectDigitalHumanWorkspaceMatter(
+  sessionId: string,
+  matterId: string | null,
+  expectedVersion: number,
+): Promise<DigitalHumanWorkspaceContext> {
+  const response = await request(
+    `/api/digital-human/sessions/${encodeURIComponent(sessionId)}/workspace`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matter_id: matterId,
+        expected_version: expectedVersion,
+      }),
+    },
+  );
+  return readJson(response);
 }
 
 export async function deleteDigitalHumanSession(sessionId: string): Promise<void> {
@@ -489,10 +557,26 @@ export async function getDigitalHumanAgentRun(runId: string): Promise<DigitalHum
 export async function createDigitalHumanMatter(
   goal: string,
   sessionId?: string | null,
-): Promise<{ matter_id: string; session_id: string | null; title: string; goal: string }> {
+  expectedVersion = 0,
+  idempotencyKey?: string,
+): Promise<{
+  matter_id: string;
+  session_id: string | null;
+  title: string;
+  goal: string;
+  workspace: DigitalHumanWorkspaceContext | null;
+}> {
   const response = await request('/api/digital-human/agent/matters', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ goal, ...(sessionId ? { session_id: sessionId } : {}) }),
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey || `dhm_${crypto.randomUUID()}`,
+    },
+    body: JSON.stringify({
+      goal,
+      expected_version: expectedVersion,
+      ...(sessionId ? { session_id: sessionId } : {}),
+    }),
   });
   return readJson(response);
 }

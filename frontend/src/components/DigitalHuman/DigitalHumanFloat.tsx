@@ -609,6 +609,182 @@ export default function DigitalHumanFloat() {
           text-align: center;
         }
 
+        .dh-workspace-layout {
+          min-width: 0;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 268px;
+          overflow: hidden;
+        }
+
+        .dh-companion-column {
+          min-width: 0;
+          min-height: 0;
+          border-left: 1px solid rgba(147, 197, 253, .32);
+          background: rgba(239, 246, 255, .72);
+        }
+
+        .dh-companion {
+          height: 100%;
+          min-height: 0;
+          display: grid;
+          grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+          gap: 12px;
+          padding: 16px 14px 12px;
+        }
+
+        .dh-companion-avatar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .dh-companion-avatar .dh-avatar-small {
+          --dh-avatar-size: 56px;
+          width: 56px;
+          height: 56px;
+        }
+
+        .dh-companion-avatar div {
+          display: grid;
+          gap: 2px;
+        }
+
+        .dh-companion-avatar strong {
+          color: #183b66;
+          font-size: 15px;
+        }
+
+        .dh-companion-avatar small {
+          color: #66809e;
+          font-size: 11px;
+        }
+
+        .dh-presenter-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          padding: 11px;
+          color: #244b75;
+          background: rgba(255, 255, 255, .88);
+          border: 1px solid rgba(147, 197, 253, .38);
+          border-radius: 13px;
+        }
+
+        .dh-presenter-card svg {
+          flex: none;
+          margin-top: 2px;
+          color: #3b82f6;
+        }
+
+        .dh-presenter-card div {
+          min-width: 0;
+        }
+
+        .dh-presenter-card strong {
+          display: block;
+          color: #183b66;
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        .dh-presenter-card p {
+          margin: 4px 0 0;
+          color: #617a96;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        .dh-presenter-card span {
+          display: inline-block;
+          margin-top: 7px;
+          padding: 3px 7px;
+          color: #2563eb;
+          background: #eff6ff;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .dh-presenter-completed {
+          border-color: rgba(52, 211, 153, .38);
+          background: rgba(236, 253, 245, .9);
+        }
+
+        .dh-presenter-completed svg {
+          color: #059669;
+        }
+
+        .dh-presenter-error {
+          border-color: rgba(248, 113, 113, .34);
+          background: rgba(254, 242, 242, .92);
+        }
+
+        .dh-presenter-error svg {
+          color: #dc2626;
+        }
+
+        .dh-companion-messages {
+          min-height: 0;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding-right: 2px;
+        }
+
+        .dh-companion-message {
+          padding: 8px 9px;
+          background: rgba(255, 255, 255, .82);
+          border-radius: 11px;
+        }
+
+        .dh-companion-message.user {
+          margin-left: 18px;
+          background: rgba(219, 234, 254, .86);
+        }
+
+        .dh-companion-message span {
+          display: block;
+          margin-bottom: 3px;
+          color: #7690aa;
+          font-size: 9px;
+          font-weight: 700;
+        }
+
+        .dh-companion-message p,
+        .dh-companion-thinking {
+          margin: 0;
+          color: #304e6d;
+          font-size: 11px;
+          line-height: 1.55;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+
+        .dh-companion-thinking {
+          color: #6b82a0;
+        }
+
+        .dh-companion-composer {
+          padding: 8px;
+          border: 1px solid rgba(147, 197, 253, .34);
+          border-radius: 13px;
+        }
+
+        .dh-companion-composer textarea {
+          min-height: 34px;
+          font-size: 11px;
+        }
+
+        .dh-companion-hint {
+          margin: 0;
+          color: #7890aa;
+          font-size: 9px;
+          line-height: 1.4;
+          text-align: center;
+        }
+
         @keyframes dh-float {
           0%, 100% { transform: translateY(0) rotate(0); }
           50% { transform: translateY(-8px) rotate(.6deg); }
@@ -688,6 +864,44 @@ export default function DigitalHumanFloat() {
 
           .dh-panel-expanded .dh-workspace-column {
             padding: 14px;
+          }
+
+          .dh-workspace-layout {
+            grid-template-columns: 1fr;
+            grid-template-rows: minmax(0, 1fr) auto;
+            overflow-y: auto;
+          }
+
+          .dh-companion-column {
+            min-height: 260px;
+            border-top: 1px solid rgba(147, 197, 253, .32);
+            border-left: 0;
+          }
+
+          .dh-companion {
+            height: 260px;
+            grid-template-columns: auto minmax(0, 1fr);
+            grid-template-rows: auto minmax(0, 1fr) auto;
+          }
+
+          .dh-companion-avatar {
+            grid-column: 1;
+          }
+
+          .dh-presenter-card {
+            grid-column: 2;
+          }
+
+          .dh-companion-messages {
+            grid-column: 1 / -1;
+          }
+
+          .dh-companion-composer {
+            grid-column: 1 / -1;
+          }
+
+          .dh-companion-hint {
+            display: none;
           }
 
           .dh-portrait-stage {

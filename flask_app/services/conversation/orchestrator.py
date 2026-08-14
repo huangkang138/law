@@ -18,6 +18,7 @@ from .schemas import (
     MemorySnapshot,
     RouterDecision,
 )
+from .workspace import get_conversation_workspace_service
 
 
 class ConversationOrchestrator:
@@ -60,6 +61,12 @@ class ConversationOrchestrator:
                 cached, user_message_id, lease_token = self.repository.begin_request(
                     request_id, client_id, session_id, question,
                 )
+                initial_workspace_version = (
+                    get_conversation_workspace_service().get_version(
+                        session_id,
+                        client_id,
+                    )
+                )
             if cached is not None:
                 return cached
             return self._chat_locked(
@@ -69,6 +76,7 @@ class ConversationOrchestrator:
                 session_id,
                 user_message_id,
                 lease_token,
+                initial_workspace_version,
                 llm,
             )
         except Exception:
@@ -88,6 +96,7 @@ class ConversationOrchestrator:
         session_id: str,
         user_message_id: str,
         lease_token: str,
+        initial_workspace_version: int,
         llm=None,
     ) -> Dict:
         request_state = self.repository.load_request_checkpoint(request_id)
@@ -121,6 +130,9 @@ class ConversationOrchestrator:
                 resources=dict(request_state["resources"]),
                 lease_token=lease_token,
                 recovering=True,
+                expected_workspace_version=checkpoint.get(
+                    "workspace_version"
+                ),
             )
 
         previous = self.repository.load_memory(session_id)
@@ -168,6 +180,7 @@ class ConversationOrchestrator:
                 "decision": decision.to_dict(),
                 "memory": asdict(memory),
                 "context": self._checkpoint_context(context),
+                "workspace_version": initial_workspace_version,
             }
             with self.session_lock.acquire(session_id):
                 self.repository.mark_action_started(
@@ -189,6 +202,7 @@ class ConversationOrchestrator:
                 resources=resources,
                 lease_token=lease_token,
                 recovering=False,
+                expected_workspace_version=initial_workspace_version,
             )
 
         action = self.actions.execute(
@@ -221,6 +235,7 @@ class ConversationOrchestrator:
         resources: Dict,
         lease_token: str,
         recovering: bool,
+        expected_workspace_version: int | None,
     ) -> Dict:
         def checkpoint_resource(**changes) -> None:
             with self.session_lock.acquire(session_id):
@@ -243,6 +258,7 @@ class ConversationOrchestrator:
             resources=resources,
             checkpoint_resource=checkpoint_resource,
             recovering=recovering,
+            expected_workspace_version=expected_workspace_version,
         )
         if action.matter_id:
             memory.structured["matter_id"] = action.matter_id
@@ -256,6 +272,7 @@ class ConversationOrchestrator:
             "decision": decision.to_dict(),
             "memory": asdict(memory),
             "context": self._checkpoint_context(context),
+            "workspace_version": expected_workspace_version,
             "result": result,
         }
         with self.session_lock.acquire(session_id):

@@ -21,6 +21,11 @@ class ConversationMemoryManager:
     def __init__(self, token_budget: Optional[TokenBudget] = None) -> None:
         self.token_budget = token_budget or TokenBudget()
 
+    # snapshot             # 旧记忆
+    # question             # 当前用户输入
+    # source_message_id    # 当前消息ID
+    # history              # 历史原始消息
+    # matter_id            # 当前关联案件
     def update(
         self,
         snapshot: MemorySnapshot,
@@ -63,7 +68,7 @@ class ConversationMemoryManager:
                 "summary_item_id": goal_item["item_id"],
             }]
         extracted = self._extract_items(question)
-        active_salary = next((
+        active_salary = next((#寻找当前有效工资
             item for item in items
             if item.get("subject") == "monthly_salary"
             and item.get("status") == "active"

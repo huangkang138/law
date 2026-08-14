@@ -788,6 +788,29 @@ class ConversationMemory(Base):
     )
 
 
+class ConversationWorkspaceState(Base):
+    """会话当前案件的服务端权威指针，不复制 Matter 或 Runtime 状态。"""
+
+    __tablename__ = "conversation_workspace_states"
+
+    session_id = Column(
+        String,
+        ForeignKey("digital_human_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    active_matter_id = Column(
+        String,
+        ForeignKey("matters.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    version = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class DigitalHumanRequest(Base):
     """数字人请求幂等记录及可恢复动作检查点。"""
 

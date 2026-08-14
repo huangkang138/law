@@ -1,5 +1,6 @@
 """数字人 Agent Runtime、材料和法律来源 API。"""
 
+import hashlib
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
@@ -8,18 +9,31 @@ from sqlalchemy.exc import SQLAlchemyError
 from core.logger import app_logger
 from legal_agent_system import get_legal_agent_facade
 from legal_agent_system.runtime.errors import AgentRuntimeError
+from services.conversation import (
+    WorkspaceVersionConflict,
+    get_conversation_workspace_service,
+)
+from services.digital_human_identity import (
+    get_digital_human_client_id,
+    persist_digital_human_identity,
+)
 from services.material_extraction import MaterialExtractionError, extract_material_text
 
 
 router = Blueprint("digital_human_agent", __name__)
 
 
+@router.after_request
+def _persist_identity(response):
+    return persist_digital_human_identity(response)
+
+
 def _client_id() -> str:
     """读取并校验阶段 0 建立的浏览器匿名身份。"""
-    value = request.headers.get("X-Digital-Human-Client-ID", "").strip()
-    if not value.startswith("dhc_") or len(value) > 100:
-        raise AgentRuntimeError("缺少或无效的数字人客户端标识", "INVALID_INPUT")
-    return value
+    try:
+        return get_digital_human_client_id()
+    except ValueError as exc:
+        raise AgentRuntimeError(str(exc), "INVALID_INPUT") from exc
 
 
 def _response(action):
@@ -29,6 +43,17 @@ def _response(action):
     except AgentRuntimeError as exc:
         status = 403 if exc.code == "FORBIDDEN" else 404 if exc.code == "RUN_NOT_FOUND" else 409 if exc.code == "INVALID_STATE" else 400
         return jsonify({"success": False, "error": str(exc), "code": exc.code}), status
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "NOT_FOUND"}), 404
+    except WorkspaceVersionConflict as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "code": "WORKSPACE_VERSION_CONFLICT",
+            "current_version": exc.current_version,
+        }), 409
     except (UnicodeError, SQLAlchemyError):
         app_logger.exception("数字人 Agent 数据库不可用")
         return jsonify({
@@ -115,9 +140,49 @@ def organize_material(matter_id):
 def create_matter():
     """创建阶段 2 材料工作区。"""
     data = request.get_json(silent=True) or {}
-    return _response(lambda: get_legal_agent_facade().create_matter(
-        _client_id(), data.get("goal"), data.get("session_id"),
-    ))
+    def action():
+        client_id = _client_id()
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if (
+            not idempotency_key.startswith("dhm_")
+            or len(idempotency_key) > 100
+        ):
+            raise AgentRuntimeError(
+                "缺少或无效的案件创建幂等键",
+                "INVALID_INPUT",
+            )
+        matter_id = "matter_" + hashlib.sha256(
+            f"{client_id}:{idempotency_key}".encode("utf-8")
+        ).hexdigest()[:32]
+        expected_version = data.get("expected_version")
+        if (
+            data.get("session_id")
+            and (
+                not isinstance(expected_version, int)
+                or isinstance(expected_version, bool)
+                or expected_version < 0
+            )
+        ):
+            raise AgentRuntimeError(
+                "expected_version 必须是非负整数",
+                "INVALID_INPUT",
+            )
+        matter = get_legal_agent_facade().create_matter(
+            client_id,
+            data.get("goal"),
+            data.get("session_id"),
+            matter_id=matter_id,
+        )
+        workspace = None
+        if matter.get("session_id"):
+            workspace = get_conversation_workspace_service().select_matter(
+                matter["session_id"],
+                matter["matter_id"],
+                client_id,
+                expected_version,
+            )
+        return {**matter, "workspace": workspace}
+    return _response(action)
 
 
 @router.route("/digital-human/agent/matters", methods=["GET"])
@@ -129,7 +194,13 @@ def list_matters():
 @router.route("/digital-human/agent/matters/<matter_id>", methods=["DELETE"])
 def delete_matter(matter_id):
     """删除 Matter 及其全部阶段 2 衍生数据。"""
-    return _response(lambda: get_legal_agent_facade().delete_matter(matter_id, _client_id()))
+    def action():
+        client_id = _client_id()
+        return get_conversation_workspace_service().delete_matter(
+            matter_id,
+            client_id,
+        )
+    return _response(action)
 
 
 @router.route("/digital-human/agent/matters/<matter_id>", methods=["GET"])

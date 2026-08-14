@@ -81,10 +81,16 @@ export interface LaborTriageFlow {
 export function useLaborTriage(): LaborTriageFlow {
   const {
     currentMatterId, currentTriage, currentAgentRun, laborTriageLoading, laborTriageError,
-    laborContextBySession, sessionId, setLaborContext,
+    applyWorkspaceContext, ensureWorkspaceSession, laborContextBySession, sessionId, setLaborContext,
+    workspaceVersion,
   } = useDigitalHumanStore();
   const inFlight = useRef(false);
   const lastQuestion = useRef('');
+  const pendingMatterRequest = useRef<{
+    question: string;
+    sessionId: string | null;
+    key: string;
+  } | null>(null);
 
   const startRuntime = useCallback(async (snapshot: LaborTriageSnapshot) => {
     if (snapshot.result.missing_facts.length) {
@@ -113,8 +119,28 @@ export function useLaborTriage(): LaborTriageFlow {
     lastQuestion.current = question;
     setLaborContext({ matterId: null, triage: null, run: null, loading: true, error: '' });
     try {
-      const matter = await createDigitalHumanMatter(question, sessionId);
-      setLaborContext({ matterId: matter.matter_id });
+      const activeSessionId = sessionId || await ensureWorkspaceSession();
+      if (
+        !pendingMatterRequest.current
+        || pendingMatterRequest.current.question !== question
+        || pendingMatterRequest.current.sessionId !== activeSessionId
+      ) {
+        pendingMatterRequest.current = {
+          question,
+          sessionId: activeSessionId,
+          key: `dhm_${crypto.randomUUID()}`,
+        };
+      }
+      const matter = await createDigitalHumanMatter(
+        question,
+        activeSessionId,
+        workspaceVersion,
+        pendingMatterRequest.current.key,
+      );
+      if (!matter.workspace || !applyWorkspaceContext(matter.workspace)) {
+        throw new Error('案件已创建，但工作区状态恢复失败，请刷新后继续');
+      }
+      pendingMatterRequest.current = null;
       await assess(matter.matter_id, inferInitialFacts(question));
     } catch (error) {
       setLaborContext({ error: error instanceof Error ? error.message : '劳动案件分流暂时不可用' });
@@ -122,7 +148,10 @@ export function useLaborTriage(): LaborTriageFlow {
       inFlight.current = false;
       setLaborContext({ loading: false });
     }
-  }, [assess, sessionId, setLaborContext]);
+  }, [
+    applyWorkspaceContext, assess, ensureWorkspaceSession, sessionId, setLaborContext,
+    workspaceVersion,
+  ]);
 
   const submitFacts = useCallback(async (facts: Partial<LaborTriageFacts>) => {
     if (!currentMatterId || inFlight.current) return;

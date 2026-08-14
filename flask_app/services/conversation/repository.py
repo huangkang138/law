@@ -344,19 +344,23 @@ class ConversationRepository:
             db.close()
 
     def matter_context(self, session_id: str, client_id: str) -> Dict:
+        from .workspace import get_conversation_workspace_service
+
+        matter_id = get_conversation_workspace_service().resolve_active_matter_id(
+            session_id,
+            client_id,
+        )
+        if matter_id is None:
+            return {}
         db = SessionLocal()
         try:
-            matter = (
-                db.query(Matter)
-                .filter(
-                    Matter.session_id == session_id,
-                    Matter.client_id == client_id,
-                    Matter.status == "active",
-                )
-                .order_by(Matter.updated_at.desc(), Matter.created_at.desc())
-                .first()
-            )
-            if matter is None:
+            matter = db.get(Matter, matter_id)
+            if (
+                matter is None
+                or matter.session_id != session_id
+                or matter.client_id != client_id
+                or matter.status != "active"
+            ):
                 return {}
             from legal_agent_system.models import MatterFactAssertion
 

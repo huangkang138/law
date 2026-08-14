@@ -4,10 +4,23 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.logger import app_logger
+from services.conversation import (
+    WorkspaceVersionConflict,
+    get_conversation_workspace_service,
+)
+from services.digital_human_identity import (
+    get_digital_human_client_id,
+    persist_digital_human_identity,
+)
 from services.digital_human_service import get_digital_human_service
 
 
 router = Blueprint("digital_human", __name__)
+
+
+@router.after_request
+def _persist_identity(response):
+    return persist_digital_human_identity(response)
 
 
 def _database_unavailable(operation: str):
@@ -28,12 +41,7 @@ def _get_client_id():
     Raises:
         ValueError: 当缺少或无效的客户端标识时抛出异常
     """
-    # 从请求头中获取X-Digital-Human-Client-ID字段，去除前后空格
-    client_id = request.headers.get("X-Digital-Human-Client-ID", "").strip()
-    # 验证客户端标识是否以"dhc_"开头且长度不超过100
-    if not client_id.startswith("dhc_") or len(client_id) > 100:
-        raise ValueError("缺少或无效的数字人客户端标识")
-    return client_id
+    return get_digital_human_client_id()
 
 
 def _get_custom_llm_config():
@@ -140,6 +148,20 @@ def list_sessions():
         return jsonify({"success": False, "error": "历史会话读取失败"}), 500
 
 
+@router.route("/digital-human/sessions", methods=["POST"])
+def create_workspace_session():
+    """为先进入工作台的用户创建空会话，不调用LLM。"""
+    try:
+        result = get_conversation_workspace_service().create_session(
+            _get_client_id(),
+        )
+        return jsonify({"success": True, **result}), 201
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("创建案件会话")
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+
 @router.route("/digital-human/sessions/<session_id>/messages", methods=["GET"])
 def get_messages(session_id):
     try:
@@ -151,6 +173,70 @@ def get_messages(session_id):
         return jsonify({"success": False, "error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+
+@router.route("/digital-human/sessions/<session_id>/workspace", methods=["GET"])
+def get_workspace(session_id):
+    """一次恢复当前Matter、Triage、Run及确定性会话投影。"""
+    try:
+        result = get_conversation_workspace_service().get_context(
+            session_id,
+            _get_client_id(),
+        )
+        return jsonify({"success": True, **result})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("恢复案件工作台")
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+
+@router.route("/digital-human/sessions/<session_id>/workspace", methods=["PUT"])
+def select_workspace_matter(session_id):
+    """幂等选择当前会话的工作台Matter；null表示显式清空。"""
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "请求体必须是 JSON 对象"}), 400
+        matter_id = data.get("matter_id")
+        if matter_id is not None and not isinstance(matter_id, str):
+            return jsonify({"success": False, "error": "matter_id 必须是字符串或null"}), 400
+        expected_version = data.get("expected_version")
+        if (
+            not isinstance(expected_version, int)
+            or isinstance(expected_version, bool)
+            or expected_version < 0
+        ):
+            return jsonify({
+                "success": False,
+                "error": "expected_version 必须是非负整数",
+                "code": "INVALID_INPUT",
+            }), 400
+        result = get_conversation_workspace_service().select_matter(
+            session_id,
+            matter_id,
+            _get_client_id(),
+            expected_version,
+        )
+        return jsonify({"success": True, **result})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("切换案件工作台")
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except WorkspaceVersionConflict as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "code": "WORKSPACE_VERSION_CONFLICT",
+            "current_version": exc.current_version,
+        }), 409
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
