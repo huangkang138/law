@@ -36,6 +36,7 @@ from services.conversation.repository import (
 )
 from services.conversation.sse import EVENT_ERROR, EVENT_STATUS
 from services.digital_human_service import DigitalHumanService
+from services.voice import VoiceOrchestrator
 
 
 def _parse_sse_event(event_text):
@@ -377,6 +378,16 @@ class CancelServiceIntegrationTest(unittest.TestCase):
         self.service.system_prompt = "测试安全规则"
         self.service.llm = _FastJsonLlm()
         self.service._orchestrator = self.service._build_orchestrator()
+        # Phase 1 起 cancel_request 联动语音编排器；与生产 __init__ 保持一致。
+        self.service._voice_orchestrator = VoiceOrchestrator(provider=None)
+        # 动作路径的权威法源同步是真实网络调用（官方域名、每源 12s 超时），
+        # 与取消语义无关：测试离线隔离，避免网络状态影响取消竞态断言。
+        sync_patcher = patch(
+            "legal_agent_system.facade.LegalAgentFacade._try_sync_authorities",
+            return_value={"ok": True, "skipped": True, "reason": "test_offline"},
+        )
+        sync_patcher.start()
+        self.addCleanup(sync_patcher.stop)
 
     def tearDown(self):
         db = SessionLocal()

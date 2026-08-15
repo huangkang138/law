@@ -19,6 +19,8 @@ import {
   selectDigitalHumanWorkspaceMatter,
   sendDigitalHumanMessageStream,
 } from '@/services/digitalHumanApi';
+import { ttsController } from '@/lib/voice/ttsController';
+import { StreamingAudioPlayer } from '@/lib/voice/streamingAudioPlayer';
 
 export interface DigitalHumanMessage {
   id: string;
@@ -48,6 +50,10 @@ interface DigitalHumanStore {
   workspaceError: string;
   streamingMessage: DigitalHumanMessage | null;
   streamFallbackNotice: string;
+  voiceEnabled: boolean;
+  voiceSpeaking: boolean;
+  speakingMessageId: string | null;
+  voiceMode: 'primary' | 'fallback' | null;
   laborContextBySession: Record<string, {
     matterId: string;
     runId: string | null;
@@ -68,6 +74,9 @@ interface DigitalHumanStore {
   refreshHistory: () => Promise<void>;
   startNewConversation: () => void;
   cancelRequest: () => void;
+  toggleVoice: () => void;
+  speakMessage: (messageId: string, content: string) => void;
+  stopSpeaking: () => void;
   setLaborContext: (context: {
     matterId?: string | null;
     triage?: LaborTriageSnapshot | null;
@@ -84,6 +93,7 @@ let activeRequestId: string | null = null;
 let hydrationSequence = 0;
 let conversationOperationSequence = 0;
 let workspaceSelectionTail: Promise<void> = Promise.resolve();
+let voicePlayer: StreamingAudioPlayer;
 
 function invalidateConversationRequest() {
   conversationOperationSequence += 1;
@@ -123,6 +133,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       workspaceError: '',
       streamingMessage: null,
       streamFallbackNotice: '',
+      voiceEnabled: false,
+      voiceSpeaking: false,
+      speakingMessageId: null,
+      voiceMode: null,
       laborContextBySession: {},
 
       open: () => {
@@ -143,7 +157,11 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         });
       },
 
-      close: () => set({ isOpen: false, emotion: 'idle' }),
+      close: () => {
+        ttsController.cancel();
+        voicePlayer.clear();
+        set({ isOpen: false, emotion: 'idle', voiceSpeaking: false, speakingMessageId: null });
+      },
 
       toggle: () => {
         if (get().isOpen) {
@@ -166,18 +184,26 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           createdAt: Date.now(),
         };
 
+        // 新输入打断旧朗读（语音与键盘输入一致）。
+        ttsController.cancel();
+        const voiceRequested = get().voiceEnabled;
         set((state) => ({
           messages: [...state.messages, userMessage],
           streamingMessage: null,
           streamFallbackNotice: '',
           isLoading: true,
           emotion: 'thinking',
+          voiceSpeaking: false,
+          speakingMessageId: null,
         }));
 
         const operation = ++conversationOperationSequence;
         const controller = new AbortController();
         const requestId = `dhr_${crypto.randomUUID()}`;
         activeRequestId = requestId;
+        // 播放器切到新请求作用域：清旧队列、停在播音频，
+        // 被取消/被替换请求的迟到音频一律不得进入新队列。
+        voicePlayer.setRequest(requestId);
         try {
           activeRequest = controller;
           const response = await sendDigitalHumanMessageStream(
@@ -199,12 +225,31 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
                       },
                 }));
               },
+              onVoice: (payload) => {
+                // 句级语音：按发送时与当前的语音开关双重守卫；
+                // 关闭语音后即使事件迟到也不产生声音。
+                if (operation !== conversationOperationSequence) return;
+                if (!voiceRequested || !get().voiceEnabled) return;
+                voicePlayer.enqueue({
+                  seq: payload.seq,
+                  requestId: payload.requestId,
+                  text: payload.text,
+                  audioDataUrl: payload.audioDataUrl,
+                  ttsMode: payload.ttsMode,
+                });
+                set({
+                  voiceSpeaking: true,
+                  speakingMessageId: get().streamingMessage?.id || null,
+                  voiceMode: payload.ttsMode,
+                });
+              },
               onStreamFallback: () => {
                 if (operation !== conversationOperationSequence) return;
                 set({ streamFallbackNotice: '当前浏览器不支持增量显示，已切换为普通回复。' });
               },
             },
             controller.signal,
+            voiceRequested,
           );
           if (operation !== conversationOperationSequence) return;
           const assistantMessage: DigitalHumanMessage = {
@@ -280,6 +325,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
 
       reset: async () => {
         invalidateConversationRequest();
+        ttsController.cancel();
+        voicePlayer.clear();
         const sessionId = get().sessionId;
         if (sessionId) {
           try {
@@ -302,6 +349,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           workspaceError: '',
           streamingMessage: null,
           streamFallbackNotice: '',
+          voiceSpeaking: false,
+          speakingMessageId: null,
         });
         void get().loadSessions();
       },
@@ -338,12 +387,16 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
 
       loadSession: async (sessionId) => {
         invalidateConversationRequest();
+        ttsController.cancel();
+        voicePlayer.clear();
         const sequence = ++hydrationSequence;
         set({
           isLoading: false,
           workspaceLoading: true,
           workspaceError: '',
           streamingMessage: null,
+          voiceSpeaking: false,
+          speakingMessageId: null,
         });
         try {
           const [history, workspace] = await Promise.all([
@@ -441,7 +494,11 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       },
 
       deleteSession: async (sessionId) => {
-        if (get().sessionId === sessionId) invalidateConversationRequest();
+        if (get().sessionId === sessionId) {
+          invalidateConversationRequest();
+          ttsController.cancel();
+          voicePlayer.clear();
+        }
         await deleteDigitalHumanSession(sessionId);
         if (get().sessionId === sessionId) {
           set({
@@ -469,6 +526,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
 
       startNewConversation: () => {
         invalidateConversationRequest();
+        ttsController.cancel();
+        voicePlayer.clear();
         hydrationSequence += 1;
         set({
           sessionId: null,
@@ -485,6 +544,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           workspaceError: '',
           streamingMessage: null,
           streamFallbackNotice: '',
+          voiceSpeaking: false,
+          speakingMessageId: null,
         });
       },
 
@@ -496,6 +557,9 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           void cancelDigitalHumanChatRequest(requestId).catch(() => undefined);
         }
         invalidateConversationRequest();
+        // 停止按钮同时取消旧朗读：停止 = 取消 LLM + 取消 TTS + 清空音频队列。
+        ttsController.cancel();
+        voicePlayer.clear();
         // 操作序列已失效，sendMessage 的异步 CANCELLED 分支不会再执行：
         // 停止提示必须在这里同步给出，不能依赖该分支，也不能清空。
         set({
@@ -503,7 +567,39 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           emotion: 'idle',
           streamingMessage: null,
           streamFallbackNotice: '已停止回复',
+          voiceSpeaking: false,
+          speakingMessageId: null,
         });
+      },
+
+      toggleVoice: () => {
+        const enabled = !get().voiceEnabled;
+        if (!enabled) get().stopSpeaking();
+        set({ voiceEnabled: enabled });
+      },
+
+      speakMessage: (messageId, content) => {
+        if (get().speakingMessageId === messageId && get().voiceSpeaking) {
+          // 同一气泡再次点击 = 停止朗读。
+          get().stopSpeaking();
+          return;
+        }
+        // 气泡回放：走播放器队列（无后端 Provider 时明确以 fallback 模式朗读）。
+        voicePlayer.setRequest(`bubble_${messageId}`);
+        voicePlayer.enqueue({
+          seq: 1,
+          requestId: `bubble_${messageId}`,
+          text: content,
+          audioDataUrl: null,
+          ttsMode: 'fallback',
+        });
+        set({ voiceSpeaking: true, speakingMessageId: messageId, voiceMode: 'fallback' });
+      },
+
+      stopSpeaking: () => {
+        ttsController.cancel();
+        voicePlayer.clear();
+        set({ voiceSpeaking: false, speakingMessageId: null });
       },
 
       setLaborContext: (context) => set((state) => {
@@ -614,7 +710,24 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       name: 'yys-law-digital-human',
       partialize: (state) => ({
         sessionId: state.sessionId,
+        voiceEnabled: state.voiceEnabled,
       }),
     },
   ),
 );
+
+// 语音播放器实例：所有音频播放统一经它排队（primary/fallback 明确区分），
+// 回调把播放状态同步回 store，驱动头像与气泡按钮状态。
+voicePlayer = new StreamingAudioPlayer({
+  onSpeechStart: (chunk) => {
+    useDigitalHumanStore.setState({ voiceSpeaking: true, voiceMode: chunk.ttsMode });
+  },
+  onSpeechEnd: () => {
+    if (voicePlayer.queueLength === 0) {
+      useDigitalHumanStore.setState({ voiceSpeaking: false, speakingMessageId: null });
+    }
+  },
+  onSpeechCancelled: () => {
+    useDigitalHumanStore.setState({ voiceSpeaking: false, speakingMessageId: null });
+  },
+});

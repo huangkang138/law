@@ -957,3 +957,74 @@
 - 用户对返修（完成窗口竞态 + 停止提示）验收通过，3.7F 第二部分与 3.7F 整体收尾：`CURRENT_TASK` 状态更新为 `COMPLETED`，`NEXT_STEP` 更新为 3.7G → 3.7H 依赖顺序，不自动启动后续阶段。
 - 最终验证基线：取消专项 26/26、3.7F 流式 12/12、可靠性 16/16、3.7D 12/12、3.7E 13/13，合计 79/79；`npx tsc --noEmit`、Python `compileall`、`git diff --check` 通过。
 - 工作区改动未提交，由用户自行决定提交时机。
+
+## 2026-08-15（3.7F 提交 + 3.7G 初始化）
+
+- 3.7F 全部改动提交 `1b2f6ac`（21 个文件，+3196/-101）：提交前复验 79/79（取消 26 + 流式 12 + 可靠性 16 + 3.7D 12 + 3.7E 13）、`npx tsc --noEmit`、compileall、`git diff --check` 全部通过；`法律AI/` 目录与 3.7F 无关，未纳入提交。
+- 3.7G 初始化：`CURRENT_TASK` 切换为 3.7G（`DESIGNING`），产出 `newModify/阶段3.7G架构设计.md`（纯前端语音闭环：`frontend/src/lib/voice/` 独立 STT/TTS 控制器、Store 集成、Composer 麦克风/播报开关、气泡朗读按钮、talk_normal 说话状态图；后端零改动），待用户审批。
+- 未修改任何代码、数据库结构或迁移；未执行语音实现。
+
+## 2026-08-15（阶段 3.7G Voice Interaction：基础语音闭环实现）
+
+- 架构设计获用户批准后实施（纯前端，后端零改动）：
+  - 新增 `frontend/src/lib/voice/` 独立轻量控制器：`ttsController.ts`（中文 voice 优先、`filterSpeakableText` 清洗 Markdown/emoji、新朗读先 cancel 打断）、`sttController.ts`（continuous/interim zh-CN、onend 自动重启、not-allowed/network 降级提示）、`useVoiceReady.ts`（SSR 水合守卫）。
+  - Store：`voiceEnabled`（默认关，partialize 持久化）、`voiceSpeaking`/`speakingMessageId`；`toggleVoice`/`speakMessage`/`stopSpeaking`；sendMessage 开头与成功路径、cancelRequest、close/loadSession/startNewConversation/reset/deleteSession 集成 TTS 取消。
+  - `ConversationComposer`：麦克风按钮（interim 预览 + final 累积 + 发送前停识别）、播报开关、识别错误轻量提示；主聊天与工作台侧边共用。
+  - `DigitalHumanChat`/`DigitalHumanCompanion`：assistant 气泡朗读/停止按钮、Avatar `voiceSpeaking → talk_normal` 说话状态图；`DigitalHumanFloat` styled-jsx 仅追加语音 class，既有 class 未动。
+- 测试：新增 `test_digital_human_stage37g_voice.py` 前端源码守卫 30/30；3.7F 取消/流式/可靠性/3.7D/3.7E 全量回归 109/109；`npx tsc --noEmit`、compileall、`git diff --check` 通过。
+- 附带修复（测试级）：3.7F 取消集成测试的动作路径会触发权威法源真实网络同步（每源 12s 超时，缓存过期后整组挂起），在 `CancelServiceIntegrationTest.setUp` 隔离 `_try_sync_authorities` 使取消竞态测试离线化；取消语义断言不变。
+- 附带修复（仓库级）：`.gitignore` 的 Python 模板规则 `lib/` 误伤 `frontend/src/lib`，按最小范围放行 `frontend/src/lib/voice/`（既有 `frontend/src/lib/api.ts`、`exportUtils.ts` 仍未入库，属历史遗留，待用户决定）。
+- 未修改后端路由/服务/模型、SSE 协议、数据库结构或迁移、Runtime Graph、劳动规则与审批流程。
+- 状态：`READY_FOR_ACCEPTANCE`，待用户 Chrome/Edge 浏览器验收。
+
+## 2026-08-15（修复：前端编译错误 e'use client'）
+
+- 用户重启前端后报 `DigitalHumanCompanion.tsx` 语法错误（`GET / 500`）：第 1 行混入多余字符 `e`（`e'use client';`）。移除后 `npx tsc --noEmit` 通过、首页恢复 200。
+- 该字符非 3.7G 实现引入（实现完成后 tsc 与 109 项回归均通过），疑似编辑器误触；其余 3.7G 文件首行均正常。
+- 附注：截图气泡报错"生成回复失败: 读取请求体失败: 'NoneType' object has no attribute 'split'"的文本在本仓库任何代码（含 git 历史）中不存在，且 19:06 前后后端无对应请求日志；前端修复后待用户复测确认是否复现。
+
+## 2026-08-15（修复：STT 停止时识别文本重复）
+
+- 用户验收反馈：说"我要仲裁"后停止，最终文本变成"我要仲裁我要仲裁"。
+- 原因：停止录音时 Chrome 会重放已确认的最终结果，控制器未按结果下标去重；且中间结果只在非空时上报，停止合并时把已固化的预览又并入一次。
+- 修复（仅 `sttController.ts`）：新增 `lastFinalIndex` 游标跳过已上报的最终结果（开始识别与 60s 自动重启时复位）；`onInterim` 无条件上报（空值清空预览）。
+- 验证：`npx tsc --noEmit` 通过；3.7G 专项 31/31（新增去重守卫断言）。
+
+## 2026-08-15（阶段 3.7G 验收通过并收尾）
+
+- 用户浏览器验收通过：中文语音转文字进入同一 Session、回复朗读与打断、talk_normal 说话状态图、不支持语音的浏览器文字聊天不受影响。
+- 验收期间修复两处：`DigitalHumanCompanion.tsx` 首行多余字符 `e`（编辑器误触导致编译失败）；STT 停止时识别文本重复（Chrome 重放最终结果 + 中间结果未清空，控制器按结果下标去重并始终上报中间结果）。
+- 最终基线：3.7G 专项 31/31；`npx tsc --noEmit` 通过；历史回归 109/109 保持全绿。工作区改动未提交，由用户自行决定提交时机。
+- 后端零改动：未修改路由、服务、模型、数据库、迁移、Runtime Graph、劳动规则与审批流程。
+
+## 2026-08-15（数字人语音 Phase 1：AI 回复 → 句级 TTS → 连续播放）
+
+- 新增后端独立语音层 `flask_app/services/voice/`（聊天/Agent/工作台逻辑零改动）：
+  - `speech_text_normalizer.py`：展示文本→朗读文本，只变形式不变法律含义（Markdown 符号、URL→"链接"、括号去符号留内容、千分位 12,500→12500、百分比 30%→百分之30、emoji、空白归一）；法条编号/书名号/日期/金额保持原文；
+  - `sentence_segmenter.py`：。！？；成句即产出；短碎片缓冲（防"根据""你的"级 TTS）；超长无标点按 80 字兜底截断；
+  - `voice_profile.py`：法小助固定配置，仅环境变量 `VOICE_PROFILE_JSON`，密钥/ID 不硬编码；
+  - `tts_provider.py`：TtsProvider 抽象（synthesize/cancel）+ 注册表，环境变量 `VOICE_TTS_PROVIDER` 启用；业务不依赖供应商 SDK；当前未接入任何第三方 Provider；
+  - `voice_orchestrator.py`：按 requestId 隔离的句缓冲与 seq、primary/fallback 明确标记（Provider 异常→fallback 不拖垮聊天）、cancel 丢缓冲并联动 provider.cancel。
+- SSE：`sse.py` 新增 `voice` 事件（seq/text/tts_mode/audio_b64/mime_type）；`digital_human_service.chat_stream` 新增 `voice` 参数，呈现层按句合成下发（delta 与 voice 交错，取消信号即停并 CANCELLED 收尾）；`cancel_request` 联动语音编排器；路由接受 `voice` 布尔字段。
+- 前端：新增 `streamingAudioPlayer.ts`（队列播放、IDLE/BUFFERING/PLAYING/PAUSED/STOPPED/ERROR 状态机、onSpeechStart/End/Pause/Resume/Cancelled 事件预留、requestId 隔离丢弃迟到片段、单条错误跳过不卡队列）；`digitalHumanApi` 解析 voice 事件并构造 data URL；Store 接入播放器：发送即切换请求作用域、onVoice 双重开关守卫、停止/关闭/切会话清队列；`speechSynthesis` 保留为明确标注的 FALLBACK_TTS（voiceMode 字段区分，不静默混用）；气泡回放走播放器 fallback。
+- 测试：新增 `test_digital_human_voice_phase1.py` 25/25（normalizer/segmenter/orchestrator 取消与降级/voice 事件序与 fallback 标记/呈现层取消/前端守卫）；3.7G 测试同步新契约（onVoice 入队守卫）；3.7F 取消与流式测试因契约扩展（voice 参数、cancel 联动）做兼容更新（假服务签名、注入 voice orchestrator）。
+- 验证：`npx tsc --noEmit`、compileall、`git diff --check` 通过；全量回归 135 项复跑中。
+- 边界：本阶段不实现 ASR、口型/Viseme、动画、聊天窗口重构；语音失败不影响文字/Agent/工作台。当前缺少正式 TTS Provider/API 凭证，语音以 fallback 模式运行，待用户确认候选 Provider 后再接入。
+
+## 2026-08-15（语音 Phase 1：接入 Qwen DashScope TTS Provider）
+
+- 用户提供 DashScope 工作区密钥与参数后接入正式 Provider（密钥未写入代码/.env，仅环境变量读取）：
+  - `core/config.py` 新增语音 TTS 配置字段（DASHSCOPE_API_KEY/WORKSPACE_ID、TTS_PROVIDER/MODEL/VOICE/FORMAT/SAMPLE_RATE/RATE/VOLUME/TTS_WS_URL）；
+  - 新增 `services/voice/provider/qwen_provider.py`：经查证 qwen-audio-3.0-tts-flash 不走 HTTP 接口，改用官方 dashscope SDK `SpeechSynthesizer`（WebSocket 协议，CosyVoice 同族）；format 按 TTS_FORMAT+TTS_SAMPLE_RATE 映射 AudioFormat 枚举，语速参数为 speech_rate；取消为迟到结果丢弃语义；
+  - `requirements.txt` 新增 `dashscope>=1.26.0`（已安装到 law 环境）；`tts_provider.get_active_provider` 按 TTS_PROVIDER 环境变量激活；
+  - orchestrator：多句合成之间检查取消（发现即停）；Provider 失败按请求锁存，该回复其余句子直接 fallback，不反复调用/刷日志。
+- 真实 API 验证：默认全局 WS 地址合成成功（约 17KB mp3/句）；北京区域 MaaS 地址不通、multimodal-generation HTTP 接口 403/400（该模型不使用），最终采用 SDK 默认地址；端到端 orchestrator 产出 primary 模式语音片段。
+- 测试：QwenProviderTest 以 sys.modules 注入假 SDK（参数映射/缺 Key 前置失败/空音频/取消丢弃/注册激活）；Phase 1 专项 32/32；全量回归复跑中。
+- 待办：用户在 flask_app/.env 添加 DASHSCOPE 相关环境变量并重启后端后，浏览器验收 primary 语音链路。
+
+## 2026-08-15（模块地图文档更新：数字人语音 + 相关扩展）
+
+- 新增 `法律AI/模块地图/数字人语音.md`：3.7G 基础语音闭环 + Phase 1 句级神经 TTS 的完整模块地图（一级调用链/目的/调用链/关键状态/判断点/测试），顶部标注阶段状态与日期。
+- 更新 `数字人对话.md`：一级调用链与调用链补入 voice=true 时的句级 voice 事件支线，交叉引用《数字人语音》。
+- 更新 `服务端取消.md`：新增"Phase 1 语音取消扩展"小节（voice_orchestrator.cancel、呈现循环取消即停、前端 player.clear 与 requestId 双重隔离）；3.7F 取消测试数修正为 26 项并标注法源同步离线化。
+- 工作流沉淀：`AI_WORKFLOW/WORKFLOW.md` 收尾规则新增"模块实现完成后更新 法律AI/模块地图 对应文档"。

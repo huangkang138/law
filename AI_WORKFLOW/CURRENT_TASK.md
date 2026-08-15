@@ -1,22 +1,22 @@
 # 当前任务
 
-- 阶段/任务名称：阶段 3.7F（第二部分）——服务端取消：真正中止在途模型执行。
-- 当前状态：`COMPLETED`（2026-08-15 用户完成验收与返修确认，3.7F 整体收尾）。
-- 目标：用户按停止后，服务端真正中止在途 LLM 执行并安全落库；同一 request_id 重试可幂等恢复；前端停止按钮从"只断本地连接"升级为"通知服务端取消"。
-- 已完成：
-  - `services/conversation/cancel.py`：进程级取消注册表（15min TTL）+ 0.5s 节流 DB 轮询双通道；`ConversationCancelled` 稳定异常（不继承 RuntimeError）；
-  - `digital_human_requests.status` 增加 `cancelling`/`cancelled` 状态（自由字符串，无迁移）；`mark_cancelling`（保留租约与检查点）、`mark_cancelled`（租约断言、清租约、保留 checkpoint/resources）；
-  - `begin_request` 取消重试分支：有检查点 → action_running 幂等恢复；无检查点 → processing 重跑；cancelling+有效租约 → 拒绝穿透重跑；会话活跃冲突计入 cancelling；
-  - Orchestrator：`arm/disarm`、begin_request 前后双检查、`_ensure_not_cancelled` 检查点（快路径前、动作前、动作后、完成前）；except 分支按取消分流到 mark_cancelled；
-  - LLM 分块循环：每 chunk 检查取消 → break + 显式 close() 中止 httpx 模型流；重试的第二次 stream 同样检查；
-  - `POST /api/digital-human/chat/cancel`（幂等；404/403/400 映射）；非流式 /chat → 409 `CANCELLED`；SSE 复用 error 事件（code=CANCELLED, retryable=true）；
-  - 前端：`cancelDigitalHumanChatRequest`、在途 `activeRequestId`、停止按钮先通知服务端再本地 abort、CANCELLED 特判（不追加错误气泡，提示"已停止回复"）。
-  - 返修（2026-08-15）：P1 完成窗口竞态 —— `mark_action_completed` 后新增 `_ensure_not_cancelled`，`complete_request` 白名单只接受 processing/action_completed，cancelling/cancelled 拒绝写 completed；P2 停止提示 —— `cancelRequest` 同步设置 `streamFallbackNotice: '已停止回复'` 且不清空，不依赖已失效的异步 CANCELLED 分支。
-- 安全边界：动作（劳动分流/Run 启动）执行中不强制中断，副作用幂等保留；不修改 Runtime Graph、Domain、Plan、Tool、Verifier、劳动规则、审批与仲裁流程；不修改数据库结构或迁移；不做语音、口型与动画。
-- 自动验证：
-  - 取消专项 26/26（注册表、仓库状态机、LLM 阶段/动作前/动作中/完成窗口取消、完成写入拒绝、重试恢复、路由与前端守卫）；
-  - 3.7F 流式 12/12、可靠性 16/16、3.7D 12/12、3.7E 13/13，合计 **79/79**；
-  - 前端 `npx tsc --noEmit`；Python `compileall`；`git diff --check`。
-- 人工验收：已通过（长回复停止、停止后继续对话、主聊天/侧边行为一致、"已停止回复"提示即时显示且无错误气泡）。
-- 下一动作：3.7F 已收尾，不自动启动 3.7G；用户提出后经 TASK INTAKE 初始化新 CURRENT_TASK。
-- 关联方案：`newModify/阶段3.7F第二部分架构设计.md`。
+- 阶段/任务名称：法小助数字人语音 Phase 1 —— AI 回复 → 高质量 TTS → 前端连续播放。
+- 当前状态：`READY_FOR_ACCEPTANCE`（实现与自动验证完成 2026-08-15；待用户按验收场景 1-7 浏览器验收）。
+- 目标：比赛展示可用的语音效果：
+  ```text
+  LLM 流式回复 → 语音文本标准化 → 按完整句切分 → 后端 TTS → 前端音频队列 → 连续播放 → 支持立即打断
+  ```
+- 范围：
+  - 后端独立语音层 `services/voice/`：`SpeechTextNormalizer`（展示文本→朗读文本，只变形式不变法律含义：Markdown/URL/括号/千分位/百分比/emoji）、`SentenceSegmenter`（。！？；成句即产出，短碎片缓冲，超长兜底截断）、`VoiceProfile`（法小助配置，仅环境变量）、`TtsProvider` 抽象+注册表（synthesize/cancel，业务不依赖 SDK）、`VoiceOrchestrator`（requestId 隔离、句缓冲、primary/fallback 明确标记、取消）；
+  - SSE 新增 `voice` 事件（seq/text/tts_mode/audio_b64），仅 `voice=true` 请求出现；呈现循环内取消信号即停并 CANCELLED 收尾；`cancel_request` 联动语音编排器；
+  - 前端 `streamingAudioPlayer.ts`：队列播放（enqueue/playNext/pause/resume/stop/clear/destroy）、状态机 IDLE/BUFFERING/PLAYING/PAUSED/STOPPED/ERROR、onSpeechStart/End/Pause/Resume/Cancelled 事件预留、requestId 隔离（迟到片段丢弃）、单条错误跳下一条不卡死；`speechSynthesis` 保留为明确的 FALLBACK_TTS（`tts_mode: "fallback"`，不静默混用）；
+  - 打断闭环：停止生成 = cancel_chat(requestId) + 停 LLM + 取消在途 TTS + 停在播音频 + 清队列 + 迟到音频禁入；语音开关关闭只停 TTS/播放，不影响文字与 Agent。
+- 关键事实：当前 3.7F 架构是"已验证回复的呈现流"，原始 LLM token 不提前出后端；句级流水线接在呈现层（句子完成即合成下发，首句播放与后续合成并行）。真正的 token 级增量需改 Orchestrator 主链路，本阶段按要求不动。
+- 不做：ASR、麦克风输入、口型/Viseme、AvatarMotionDriver、动画、聊天窗口重构、Agent 业务修改。
+- Provider 现状：已接入 Qwen DashScope（用户提供密钥与参数，2026-08-15）：`services/voice/provider/qwen_provider.py`，经查证 qwen-audio-3.0-tts-flash 走官方 dashscope SDK 的 WebSocket 协议（非 HTTP 接口）；`requirements.txt` 新增 dashscope 并已安装；真实 API 冒烟通过（每句约 17KB mp3，orchestrator 产出 primary 模式片段）。密钥只从环境变量读取，未写入代码或 .env —— 待用户自行把 DASHSCOPE 变量加入 flask_app/.env 并重启后端后生效。
+- 验证：
+  - `test_digital_human_voice_phase1.py` 32/32（normalizer/segmenter/orchestrator 取消与降级/voice 事件序与 fallback 标记/取消呈现/Qwen Provider 假 SDK 注入/前端播放器守卫）；3.7G 31/31；全量回归 142/142；`npx tsc --noEmit`、compileall、`git diff --check` 通过；
+  - 真实 API 冒烟：默认全局 WS 地址合成成功（约 17KB mp3/句，primary 模式）；
+  - 人工验收场景 1-7：短回答自然播放、长回答句级流式连续不重叠不乱序、法律文本朗读自然（法条/日期/金额/百分比）、停止立即打断、A 取消后 B 隔离、TTS 异常文字正常、关闭语音无声音且 Agent 正常。
+- 下一动作：用户在 flask_app/.env 添加 DASHSCOPE 变量并重启后端 → 浏览器验收场景 1-7 → `COMPLETED`。工作区改动未提交，提交时机由用户决定。
+- 关联方案：用户规格（本阶段禁止项与 Provider 边界以用户消息为准）；`newModify/阶段3.7G架构设计.md` 为前序语音基线。

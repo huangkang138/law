@@ -468,9 +468,18 @@ export async function sendDigitalHumanMessage(
 
 export type DigitalHumanStreamStatus = 'accepted' | 'thinking';
 
+export interface DigitalHumanVoicePayload {
+  seq: number;
+  text: string;
+  ttsMode: 'primary' | 'fallback';
+  audioDataUrl: string | null;
+  requestId: string;
+}
+
 export interface DigitalHumanStreamHandlers {
   onStatus?: (status: DigitalHumanStreamStatus, message?: string) => void;
   onDelta?: (text: string) => void;
+  onVoice?: (payload: DigitalHumanVoicePayload) => void;
   onStreamFallback?: () => void;
 }
 
@@ -511,13 +520,15 @@ export async function sendDigitalHumanMessageStream(
   requestId: string,
   handlers: DigitalHumanStreamHandlers,
   signal?: AbortSignal,
+  voice = false,
 ): Promise<DigitalHumanChatResponse> {
-  // SSE增量呈现：服务端完成解析、路由、安全校验和持久化后分块下发已验证回复。
+  // SSE增量呈现：服务端完成解析、路由、安全校验和持久化后分块下发已验证回复；
+  // voice=true 时按句附加 voice 事件（seq 递增，tts_mode 区分 primary/fallback）。
   const response = await request('/api/digital-human/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      question, request_id: requestId,
+      question, request_id: requestId, voice,
       ...(sessionId ? { session_id: sessionId } : {}),
     }), signal,
   });
@@ -554,6 +565,18 @@ export async function sendDigitalHumanMessageStream(
             );
           } else if (parsed.event === 'delta') {
             handlers.onDelta?.(typeof payload.text === 'string' ? payload.text : '');
+          } else if (parsed.event === 'voice') {
+            const audioB64 = typeof payload.audio_b64 === 'string' ? payload.audio_b64 : '';
+            const mimeType = typeof payload.mime_type === 'string' ? payload.mime_type : 'audio/mp3';
+            handlers.onVoice?.({
+              seq: typeof payload.seq === 'number' ? payload.seq : 0,
+              text: typeof payload.text === 'string' ? payload.text : '',
+              ttsMode: payload.tts_mode === 'primary' ? 'primary' : 'fallback',
+              audioDataUrl: audioB64
+                ? `data:${mimeType};base64,${audioB64}`
+                : null,
+              requestId: typeof payload.request_id === 'string' ? payload.request_id : requestId,
+            });
           } else if (parsed.event === 'completed') {
             completed = payload as unknown as DigitalHumanChatResponse;
           } else if (parsed.event === 'error') {

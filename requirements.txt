@@ -63,3 +63,6 @@ flask-sock>=0.7.0
 
 # Retry Mechanism
 tenacity>=8.2.3
+
+# 数字人语音 TTS（阿里云百炼 DashScope，WebSocket 协议）
+dashscope>=1.26.0

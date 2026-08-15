@@ -795,6 +795,129 @@ export default function DigitalHumanFloat() {
           text-align: center;
         }
 
+        .dh-mic-button,
+        .dh-voice-toggle {
+          width: 42px;
+          height: 42px;
+          display: grid;
+          place-items: center;
+          flex: none;
+          padding: 0;
+          color: #2563b8;
+          background: #fff;
+          border: 1px solid #cbdff5;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+
+        .dh-mic-button:hover:not(:disabled),
+        .dh-voice-toggle:hover {
+          background: #eff6ff;
+          border-color: #93c5fd;
+        }
+
+        .dh-mic-button:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        .dh-mic-button-active,
+        .dh-mic-button-active:hover:not(:disabled) {
+          color: #fff;
+          background: #dc2626;
+          border-color: #dc2626;
+        }
+
+        .dh-voice-toggle-on,
+        .dh-voice-toggle-on:hover {
+          color: #fff;
+          background: #2563b8;
+          border-color: #2563b8;
+        }
+
+        .dh-stt-error-hint {
+          margin: 0;
+          padding: 6px 14px 0;
+          color: #b45309;
+          background: #fff;
+          font-size: 11px;
+          line-height: 1.5;
+          text-align: center;
+        }
+
+        .dh-speak-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          margin-top: 8px;
+          padding: 5px 9px;
+          color: #4773a5;
+          background: #f7fbff;
+          border: 1px solid #cbdff5;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+
+        .dh-speak-button:hover {
+          background: #eff6ff;
+          border-color: #93c5fd;
+        }
+
+        .dh-speak-button-active,
+        .dh-speak-button-active:hover {
+          color: #b45309;
+          background: #fffbeb;
+          border-color: #fcd34d;
+        }
+
+        .dh-companion-message-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 3px;
+        }
+
+        .dh-companion-message-head span {
+          margin-bottom: 0;
+        }
+
+        .dh-companion-speak {
+          display: grid;
+          place-items: center;
+          flex: none;
+          width: 20px;
+          height: 20px;
+          padding: 0;
+          color: #4773a5;
+          background: transparent;
+          border: 1px solid transparent;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+
+        .dh-companion-speak:hover {
+          background: #eff6ff;
+          border-color: #bfdbfe;
+        }
+
+        .dh-companion-speak-active,
+        .dh-companion-speak-active:hover {
+          color: #b45309;
+          background: #fffbeb;
+          border-color: #fcd34d;
+        }
+
+        .dh-companion-composer .dh-mic-button,
+        .dh-companion-composer .dh-voice-toggle {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+        }
+
         @keyframes dh-float {
           0%, 100% { transform: translateY(0) rotate(0); }
           50% { transform: translateY(-8px) rotate(.6deg); }

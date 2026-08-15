@@ -381,7 +381,11 @@ class ConversationStreamIntegrationTest(unittest.TestCase):
 class _FakeStreamService:
     """路由测试用：不调用LLM，直接返回契约事件流。"""
 
-    def chat_stream(self, question, client_id, request_id, session_id=None, custom_config=None):
+    def chat_stream(
+        self, question, client_id, request_id,
+        session_id=None, custom_config=None, voice=False,
+    ):
+        # voice 为 Phase 1 新增的可选契约参数；本假服务始终返回纯文本流。
         reply = "你好世界"
 
         def generate():

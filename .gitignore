@@ -12,6 +12,10 @@ eggs/
 .eggs/
 lib/
 lib64/
+# 前端源码目录放行（上面的 lib/ 是 Python 打包模板规则，不应命中 frontend/src/lib）
+!frontend/src/lib/
+frontend/src/lib/*
+!frontend/src/lib/voice/
 parts/
 sdist/
 var/

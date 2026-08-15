@@ -28,9 +28,11 @@ from services.conversation.sse import (
     STATUS_ACCEPTED,
     STATUS_THINKING,
     encode_event,
+    encode_voice_event,
     iter_text_chunks,
     stream_error_data,
 )
+from services.voice import VoiceOrchestrator, get_active_provider
 
 
 INTENT_ROUTE_MAP = {
@@ -76,6 +78,8 @@ class DigitalHumanService:
         self.llm = LLMFactory.create_llm()
         self.system_prompt = self._get_system_prompt()
         self._orchestrator = self._build_orchestrator()
+        # 语音层独立于聊天编排：只消费最终展示文本，不进入 Chat Service 逻辑。
+        self._voice_orchestrator = VoiceOrchestrator(provider=get_active_provider())
         app_logger.info("数字人智能助手服务初始化完成")
 
     def _build_orchestrator(self) -> ConversationOrchestrator:
@@ -408,6 +412,7 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
         session_id: Optional[str] = None,
         custom_config: Optional[Dict[str, str]] = None,
         chunk_delay: float = DEFAULT_CHUNK_DELAY,
+        voice: bool = False,
     ):
         """生成SSE增量呈现事件流。
 
@@ -464,13 +469,63 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
             reply = result.get("reply")
             if not isinstance(reply, str):
                 reply = ""
-            for chunk in iter_text_chunks(reply):
-                yield encode_event(EVENT_DELTA, {"text": chunk}, request_id)
-                if chunk_delay > 0:
-                    time.sleep(chunk_delay)
+            if voice:
+                # 句级语音：文本分块下发的同时，完整句立即合成并下发 voice 事件；
+                # 取消信号到达时停止继续下发（音频打断由前端播放器按 requestId 完成）。
+                yield from self._stream_voice_presentation(reply, request_id, chunk_delay)
+            else:
+                for chunk in iter_text_chunks(reply):
+                    yield encode_event(EVENT_DELTA, {"text": chunk}, request_id)
+                    if chunk_delay > 0:
+                        time.sleep(chunk_delay)
             yield encode_event(EVENT_COMPLETED, result, request_id)
 
         return generate()
+
+    def _stream_voice_presentation(
+        self,
+        reply: str,
+        request_id: str,
+        chunk_delay: float,
+    ):
+        """句级语音呈现：delta 与 voice 事件交错，句子完成即合成下发。
+
+        与纯文本呈现的事件序兼容：voice 事件只出现在 voice=true 的请求中。
+        取消后不再下发任何 delta/voice 事件，以 CANCELLED 收尾。
+        """
+        for chunk in iter_text_chunks(reply):
+            if is_cancelled(request_id):
+                yield encode_event(
+                    EVENT_ERROR,
+                    stream_error_data(ConversationCancelled()),
+                    request_id,
+                )
+                return
+            yield encode_event(EVENT_DELTA, {"text": chunk}, request_id)
+            if chunk_delay > 0:
+                time.sleep(chunk_delay)
+            for voice_chunk in self._voice_orchestrator.push_text(request_id, chunk):
+                yield encode_voice_event(
+                    {
+                        "seq": voice_chunk.seq,
+                        "text": voice_chunk.text,
+                        "tts_mode": voice_chunk.tts_mode,
+                        "audio_b64": voice_chunk.audio_b64,
+                        "mime_type": voice_chunk.mime_type,
+                    },
+                    request_id,
+                )
+        for voice_chunk in self._voice_orchestrator.finish(request_id):
+            yield encode_voice_event(
+                {
+                    "seq": voice_chunk.seq,
+                    "text": voice_chunk.text,
+                    "tts_mode": voice_chunk.tts_mode,
+                    "audio_b64": voice_chunk.audio_b64,
+                    "mime_type": voice_chunk.mime_type,
+                },
+                request_id,
+            )
 
     def cancel_request(self, request_id: str, client_id: str) -> Dict:
         """幂等取消在途数字人请求；返回最新状态。
@@ -480,6 +535,8 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
         或分块循环轮询发现并落 cancelled 终态。
         """
         set_cancelled(request_id)
+        # 取消语音流水线：丢弃该请求句缓冲并取消供应商在途合成。
+        self._voice_orchestrator.cancel(request_id)
         db = SessionLocal()
         try:
             record = db.get(DigitalHumanRequest, request_id)

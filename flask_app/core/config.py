@@ -25,6 +25,19 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "deepseek-chat"
     OPENAI_TEMPERATURE: float = 0.3
     OPENAI_MAX_TOKENS: int = 2048
+
+    # 语音 TTS 配置（数字人语音 Phase 1；密钥只从环境读取，禁止硬编码）
+    DASHSCOPE_API_KEY: Optional[str] = None
+    DASHSCOPE_WORKSPACE_ID: Optional[str] = None
+    TTS_PROVIDER: Optional[str] = None
+    TTS_MODEL: str = "qwen-audio-3.0-tts-flash"
+    TTS_VOICE: str = "longanhuan_v3.6"
+    TTS_FORMAT: str = "mp3"
+    TTS_SAMPLE_RATE: int = 22050
+    TTS_RATE: float = 1.0
+    TTS_VOLUME: int = 50
+    # 可选：自定义 DashScope WebSocket 地址；默认走 SDK 全局地址
+    TTS_WS_URL: Optional[str] = None
     
     # Agent 配置
     AGENT_MAX_ITERATIONS: int = 5

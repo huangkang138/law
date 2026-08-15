@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Square, Volume2 } from 'lucide-react';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
+import { isTtsSupported } from '@/lib/voice/ttsController';
+import { useVoiceReady } from '@/lib/voice/useVoiceReady';
 
 import ConversationComposer from './ConversationComposer';
 import ConversationMessageContent from './ConversationMessageContent';
@@ -15,11 +18,17 @@ export default function DigitalHumanCompanion() {
     emotion,
     isLoading,
     messages,
+    speakMessage,
+    speakingMessageId,
+    stopSpeaking,
     streamingMessage,
+    voiceSpeaking,
     workspaceError,
     workspaceLoading,
     workspacePresentation,
   } = useDigitalHumanStore();
+  const voiceReady = useVoiceReady();
+  const ttsSupported = voiceReady && isTtsSupported();
   const recentMessages = [
     ...messages,
     ...(streamingMessage ? [streamingMessage] : []),
@@ -33,7 +42,7 @@ export default function DigitalHumanCompanion() {
   return (
     <aside className="dh-companion" aria-label="案件工作台数字人陪伴">
       <div className="dh-companion-avatar">
-        <DigitalHumanAvatar emotion={emotion} size="small" />
+        <DigitalHumanAvatar emotion={voiceSpeaking ? 'talk_normal' : emotion} size="small" />
         <div><strong>法小助</strong><small>当前案件陪伴</small></div>
       </div>
       <ConversationPresenterCard
@@ -44,7 +53,26 @@ export default function DigitalHumanCompanion() {
       <div ref={messagesRef} className="dh-companion-messages" aria-live="polite">
         {recentMessages.map((message) => (
           <div key={message.id} className={`dh-companion-message ${message.role}`}>
-            <span>{message.role === 'assistant' ? '法小助' : '你'}</span>
+            <div className="dh-companion-message-head">
+              <span>{message.role === 'assistant' ? '法小助' : '你'}</span>
+              {message.role === 'assistant'
+                && streamingMessage?.id !== message.id
+                && ttsSupported && (
+                <button
+                  type="button"
+                  className={`dh-companion-speak ${speakingMessageId === message.id ? 'dh-companion-speak-active' : ''}`}
+                  onClick={() => (
+                    speakingMessageId === message.id
+                      ? stopSpeaking()
+                      : speakMessage(message.id, message.content)
+                  )}
+                  aria-label={speakingMessageId === message.id ? '停止朗读' : '朗读这条回复'}
+                  title={speakingMessageId === message.id ? '停止朗读' : '朗读'}
+                >
+                  {speakingMessageId === message.id ? <Square size={10} /> : <Volume2 size={10} />}
+                </button>
+              )}
+            </div>
             <ConversationMessageContent
               role={message.role}
               content={message.content}

@@ -17,6 +17,7 @@ DEFAULT_CHUNK_DELAY = 0.02  # 两个delta事件之间的呈现间隔（秒）
 
 EVENT_STATUS = "status"
 EVENT_DELTA = "delta"
+EVENT_VOICE = "voice"
 EVENT_COMPLETED = "completed"
 EVENT_ERROR = "error"
 
@@ -29,6 +30,15 @@ def encode_event(event: str, data: Dict, request_id: str) -> str:
     payload = dict(data)
     payload["request_id"] = request_id
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def encode_voice_event(chunk: Dict, request_id: str) -> str:
+    """编码一条句级语音事件（voice）；按 seq 保证播放顺序。
+
+    载荷：seq（序号）、text（归一化朗读文本）、tts_mode（primary/fallback，
+    明确区分，不静默混用）、audio_b64（正式 TTS 音频；fallback 时为 None）。
+    """
+    return encode_event(EVENT_VOICE, chunk, request_id)
 
 
 def iter_text_chunks(text: str, size: int = DEFAULT_CHUNK_SIZE) -> Iterable[str]:

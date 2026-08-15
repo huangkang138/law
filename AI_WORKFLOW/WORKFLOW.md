@@ -62,4 +62,4 @@ REVIEW 不通过：`FAILED_REVIEW`，返回 FEATURE、BUGFIX、FRONTEND 或 ARCH
 
 不满意不自动 `git reset --hard` 或 `git clean`。只有用户明确要求撤销时，先检查 status/diff、区分任务前已有改动与本任务改动、说明拟撤销范围并获得确认，再只撤销本任务范围。
 
-完成后按需更新 `DEVELOPER_MEMORY`、`DECISIONS`、`NEXT_STEP` 与 `modification-log`；结构性事实变化同步 `latest-project-analysis`。
+完成后按需更新 `DEVELOPER_MEMORY`、`DECISIONS`、`NEXT_STEP` 与 `modification-log`；结构性事实变化同步 `latest-project-analysis`；**每个模块实现完成后，把核心内容（一级调用链/目的/调用链/关键状态/判断点/测试）写入 `法律AI/模块地图/` 对应模块文档并标注阶段与日期**（用户明确要求）。

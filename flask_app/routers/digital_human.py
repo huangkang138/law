@@ -134,6 +134,9 @@ def chat_stream():
         request_id = data.get("request_id")
         if not isinstance(request_id, str) or not request_id.startswith("dhr_"):
             return jsonify({"success": False, "error": "缺少或无效的 request_id"}), 400
+        voice = data.get("voice")
+        if voice is not None and not isinstance(voice, bool):
+            return jsonify({"success": False, "error": "voice 必须是布尔值"}), 400
 
         stream = get_digital_human_service().chat_stream(
             question=question,
@@ -141,6 +144,7 @@ def chat_stream():
             request_id=request_id,
             session_id=session_id,
             custom_config=_get_custom_llm_config(),
+            voice=voice is True,
         )
     except (UnicodeError, SQLAlchemyError):
         return _database_unavailable("流式聊天")

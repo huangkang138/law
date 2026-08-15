@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Square, Trash2, Volume2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
+import { isTtsSupported } from '@/lib/voice/ttsController';
+import { useVoiceReady } from '@/lib/voice/useVoiceReady';
 
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
 import ConversationComposer from './ConversationComposer';
@@ -32,10 +34,16 @@ export default function DigitalHumanChat() {
     setEmotion,
     sessions,
     sessionId,
+    speakMessage,
+    speakingMessageId,
     startNewConversation,
+    stopSpeaking,
     streamFallbackNotice,
     streamingMessage,
+    voiceSpeaking,
   } = useDigitalHumanStore();
+  const voiceReady = useVoiceReady();
+  const ttsSupported = voiceReady && isTtsSupported();
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -157,7 +165,7 @@ export default function DigitalHumanChat() {
       <div className="dh-chat-column">
       <div className="dh-portrait-stage">
         <div className="dh-portrait-halo" aria-hidden="true" />
-        <DigitalHumanAvatar emotion={emotion} />
+        <DigitalHumanAvatar emotion={voiceSpeaking ? 'talk_normal' : emotion} />
       </div>
 
       <div ref={messagesRef} className="dh-messages" aria-live="polite">
@@ -176,6 +184,21 @@ export default function DigitalHumanChat() {
                 >
                   去{message.routeLabel}看看
                   <ArrowRight size={15} />
+                </button>
+              )}
+              {message.role === 'assistant' && ttsSupported && (
+                <button
+                  type="button"
+                  className={`dh-speak-button ${speakingMessageId === message.id ? 'dh-speak-button-active' : ''}`}
+                  onClick={() => (
+                    speakingMessageId === message.id
+                      ? stopSpeaking()
+                      : speakMessage(message.id, message.content)
+                  )}
+                  aria-label={speakingMessageId === message.id ? '停止朗读' : '朗读这条回复'}
+                  title={speakingMessageId === message.id ? '停止朗读' : '朗读'}
+                >
+                  {speakingMessageId === message.id ? <Square size={13} /> : <Volume2 size={13} />}
                 </button>
               )}
             </div>
