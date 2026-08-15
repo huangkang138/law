@@ -7,6 +7,7 @@ from legal_agent_system import get_legal_agent_facade
 from legal_agent_system.runtime.errors import AgentRuntimeError
 
 from .schemas import ConversationAction, RouterDecision
+from .tracing import link_run, trace
 from .workspace import (
     WorkspaceVersionConflict,
     get_conversation_workspace_service,
@@ -35,6 +36,7 @@ class ConversationActions:
         checkpoint_resource: Optional[Callable[..., None]] = None,
         recovering: bool = False,
         expected_workspace_version: Optional[int] = None,
+        request_id: Optional[str] = None,
     ) -> ConversationAction:
         if decision.route in {"normal_chat", "labor_consultation"}:
             return ConversationAction("reply_only")
@@ -65,6 +67,7 @@ class ConversationActions:
                 checkpoint_resource,
                 recovering,
                 expected_workspace_version,
+                request_id,
             )
         return ConversationAction("reply_only")
 
@@ -77,6 +80,7 @@ class ConversationActions:
         checkpoint_resource: Optional[Callable[..., None]],
         recovering: bool,
         expected_workspace_version: Optional[int],
+        request_id: Optional[str] = None,
     ) -> ConversationAction:
         facade = get_legal_agent_facade()
         matter = None
@@ -99,6 +103,7 @@ class ConversationActions:
                 session_id,
                 matter_id=planned_matter_id,
             )
+            trace("matter_created", request_id, matter_id=matter["matter_id"])
         if expected_workspace_version is not None:
             try:
                 get_conversation_workspace_service().select_matter(
@@ -166,10 +171,21 @@ class ConversationActions:
             run_id=planned_run_id,
             on_reserved=record_reserved,
         )
+        run_id = run.get("run_id")
+        # 把 Agent 运行关联回发起它的会话请求（步骤明细仍以 DB AgentRun.steps 为准）。
+        link_run(run_id, request_id)
+        trace(
+            "run_started",
+            request_id,
+            run_id=run_id,
+            matter_id=matter["matter_id"],
+            task_type=task_type,
+            status=run.get("status"),
+        )
         return ConversationAction(
             "start_agent",
             matter_id=matter["matter_id"],
-            run_id=run.get("run_id"),
+            run_id=run_id,
             status=run.get("status", "completed"),
         )
 

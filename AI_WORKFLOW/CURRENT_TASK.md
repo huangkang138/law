@@ -1,7 +1,16 @@
 # 当前任务
 
-- 阶段/任务名称：法小助数字人语音 Phase 1 —— AI 回复 → 高质量 TTS → 前端连续播放。
-- 当前状态：`READY_FOR_ACCEPTANCE`（实现与自动验证完成 2026-08-15；待用户按验收场景 1-7 浏览器验收）。
+- 阶段/任务名称：数字人最小全链路 Trace（3.7H 的 Trace 子项）—— trace_id 串联 会话→路由→记忆→案件→Agent。
+- 当前状态：`COMPLETED`（2026-08-15 实现与自动验证完成：trace 专项 10/10，全量回归 152/152，tsc/compileall/diff-check 通过；后端基础设施无需浏览器验收，重启后端后即可在 logs/trace.jsonl 与 app.log 看到 [trace] 链路）。
+- 目标：正常运行时按 trace_id（=request_id）即可回溯一次会话：请求开始 → 路由决策 → 动作执行（建案/启动 Run，run_id↔trace_id 关联）→ 完成/取消/失败；写 logs/trace.jsonl（JSONL）并镜像 app.log；写入失败绝不拖垮业务。
+- 已完成：
+  - `services/conversation/tracing.py`：trace()/link_run/trace_for_run/unlink_run/set_trace_file；
+  - 挂点：digital_human_service（request_start/request_error/request_cancelled）、orchestrator（request_replayed/route_decision/action_executed/request_completed/request_failed/request_cancelled）、actions（matter_created/run_started + link_run）；execute 新增可选 request_id；
+  - `test_digital_human_trace.py` 10/10；全量回归 152 项复跑中；
+  - 模块文档 `法律AI/模块地图/链路追踪.md` 已产出。
+- 边界：不改 Agent 业务逻辑、不侵入 legal_agent_system（步骤明细仍以 DB AgentRun.steps 为准）；不做 Guardrails、评测集（用户裁定）；前端零改动。
+- 前序任务（已收尾）：语音 Phase 1 仍待浏览器验收（Qwen 语音链路），状态保持 READY_FOR_ACCEPTANCE。
+- 下一动作：收尾（提交时机由用户决定）；不自动启动 3.7H 其余子项（Guardrails/评测集）与下一阶段。语音 Phase 1 浏览器验收仍待用户执行。
 - 目标：比赛展示可用的语音效果：
   ```text
   LLM 流式回复 → 语音文本标准化 → 按完整句切分 → 后端 TTS → 前端音频队列 → 连续播放 → 支持立即打断

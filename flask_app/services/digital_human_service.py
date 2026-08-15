@@ -19,6 +19,7 @@ from services.conversation.cancel import (
     set_cancelled,
 )
 from services.conversation.repository import ConversationRepository, RequestInProgress
+from services.conversation.tracing import trace
 from services.conversation.sse import (
     DEFAULT_CHUNK_DELAY,
     EVENT_COMPLETED,
@@ -384,6 +385,14 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
         if not session_id.startswith("dh_"):
             raise ValueError("数字人会话 ID 必须以 dh_ 开头")
 
+        trace(
+            "request_start",
+            request_id,
+            session_id=session_id,
+            voice=False,
+            question_preview=question[:30],
+        )
+
         llm = self.llm
         if custom_config and custom_config.get("api_key"):
             llm = LLMFactory.create_llm(
@@ -450,6 +459,13 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
                 {"status": STATUS_ACCEPTED, "message": "已收到消息，正在处理"},
                 request_id,
             )
+            trace(
+                "request_start",
+                request_id,
+                session_id=session_id,
+                voice=voice,
+                question_preview=question[:30],
+            )
             yield encode_event(
                 EVENT_STATUS,
                 {"status": STATUS_THINKING, "message": "正在整理回答"},
@@ -464,6 +480,11 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
                     llm=llm,
                 )
             except Exception as exc:
+                trace(
+                    "request_error",
+                    request_id,
+                    code=stream_error_data(exc).get("code"),
+                )
                 yield encode_event(EVENT_ERROR, stream_error_data(exc), request_id)
                 return
             reply = result.get("reply")
@@ -537,6 +558,7 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
         set_cancelled(request_id)
         # 取消语音流水线：丢弃该请求句缓冲并取消供应商在途合成。
         self._voice_orchestrator.cancel(request_id)
+        trace("request_cancelled", request_id)
         db = SessionLocal()
         try:
             record = db.get(DigitalHumanRequest, request_id)

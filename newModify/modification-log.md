@@ -1028,3 +1028,13 @@
 - 更新 `数字人对话.md`：一级调用链与调用链补入 voice=true 时的句级 voice 事件支线，交叉引用《数字人语音》。
 - 更新 `服务端取消.md`：新增"Phase 1 语音取消扩展"小节（voice_orchestrator.cancel、呈现循环取消即停、前端 player.clear 与 requestId 双重隔离）；3.7F 取消测试数修正为 26 项并标注法源同步离线化。
 - 工作流沉淀：`AI_WORKFLOW/WORKFLOW.md` 收尾规则新增"模块实现完成后更新 法律AI/模块地图 对应文档"。
+
+## 2026-08-15（数字人最小全链路 Trace：trace_id 串联 会话→路由→案件→Agent）
+
+- 用户裁定范围：3.7H 只做 Trace 链路追踪；Guardrails 与固定评测集不做。
+- 新增 `services/conversation/tracing.py`：trace(event, trace_id, **fields) 以 JSONL 写 logs/trace.jsonl 并镜像 app.log（[trace] 前缀）；写入失败绝不抛异常；link_run/trace_for_run 维护 run_id↔trace_id 映射（Agent 步骤回溯，不侵入 Runtime）。
+- 挂点：digital_human_service（request_start/question 30 字预览、request_error、request_cancelled）、orchestrator（request_replayed、route_decision、action_executed、request_completed、request_failed、request_cancelled）、actions（matter_created、run_started + link_run；execute 新增可选 request_id 参数，3.7F 测试 patch 兼容）。
+- 过程中修复：ConversationAction 字段名是 action 而非 type（to_dict 才映射 "type"），挂点最初误用 action.type 致 AttributeError，已改为 action.action。
+- 测试：新增 `test_digital_human_trace.py` 10/10（JSONL 写入与容错、run 关联、同 trace_id 全链事件序、取消事件、劳动动作 matter/run 事件与关联、三处挂点源码守卫）；全量回归 152/152；compileall、diff-check 通过。
+- 模块文档：新增 `法律AI/模块地图/链路追踪.md`（按功能段模板，一级调用链可点击）。
+- 边界：前端零改动；不改 Agent 业务逻辑；步骤级明细仍以 DB AgentRun.steps 为准。

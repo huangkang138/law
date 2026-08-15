@@ -18,6 +18,7 @@ from .locks import ConversationSessionLock
 from .memory import ConversationMemoryManager
 from .repository import ConversationRepository
 from .router import ConversationRouter
+from .tracing import trace
 from .schemas import (
     ContextEnvelope,
     ConversationAction,
@@ -79,6 +80,7 @@ class ConversationOrchestrator:
                 )
             if cached is not None:
                 # 已完成请求的取消是 no-op：优先返回既有缓存。
+                trace("request_replayed", request_id, session_id=session_id)
                 return cached
             if is_cancelled(request_id, poll_db=True):
                 # begin_request 执行期间到达的取消（含跨 worker 的 cancelling）。
@@ -101,8 +103,10 @@ class ConversationOrchestrator:
                             request_id, poll_db=True,
                         ):
                             self.repository.mark_cancelled(request_id, lease_token)
+                            trace("request_cancelled", request_id)
                         else:
                             self.repository.mark_retryable(request_id, lease_token)
+                            trace("request_failed", request_id, error=type(exc).__name__)
                 except Exception:
                     pass
             raise
@@ -192,6 +196,15 @@ class ConversationOrchestrator:
             parsed = self.parse_llm_response(raw)
             decision = self.router.route(question, context, parsed)
 
+        trace(
+            "route_decision",
+            request_id,
+            route=decision.route,
+            confidence=decision.confidence,
+            reason_code=decision.reason_code,
+            side_effect_authorized=decision.side_effect_authorized,
+        )
+
         if decision.side_effect_authorized:
             resources = {
                 "matter_id": f"matter_{uuid.uuid4().hex}",
@@ -231,6 +244,15 @@ class ConversationOrchestrator:
 
         action = self.actions.execute(
             decision, question, client_id, session_id, context,
+            request_id=request_id,
+        )
+        trace(
+            "action_executed",
+            request_id,
+            action_type=action.action,
+            status=action.status,
+            matter_id=action.matter_id,
+            run_id=action.run_id,
         )
         result = self._build_result(
             parsed, action, decision, context, session_id,
@@ -245,6 +267,7 @@ class ConversationOrchestrator:
                 memory,
                 lease_token,
             )
+        trace("request_completed", request_id, action_type=action.action)
         return result
 
     def _ensure_not_cancelled(
@@ -298,6 +321,16 @@ class ConversationOrchestrator:
             checkpoint_resource=checkpoint_resource,
             recovering=recovering,
             expected_workspace_version=expected_workspace_version,
+            request_id=request_id,
+        )
+        trace(
+            "action_executed",
+            request_id,
+            action_type=action.action,
+            status=action.status,
+            matter_id=action.matter_id,
+            run_id=action.run_id,
+            recovering=recovering,
         )
         if action.matter_id:
             memory.structured["matter_id"] = action.matter_id
@@ -336,6 +369,12 @@ class ConversationOrchestrator:
                 memory,
                 lease_token,
             )
+        trace(
+            "request_completed",
+            request_id,
+            action_type=action.action,
+            recovering=recovering,
+        )
         return result
 
     def _build_result(
