@@ -47,8 +47,8 @@ LangGraph 与 Plan 的后续边界已经明确：
 下一阶段按以下顺序实施：
 
 1. 3.7C已完成开发测试实现：七类劳动材料适配、证据矩阵、实体规则、法源门禁与五类25条青年就业旗舰评测已落地；数字人工作台已打通材料建议、动态事实补录、缺失事实续跑、规则结果、审批和仲裁草稿。4个官方法源按用户指示以开发测试标识批准，健康状态 `ready`；正式环境仍须重新同步并完成真实法律专业复核。
-2. 阶段3.7D已实现并进入 `READY_FOR_ACCEPTANCE`：Raw Messages、Token Budget Recent Window、Structured Memory、双层Rolling Summary、ContextBuilder、单一Router与Conversation Orchestrator已落地，前端聊天提交不再执行关键词分流。流式文字/取消仍后移3.7F，基础语音后移3.7G。
-3. 3.5 生产可信化暂缓但仍是未来必补项；3.7E工作台协同、3.7F数字人交互、3.7G语音、3.7H工程化评测按依赖顺序后置。
+2. 阶段3.7D已实现：Raw Messages、Token Budget Recent Window、Structured Memory、双层Rolling Summary、ContextBuilder、单一Router与Conversation Orchestrator已落地，前端聊天提交不再执行关键词分流。
+3. 阶段3.7E工作台协同、3.7F数字人交互（SSE增量呈现 + 服务端取消）均已完成并收尾（3.7F 状态 `COMPLETED`，2026-08-15）；3.7G基础语音（浏览器STT/TTS）、3.7H工程化评测（Trace/Guardrails/固定评测集）为下一阶段，按依赖顺序实施；3.5 生产可信化暂缓但仍是未来必补项。
 
 比赛版本只突出“青年就业劳动权益”旗舰闭环；合同、模拟法庭、知识图谱和其他旧页面保留为扩展能力，不与主线并列宣传。
 
@@ -431,3 +431,35 @@ npm run dev
 - LAW-REVIEW 返修后，Matter 创建具备稳定幂等恢复并直接返回权威 Workspace 快照；跨 Session 历史 Matter 会精确恢复；聊天和案件切换使用取消序列、Workspace 版本、Session 行锁与前端顺序队列防止旧响应倒灌。首次进入工作台可独立创建 Session，当前 Matter 删除与回退在同一事务完成。
 - 第二轮 LAW-REVIEW 进一步将聊天请求领取时的 Workspace 版本写入可恢复检查点；后台动作遇到版本变化不再抢回当前指针。Workspace Context 改为在 Session 行锁保护的单一事务中读取指针、版本和关联投影，避免并发切换产生混合快照。
 - 数据库迁移已升级至 `20260727_0011`。验证通过：后端全量 97/97（另有 13 个子测试）、TypeScript、Python compileall、Alembic current/heads、`git diff --check`，以及桌面端和 375×812 移动端真实浏览器复核。
+
+## 阶段 3.7F：SSE增量呈现（2026-08-14）
+
+- 3.7E 已由用户技术验收 PASS 并提交；3.7F 第一部分实现"实时文字交互基础"，保留 `POST /api/digital-human/chat`，新增 `POST /api/digital-human/chat/stream`。
+- 本阶段是"SSE增量呈现"而非原始 LLM Token 流式输出：生成器先完整复用 Conversation Orchestrator 的解析、路由、安全校验与持久化，再对已验证 reply 按字符分块下发；事件顺序固定为 accepted → thinking → delta* → completed，异常以 error 事件收尾（稳定中文错误、错误码、是否可重试），所有事件携带 request_id。
+- 新增 `services/conversation/sse.py` 独立小模块；流式路由设置 `Cache-Control: no-cache` 并关闭代理缓冲（`X-Accel-Buffering: no`）；入参校验失败仍返回 JSON 400，与 `/chat` 一致。
+- 同一 request_id 重试复用 3.7D 请求幂等缓存，不重复创建 Matter/Run；流中断后服务端已完成消息仍可通过历史恢复。
+- 前端用 fetch + ReadableStream 解析 SSE（不用 EventSource）；Zustand 只维护一条 `streamingMessage` 临时消息，completed 后才确认最终消息与 Workspace；不支持流式读取时降级普通请求并显示明确中文提示。桌面聊天与工作台侧边陪伴继续共用同一 `sendMessage`，两侧均渲染增量气泡。
+- 未修改数据库结构、迁移、Runtime Graph、劳动规则、审批与仲裁流程；服务端取消、语音与口型留待后续部分。
+
+### 阶段 3.7F 返修：结构化输出解析可靠性（2026-08-14）
+
+- 浏览器验收发现明确劳动咨询偶发返回"我不确定你的需求"固定兜底句；真实模型探针定位失败类型：多轮会话中 DeepSeek 偶发返回纯文本（含 Markdown、无 JSON），且固定兜底句被持久化为 assistant 消息进入历史后，模型会逐字复读该句，形成自我强化的污染循环（连续多轮返回完全相同的 26 字符兜底句）。
+- 修复集中在 `DigitalHumanService`：首次响应非 JSON 时追加严格格式指令重试一次；解析链增强为围栏清理 → 直接解析 → 平衡括号提取 → 字符串内裸换行/制表符与尾逗号修复；彻底失败时降级为模型纯文本回复（含花括号或超长则拒绝），路由仍由确定性规则决定，固定兜底句仅作最后手段且不再污染历史。
+- 日志记录解析失败阶段与截断原始响应头部，供真实环境持续观测失败类型。
+- 验证：可靠性专项 14/14、3.7F 流式专项 12/12、3.7D+3.7E 联合回归 25/25；真实模型复验新会话 6 轮连续同问题固定兜底句 0/6。
+
+### 阶段 3.7F 验收与收尾（2026-08-14）
+
+- 用户真实浏览器验收通过，阶段 3.7F 第一部分状态为 `COMPLETED`。
+- 收尾补充：reply 中单层字面量 `\n`/`\r\n`/`\t` 受控反转义（保留双反斜杠），恢复 Markdown 段落与列表排版；前端等待阶段保留打字动画，收到首个非空 delta 后才创建流式气泡，消除空白光标气泡。
+- 最终验证：可靠性专项 16/16、3.7F 流式专项 12/12、3.7F+3.7D+3.7E 全量回归 53/53、TypeScript、Python compileall、`git diff --check` 均通过；真实模型复验固定兜底句 0/6。
+- 工作区改动未提交，由用户决定提交时机；3.7F 第二部分（服务端取消）、语音与口型动画仍暂缓。
+
+### 阶段 3.7F 第二部分：服务端取消（2026-08-14）
+
+- 3.7F 第一部分已验收；第二部分实现服务端取消：新增 `POST /api/digital-human/chat/cancel` 幂等端点；取消双通道为进程级标志（同进程即时）+ `digital_human_requests.status` 的 cancelling/cancelled 状态（跨 worker，0.5s 节流轮询）。
+- 在途 LLM 分块循环检测到取消后 break 并显式 close() 迭代器，经 GeneratorExit → openai Stream.close → httpx 响应关闭真正中止底层模型请求；重试的第二次 stream 同样受控。
+- 状态机：cancelling（保留租约与检查点）→ 在途线程 mark_cancelled（租约断言、清租约、保留 checkpoint/resources）；同 request_id 重试按检查点幂等恢复或 LLM 阶段重跑；cancelling+有效租约拒绝穿透重跑；会话活跃冲突计入 cancelling。动作执行中不强制中断，劳动副作用幂等保留。
+- Orchestrator 增加 arm/disarm 与四个取消检查点；except 分支按取消分流到 mark_cancelled。SSE 复用 error 事件（CANCELLED，retryable=true）；非流式 /chat 映射 409。
+- 前端停止按钮升级为真正通知服务端取消（在途 activeRequestId），CANCELLED 不追加错误气泡、显示"已停止回复"提示。
+- 验证：取消专项 23/23；3.7F+3.7D+3.7E 全量回归 76/76；TypeScript、compileall、`git diff --check` 通过。语音、口型与动画仍暂缓，归属后续阶段。

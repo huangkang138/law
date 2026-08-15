@@ -15,6 +15,7 @@ from models.db_models import (
     Matter,
 )
 
+from .cancel import CANCELLED_STATUSES, ConversationCancelled
 from .schemas import MemorySnapshot
 from .token_budget import TokenBudget
 
@@ -25,6 +26,11 @@ class RequestInProgress(RuntimeError):
 
 class ConversationRepository:
     ACTIVE_STATUSES = {"processing", "action_running", "action_completed"}
+    # cancelling 仍在解除过程中，会话级活跃冲突必须把它计入，防止并发重跑。
+    IN_FLIGHT_STATUSES = ACTIVE_STATUSES | {"cancelling"}
+    # complete_request 只允许从这两个状态落 completed：
+    # cancelling/cancelled 说明取消已在完成窗口内到达，必须拒绝覆盖。
+    ALLOWED_COMPLETE_STATUSES = {"processing", "action_completed"}
     LEASE_DURATION = timedelta(minutes=15)
 
     def __init__(self, token_budget: Optional[TokenBudget] = None) -> None:
@@ -60,12 +66,18 @@ class ConversationRepository:
                     and record.lease_expires_at > now
                 ):
                     raise RequestInProgress("该请求正在处理中")
+                if (
+                    record.status == "cancelling"
+                    and record.lease_expires_at is not None
+                    and record.lease_expires_at > now
+                ):
+                    raise ConversationCancelled("该请求正在停止")
                 other_active = (
                     db.query(DigitalHumanRequest.request_id)
                     .filter(
                         DigitalHumanRequest.session_id == session_id,
                         DigitalHumanRequest.request_id != request_id,
-                        DigitalHumanRequest.status.in_(self.ACTIVE_STATUSES),
+                        DigitalHumanRequest.status.in_(self.IN_FLIGHT_STATUSES),
                         (
                             DigitalHumanRequest.lease_expires_at.is_(None)
                             | (DigitalHumanRequest.lease_expires_at > now)
@@ -75,7 +87,12 @@ class ConversationRepository:
                 )
                 if other_active is not None:
                     raise RequestInProgress("该会话正在处理另一条消息，请稍后重试")
-                if record.status == "retryable":
+                if record.status in {"cancelling", "cancelled"}:
+                    # 取消后的重试：动作阶段按检查点幂等恢复，LLM 阶段重新执行。
+                    record.status = (
+                        "action_running" if record.checkpoint_json else "processing"
+                    )
+                elif record.status == "retryable":
                     record.status = "processing"
                 elif record.status == "action_retryable":
                     record.status = "action_running"
@@ -101,7 +118,7 @@ class ConversationRepository:
                 db.query(DigitalHumanRequest.request_id)
                 .filter(
                     DigitalHumanRequest.session_id == session_id,
-                    DigitalHumanRequest.status.in_(self.ACTIVE_STATUSES),
+                    DigitalHumanRequest.status.in_(self.IN_FLIGHT_STATUSES),
                     (
                         DigitalHumanRequest.lease_expires_at.is_(None)
                         | (DigitalHumanRequest.lease_expires_at > now)
@@ -285,6 +302,62 @@ class ConversationRepository:
             db.close()
 
     @staticmethod
+    def mark_cancelling(
+        request_id: str,
+        lease_token: Optional[str] = None,
+    ) -> Optional[str]:
+        """ACTIVE → cancelling，保留租约与检查点；返回最新 status。
+
+        取消端点拿不到租约（租约不暴露给客户端），因此 lease_token 可选；
+        传入时才执行租约断言。已 cancelling 幂等；终态不改。
+        """
+        db = SessionLocal()
+        try:
+            record = db.get(DigitalHumanRequest, request_id)
+            if record is None:
+                raise LookupError("数字人请求不存在")
+            if lease_token is not None:
+                ConversationRepository._assert_lease(record, lease_token)#防止“过期执行者”回来乱写状态
+            if record.status in ConversationRepository.ACTIVE_STATUSES:
+                record.status = "cancelling"
+                db.commit()
+            return record.status
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @staticmethod
+    def mark_cancelled(request_id: str, lease_token: str) -> None:
+        """取消终态：租约断言后置 cancelled、清租约，保留检查点与资源。
+
+        检查点（含已 checkpoint 的 matter_id/run_id）保留，
+        供同 request_id 重试按 begin_request 的恢复分支幂等续作。
+        来源状态仅限 processing/action_running/action_completed/cancelling；
+        其余状态（如 completed 竞态已赢）幂等返回。
+        """
+        db = SessionLocal()
+        try:
+            record = db.get(DigitalHumanRequest, request_id)
+            if record is None:
+                raise LookupError("数字人请求不存在")
+            ConversationRepository._assert_lease(record, lease_token)
+            if record.status not in {
+                "processing", "action_running", "action_completed", "cancelling",
+            }:
+                return
+            record.status = "cancelled"
+            record.lease_token = None
+            record.lease_expires_at = None
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @staticmethod
     def _assert_lease(record: DigitalHumanRequest, lease_token: str) -> None:
         if not lease_token or record.lease_token != lease_token:
             raise RequestInProgress("请求执行租约已失效")
@@ -413,6 +486,13 @@ class ConversationRepository:
                 raise LookupError("数字人请求不存在")
             if lease_token is not None:
                 self._assert_lease(record, lease_token)
+            if record.status in CANCELLED_STATUSES:
+                # mark_cancelling 可从 action_completed 转 cancelling：
+                # 取消恰好落在动作完成与请求完成之间时，
+                # 绝不能把结果写成 completed，交由 orchestrator 落 cancelled 终态。
+                raise ConversationCancelled("回复已停止，未写入完成结果")
+            if record.status not in self.ALLOWED_COMPLETE_STATUSES:
+                raise RequestInProgress("请求状态不允许完成")
             now = datetime.now(timezone.utc)
             assistant = (
                 db.query(DigitalHumanMessage)

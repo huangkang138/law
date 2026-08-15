@@ -466,6 +466,143 @@ export async function sendDigitalHumanMessage(
   return readJson<DigitalHumanChatResponse>(response);
 }
 
+export type DigitalHumanStreamStatus = 'accepted' | 'thinking';
+
+export interface DigitalHumanStreamHandlers {
+  onStatus?: (status: DigitalHumanStreamStatus, message?: string) => void;
+  onDelta?: (text: string) => void;
+  onStreamFallback?: () => void;
+}
+
+export class DigitalHumanStreamError extends Error {
+  code: string;
+  retryable: boolean;
+
+  constructor(payload: { error?: string; code?: string; retryable?: boolean }) {
+    super(payload.error || '数字人服务暂时不可用');
+    this.name = 'DigitalHumanStreamError';
+    this.code = payload.code || 'STREAM_ERROR';
+    this.retryable = Boolean(payload.retryable);
+  }
+}
+
+interface SseEventBlock {
+  event: string;
+  data: string;
+}
+
+function parseSseBlock(block: string): SseEventBlock | null {
+  let event = '';
+  const dataLines: string[] = [];
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) {
+      event = line.slice('event:'.length).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).replace(/^ /, ''));
+    }
+  }
+  if (!dataLines.length) return null;
+  return { event, data: dataLines.join('\n') };
+}
+
+export async function sendDigitalHumanMessageStream(
+  question: string,
+  sessionId: string | null,
+  requestId: string,
+  handlers: DigitalHumanStreamHandlers,
+  signal?: AbortSignal,
+): Promise<DigitalHumanChatResponse> {
+  // SSE增量呈现：服务端完成解析、路由、安全校验和持久化后分块下发已验证回复。
+  const response = await request('/api/digital-human/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question, request_id: requestId,
+      ...(sessionId ? { session_id: sessionId } : {}),
+    }), signal,
+  });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as ApiErrorResponse;
+    throw new Error(data.error || '数字人服务暂时不可用');
+  }
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    // 浏览器不支持流式读取：降级为普通请求，并明确提示而不是静默吞错。
+    handlers.onStreamFallback?.();
+    return sendDigitalHumanMessage(question, sessionId, requestId, signal);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let completed: DigitalHumanChatResponse | null = null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const parsed = parseSseBlock(block);
+        if (parsed) {
+          const payload = JSON.parse(parsed.data) as Record<string, unknown>;
+          if (parsed.event === 'status') {
+            handlers.onStatus?.(
+              payload.status as DigitalHumanStreamStatus,
+              typeof payload.message === 'string' ? payload.message : undefined,
+            );
+          } else if (parsed.event === 'delta') {
+            handlers.onDelta?.(typeof payload.text === 'string' ? payload.text : '');
+          } else if (parsed.event === 'completed') {
+            completed = payload as unknown as DigitalHumanChatResponse;
+          } else if (parsed.event === 'error') {
+            throw new DigitalHumanStreamError(payload as {
+              error?: string;
+              code?: string;
+              retryable?: boolean;
+            });
+          }
+        }
+        boundary = buffer.indexOf('\n\n');
+      }
+    }
+  } catch (error) {
+    if (error instanceof DigitalHumanStreamError) throw error;
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('已停止等待回复');
+    }
+    if (error instanceof SyntaxError) {
+      throw new Error('流式回复解析失败，请稍后重试');
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  if (!completed) {
+    throw new Error('流式回复中断，未收到完整回答，请刷新后重试');
+  }
+  return completed;
+}
+
+export interface DigitalHumanCancelResult {
+  success: boolean;
+  cancelled: boolean;
+  request_id: string;
+  status: string | null;
+}
+
+export async function cancelDigitalHumanChatRequest(
+  requestId: string,
+): Promise<DigitalHumanCancelResult> {
+  const response = await request('/api/digital-human/chat/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId }),
+  });
+  return readJson<DigitalHumanCancelResult>(response);
+}
+
 export async function resetDigitalHumanSession(sessionId: string): Promise<void> {
   const response = await request('/api/digital-human/reset', {
     method: 'POST',

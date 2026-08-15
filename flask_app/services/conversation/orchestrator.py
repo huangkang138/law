@@ -7,6 +7,12 @@ from typing import Dict
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from .actions import ConversationActions
+from .cancel import (
+    ConversationCancelled,
+    arm,
+    disarm,
+    is_cancelled,
+)
 from .context_builder import ConversationContextBuilder
 from .locks import ConversationSessionLock
 from .memory import ConversationMemoryManager
@@ -56,7 +62,11 @@ class ConversationOrchestrator:
     ) -> Dict:
         session_id = session_id or f"dh_{uuid.uuid4().hex}"
         lease_token = None
+        arm(request_id)
         try:
+            if is_cancelled(request_id):
+                # 取消先于请求行创建到达：不建行、不持久化用户消息，直接结束。
+                raise ConversationCancelled()
             with self.session_lock.acquire(session_id):
                 cached, user_message_id, lease_token = self.repository.begin_request(
                     request_id, client_id, session_id, question,
@@ -68,7 +78,11 @@ class ConversationOrchestrator:
                     )
                 )
             if cached is not None:
+                # 已完成请求的取消是 no-op：优先返回既有缓存。
                 return cached
+            if is_cancelled(request_id, poll_db=True):
+                # begin_request 执行期间到达的取消（含跨 worker 的 cancelling）。
+                raise ConversationCancelled()
             return self._chat_locked(
                 question,
                 client_id,
@@ -79,14 +93,21 @@ class ConversationOrchestrator:
                 initial_workspace_version,
                 llm,
             )
-        except Exception:
+        except Exception as exc:
             if lease_token:
                 try:
                     with self.session_lock.acquire(session_id):
-                        self.repository.mark_retryable(request_id, lease_token)
+                        if isinstance(exc, ConversationCancelled) or is_cancelled(
+                            request_id, poll_db=True,
+                        ):
+                            self.repository.mark_cancelled(request_id, lease_token)
+                        else:
+                            self.repository.mark_retryable(request_id, lease_token)
                 except Exception:
                     pass
             raise
+        finally:
+            disarm(request_id)
 
     def _chat_locked(
         self,
@@ -105,6 +126,7 @@ class ConversationOrchestrator:
             parsed = dict(checkpoint["parsed"])
             result = dict(checkpoint["result"])
             memory = MemorySnapshot(**checkpoint["memory"])
+            self._ensure_not_cancelled(request_id, session_id, lease_token)
             with self.session_lock.acquire(session_id):
                 self.repository.complete_request(
                     request_id,
@@ -165,6 +187,7 @@ class ConversationOrchestrator:
             raw = self.invoke_llm(
                 self._to_langchain_messages(context.messages),
                 llm or self.llm,
+                request_id=request_id,
             )
             parsed = self.parse_llm_response(raw)
             decision = self.router.route(question, context, parsed)
@@ -182,6 +205,7 @@ class ConversationOrchestrator:
                 "context": self._checkpoint_context(context),
                 "workspace_version": initial_workspace_version,
             }
+            self._ensure_not_cancelled(request_id, session_id, lease_token)
             with self.session_lock.acquire(session_id):
                 self.repository.mark_action_started(
                     request_id,
@@ -211,6 +235,7 @@ class ConversationOrchestrator:
         result = self._build_result(
             parsed, action, decision, context, session_id,
         )
+        self._ensure_not_cancelled(request_id, session_id, lease_token)
         with self.session_lock.acquire(session_id):
             self.repository.complete_request(
                 request_id,
@@ -221,6 +246,19 @@ class ConversationOrchestrator:
                 lease_token,
             )
         return result
+
+    def _ensure_not_cancelled(
+        self,
+        request_id: str,
+        session_id: str,
+        lease_token: str,
+    ) -> None:
+        """已完成持久化前的取消检查；命中则落 cancelled 终态并抛出。"""
+        if not is_cancelled(request_id, poll_db=True):
+            return
+        with self.session_lock.acquire(session_id):
+            self.repository.mark_cancelled(request_id, lease_token)
+        raise ConversationCancelled()
 
     def _execute_recoverable_action(
         self,
@@ -249,6 +287,7 @@ class ConversationOrchestrator:
                 if value is not None
             })
 
+        self._ensure_not_cancelled(request_id, session_id, lease_token)
         action = self.actions.execute(
             decision,
             question,
@@ -275,6 +314,7 @@ class ConversationOrchestrator:
             "workspace_version": expected_workspace_version,
             "result": result,
         }
+        self._ensure_not_cancelled(request_id, session_id, lease_token)
         with self.session_lock.acquire(session_id):
             self.repository.mark_action_completed(
                 request_id,
@@ -282,6 +322,11 @@ class ConversationOrchestrator:
                 resources,
                 completed_checkpoint,
             )
+        # 动作完成到请求完成之间是取消竞态窗口：
+        # mark_cancelling 允许从 action_completed 转 cancelling，
+        # 若取消恰好落在这里必须拒绝把结果写成 completed。
+        # complete_request 内部的允许状态校验是同一竞态的第二道防线。
+        self._ensure_not_cancelled(request_id, session_id, lease_token)
         with self.session_lock.acquire(session_id):
             self.repository.complete_request(
                 request_id,

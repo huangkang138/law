@@ -1,6 +1,6 @@
 """数字人智能助手路由。"""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.logger import app_logger
@@ -8,6 +8,7 @@ from services.conversation import (
     WorkspaceVersionConflict,
     get_conversation_workspace_service,
 )
+from services.conversation.cancel import ConversationCancelled
 from services.digital_human_identity import (
     get_digital_human_client_id,
     persist_digital_human_identity,
@@ -96,11 +97,94 @@ def chat():
         return jsonify({"success": False, "error": str(exc)}), 400
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except ConversationCancelled as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "code": "CANCELLED",
+            "retryable": True,
+        }), 409
     except RuntimeError as exc:
         return jsonify({"success": False, "error": str(exc), "code": "REQUEST_IN_PROGRESS"}), 409
     except Exception as exc:
         app_logger.exception(f"数字人聊天接口错误: {str(exc)}")
         return jsonify({"success": False, "error": "数字人暂时无法回答，请稍后重试"}), 500
+
+
+@router.route("/digital-human/chat/stream", methods=["POST"])
+def chat_stream():
+    """接收用户消息，以SSE增量呈现已验证回复；完整响应与 /chat 一致。
+
+    事件顺序：accepted → thinking → delta* → completed，
+    处理异常时以 error 事件收尾；所有事件携带 request_id。
+    回复在服务端完成解析、路由、安全校验和持久化后才分块下发。
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "请求体必须是 JSON 对象"}), 400
+
+        question = data.get("question")
+        if not isinstance(question, str) or not question.strip():
+            return jsonify({"success": False, "error": "缺少必要参数 question"}), 400
+
+        session_id = data.get("session_id")
+        if session_id is not None and not isinstance(session_id, str):
+            return jsonify({"success": False, "error": "session_id 必须是字符串"}), 400
+        request_id = data.get("request_id")
+        if not isinstance(request_id, str) or not request_id.startswith("dhr_"):
+            return jsonify({"success": False, "error": "缺少或无效的 request_id"}), 400
+
+        stream = get_digital_human_service().chat_stream(
+            question=question,
+            client_id=_get_client_id(),
+            request_id=request_id,
+            session_id=session_id,
+            custom_config=_get_custom_llm_config(),
+        )
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("流式聊天")
+    except (ValueError, LookupError) as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+
+    response = Response(
+        stream_with_context(stream),
+        mimetype="text/event-stream; charset=utf-8",
+    )
+    response.headers["Cache-Control"] = "no-cache, no-transform"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
+
+@router.route("/digital-human/chat/cancel", methods=["POST"])
+def cancel_chat():
+    """停止指定数字人请求的服务端处理（幂等）。
+
+    活跃请求标记为 cancelling，在途 LLM 分块循环发现后中断
+    底层模型请求并落 cancelled 终态；已完成请求取消为 no-op。
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "请求体必须是 JSON 对象"}), 400
+        request_id = data.get("request_id")
+        if not isinstance(request_id, str) or not request_id.startswith("dhr_"):
+            return jsonify({"success": False, "error": "缺少或无效的 request_id"}), 400
+        result = get_digital_human_service().cancel_request(
+            request_id,
+            _get_client_id(),
+        )
+        return jsonify({"success": True, **result})
+    except (UnicodeError, SQLAlchemyError):
+        return _database_unavailable("停止回复")
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "NOT_FOUND"}), 404
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "code": "FORBIDDEN"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 
 
 @router.route("/digital-human/reset", methods=["POST"])

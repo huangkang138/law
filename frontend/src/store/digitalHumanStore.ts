@@ -6,8 +6,10 @@ import {
   DigitalHumanEmotion,
   DigitalHumanSessionSummary,
   ConversationPresentation,
+  DigitalHumanStreamError,
   DigitalHumanWorkspaceContext,
   LaborTriageSnapshot,
+  cancelDigitalHumanChatRequest,
   createDigitalHumanWorkspaceSession,
   deleteDigitalHumanSession,
   getDigitalHumanMessages,
@@ -15,7 +17,7 @@ import {
   getDigitalHumanWorkspace,
   resetDigitalHumanSession,
   selectDigitalHumanWorkspaceMatter,
-  sendDigitalHumanMessage,
+  sendDigitalHumanMessageStream,
 } from '@/services/digitalHumanApi';
 
 export interface DigitalHumanMessage {
@@ -44,6 +46,8 @@ interface DigitalHumanStore {
   workspaceVersion: number;
   workspaceLoading: boolean;
   workspaceError: string;
+  streamingMessage: DigitalHumanMessage | null;
+  streamFallbackNotice: string;
   laborContextBySession: Record<string, {
     matterId: string;
     runId: string | null;
@@ -76,6 +80,7 @@ interface DigitalHumanStore {
 }
 
 let activeRequest: AbortController | null = null;
+let activeRequestId: string | null = null;
 let hydrationSequence = 0;
 let conversationOperationSequence = 0;
 let workspaceSelectionTail: Promise<void> = Promise.resolve();
@@ -116,6 +121,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       workspaceVersion: 0,
       workspaceLoading: false,
       workspaceError: '',
+      streamingMessage: null,
+      streamFallbackNotice: '',
       laborContextBySession: {},
 
       open: () => {
@@ -161,16 +168,43 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
 
         set((state) => ({
           messages: [...state.messages, userMessage],
+          streamingMessage: null,
+          streamFallbackNotice: '',
           isLoading: true,
           emotion: 'thinking',
         }));
 
         const operation = ++conversationOperationSequence;
         const controller = new AbortController();
+        const requestId = `dhr_${crypto.randomUUID()}`;
+        activeRequestId = requestId;
         try {
           activeRequest = controller;
-          const response = await sendDigitalHumanMessage(
-            question, get().sessionId, `dhr_${crypto.randomUUID()}`, controller.signal,
+          const response = await sendDigitalHumanMessageStream(
+            question, get().sessionId, requestId, {
+              onDelta: (text) => {
+                if (operation !== conversationOperationSequence) return;
+                if (!text) return;
+                set((state) => ({
+                  streamingMessage: state.streamingMessage
+                    ? {
+                        ...state.streamingMessage,
+                        content: state.streamingMessage.content + text,
+                      }
+                    : {
+                        id: createMessageId('assistant'),
+                        role: 'assistant',
+                        content: text,
+                        createdAt: Date.now(),
+                      },
+                }));
+              },
+              onStreamFallback: () => {
+                if (operation !== conversationOperationSequence) return;
+                set({ streamFallbackNotice: '当前浏览器不支持增量显示，已切换为普通回复。' });
+              },
+            },
+            controller.signal,
           );
           if (operation !== conversationOperationSequence) return;
           const assistantMessage: DigitalHumanMessage = {
@@ -200,6 +234,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
               sessionId: response.session_id,
               emotion: response.emotion,
               isLoading: false,
+              streamingMessage: null,
               currentMatterId: matterId || state.currentMatterId,
               currentTriage: matterId && matterId !== state.currentMatterId
                 ? null : state.currentTriage,
@@ -212,6 +247,16 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           void get().refreshWorkspace(response.session_id);
         } catch (error) {
           if (operation !== conversationOperationSequence) return;
+          if (error instanceof DigitalHumanStreamError && error.code === 'CANCELLED') {
+            // 服务端已确认停止：不追加错误气泡，只给出轻量提示。
+            set({
+              isLoading: false,
+              emotion: 'idle',
+              streamingMessage: null,
+              streamFallbackNotice: '已停止回复',
+            });
+            return;
+          }
           const message = error instanceof Error ? error.message : '数字人服务暂时不可用';
           set((state) => ({
             messages: [
@@ -225,9 +270,11 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             ],
             emotion: 'error',
             isLoading: false,
+            streamingMessage: null,
           }));
         } finally {
           if (activeRequest === controller) activeRequest = null;
+          if (activeRequestId === requestId) activeRequestId = null;
         }
       },
 
@@ -253,6 +300,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           workspacePresentation: null,
           workspaceVersion: 0,
           workspaceError: '',
+          streamingMessage: null,
+          streamFallbackNotice: '',
         });
         void get().loadSessions();
       },
@@ -290,7 +339,12 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       loadSession: async (sessionId) => {
         invalidateConversationRequest();
         const sequence = ++hydrationSequence;
-        set({ isLoading: false, workspaceLoading: true, workspaceError: '' });
+        set({
+          isLoading: false,
+          workspaceLoading: true,
+          workspaceError: '',
+          streamingMessage: null,
+        });
         try {
           const [history, workspace] = await Promise.all([
             getDigitalHumanMessages(sessionId),
@@ -395,6 +449,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             currentMatterId: null, currentTriage: null, currentAgentRun: null,
             workspacePresentation: null, workspaceError: '',
             workspaceVersion: 0,
+            streamingMessage: null,
+            streamFallbackNotice: '',
           });
         }
         set((state) => {
@@ -427,12 +483,27 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           workspaceVersion: 0,
           workspaceLoading: false,
           workspaceError: '',
+          streamingMessage: null,
+          streamFallbackNotice: '',
         });
       },
 
       cancelRequest: () => {
+        // 真正的服务端取消：先通知服务端中断在途模型执行，再本地停止读取。
+        const requestId = activeRequestId;
+        activeRequestId = null;
+        if (requestId) {
+          void cancelDigitalHumanChatRequest(requestId).catch(() => undefined);
+        }
         invalidateConversationRequest();
-        set({ isLoading: false, emotion: 'idle' });
+        // 操作序列已失效，sendMessage 的异步 CANCELLED 分支不会再执行：
+        // 停止提示必须在这里同步给出，不能依赖该分支，也不能清空。
+        set({
+          isLoading: false,
+          emotion: 'idle',
+          streamingMessage: null,
+          streamFallbackNotice: '已停止回复',
+        });
       },
 
       setLaborContext: (context) => set((state) => {
@@ -481,6 +552,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             workspaceError: '',
             isLoading: false,
             emotion: 'idle',
+            streamingMessage: null,
           });
           try {
             const workspace: DigitalHumanWorkspaceContext =

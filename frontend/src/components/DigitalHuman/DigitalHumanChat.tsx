@@ -8,6 +8,7 @@ import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
 import ConversationComposer from './ConversationComposer';
+import ConversationMessageContent from './ConversationMessageContent';
 import DigitalHumanCompanion from './DigitalHumanCompanion';
 import LaborTriageCard from './LaborTriageCard';
 import DigitalHumanMatterWorkspace from './DigitalHumanMatterWorkspace';
@@ -32,6 +33,8 @@ export default function DigitalHumanChat() {
     sessions,
     sessionId,
     startNewConversation,
+    streamFallbackNotice,
+    streamingMessage,
   } = useDigitalHumanStore();
 
   useEffect(() => {
@@ -39,7 +42,7 @@ export default function DigitalHumanChat() {
     if (container) {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading]);
+  }, [messages, streamingMessage, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading]);
 
   const handleRoute = (route: string) => {
     setEmotion('handoff');
@@ -161,7 +164,10 @@ export default function DigitalHumanChat() {
         {messages.map((message) => (
           <div key={message.id} className={`dh-message-row dh-message-${message.role}`}>
             <div className="dh-message-bubble">
-              <p>{message.content}</p>
+              <ConversationMessageContent
+                role={message.role}
+                content={message.content}
+              />
               {message.role === 'assistant' && message.route && message.routeLabel && (
                 <button
                   type="button"
@@ -175,7 +181,18 @@ export default function DigitalHumanChat() {
             </div>
           </div>
         ))}
-        {isLoading && (
+        {streamingMessage && (
+          <div className="dh-message-row dh-message-assistant">
+            <div className="dh-message-bubble" aria-label="法小助正在输入">
+              <ConversationMessageContent
+                role="assistant"
+                content={streamingMessage.content}
+                streaming
+              />
+            </div>
+          </div>
+        )}
+        {isLoading && !streamingMessage && (
           <div className="dh-message-row dh-message-assistant">
             <div className="dh-message-bubble dh-typing" aria-label="法小助正在输入">
               <span />
@@ -194,6 +211,9 @@ export default function DigitalHumanChat() {
         />
       </div>
 
+      {streamFallbackNotice && (
+        <p className="dh-stream-fallback-hint">{streamFallbackNotice}</p>
+      )}
       <ConversationComposer />
       <p className="dh-disclaimer">回答仅供参考，重要法律事项请咨询专业律师</p>
       </div>

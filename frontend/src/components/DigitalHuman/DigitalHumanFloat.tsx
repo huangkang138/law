@@ -609,6 +609,16 @@ export default function DigitalHumanFloat() {
           text-align: center;
         }
 
+        .dh-stream-fallback-hint {
+          margin: 0;
+          padding: 6px 14px 0;
+          color: #b45309;
+          background: #fff;
+          font-size: 11px;
+          line-height: 1.5;
+          text-align: center;
+        }
+
         .dh-workspace-layout {
           min-width: 0;
           min-height: 0;

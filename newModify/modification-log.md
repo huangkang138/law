@@ -900,3 +900,60 @@
 - 用户希望把“完整故事 + LAW-DEV验收报告结构”的只读讲解固化到工作流，避免 `REVIEW / LEARN` 被路由成简短结论或逐函数拆解。
 - 新增 `ACCEPTANCE_GUIDE`：先执行 LAW-REVIEW 核实事实，再一次讲完目标、完整业务故事、状态/数据库变化、Before → After、安全边界、测试证据、人工验收表和关键文件入口。
 - 自动路由已接入“验收导读、讲清最终效果、怎么人工验收、完整故事一次讲完”等自然语言；该模式保持只读，REVIEW 失败时必须先报告阻断问题。
+
+## 2026-08-14（阶段 3.7F 第一部分：SSE增量呈现）
+
+- 用户确认 3.7E 技术验收 PASS（已提交 `e00e578`）并批准 3.7F 架构决定：保留 `POST /chat`、新增 `POST /chat/stream`、SSE 只呈现服务端完成解析/路由/安全校验/持久化后的已验证回复、不宣称原始 LLM Token 流式输出、不做语音口型、不修改仲裁业务。
+- 后端：新增 `services/conversation/sse.py`（事件编码、按字符分块、稳定错误映射：中文错误 + 错误码 + 是否可重试）；`DigitalHumanService.chat_stream` 生成器复用同一 Orchestrator，事件顺序 accepted → thinking → delta* → completed，异常以 error 事件收尾；路由设置 `Cache-Control: no-cache, no-transform` 与 `X-Accel-Buffering: no`，校验失败仍返回 JSON 400。
+- 前端：`sendDigitalHumanMessageStream` 用 fetch + ReadableStream 解析 SSE（不用 EventSource）；不支持流式读取时降级普通请求并显示明确中文提示；Zustand 只维护一条 `streamingMessage` 临时消息，completed 后才确认最终消息与 Workspace；主对话与工作台侧边陪伴共用同一 `sendMessage`，两侧均渲染增量气泡。
+- 幂等与恢复：同一 request_id 重试复用现有请求缓存，不重复创建 Matter/Run；流中断后服务端已完成消息仍可通过历史恢复，前端不写半条正式 assistant 消息。AbortController 仅停止前端读取，服务端取消留待 3.7F 第二部分。
+- 验证：3.7F 专项 12/12、3.7D + 3.7E 联合回归 25/25、`npx tsc --noEmit`、Python `compileall`、`git diff --check` 均通过；未修改数据库结构、迁移、Runtime Graph、劳动规则或审批协议。
+
+## 2026-08-14（阶段 3.7F 返修：真实模型结构化输出解析可靠性）
+
+- 用户浏览器验收发现：明确劳动咨询偶发返回"我还不太确定你的需求……"固定兜底句；自动测试使用固定 Fake LLM 无法覆盖。真实模型探针定位失败类型：多轮会话中 DeepSeek 偶发返回纯文本（含 Markdown 加粗、无 JSON），解析失败后固定兜底句被作为 assistant 消息写入历史，后续轮次模型逐字复读兜底句形成永久污染循环。
+- 修复（仅 `digital_human_service.py`）：首次响应非 JSON 时追加"严格只返回 JSON"指令重试一次；解析链增强为清理围栏 → 直接解析 → 平衡括号提取 → 字符串内裸换行/制表符与尾逗号修复；全部失败时降级为模型纯文本回复（剔除 Markdown 加粗，含花括号或超长则拒绝），路由仍由服务端确定性规则决定，固定兜底句仅作为最后手段，不再污染会话历史。
+- 失败类型记录：日志现在记录失败阶段与截断的原始响应头部，便于后续真实环境继续观测。
+- 验证：新增可靠性专项 14/14（含纯文本降级、重试、修复、兜底隔离与真实链路集成）；3.7F 流式专项 12/12、3.7D + 3.7E 联合回归 25/25；真实模型复验 6/6 轮无兜底句、重试全部拉回合法 JSON；Python compileall 与 `git diff --check` 通过。
+
+## 2026-08-14（阶段 3.7F 前端呈现返修：Markdown 正文统一渲染）
+
+- 用户浏览器验收发现：数字人回复中的 `**加粗**` 被原样显示、编号列表与段落换行拥挤、主聊天与工作台侧边呈现不一致。
+- 新增 `frontend/src/components/DigitalHuman/ConversationMessageContent.tsx` 共享正文组件：复用项目已有 react-markdown + remark-gfm，仅 assistant 消息渲染 Markdown，用户消息保持纯文本；未启用 rehypeRaw，未使用 dangerouslySetInnerHTML。
+- `DigitalHumanChat` 与 `DigitalHumanCompanion` 共用该组件（禁止各写一套解析逻辑）；流式临时消息走同一渲染路径，光标动画移入组件局部样式；为 p/ol/ul/li/strong/code 设置局部样式，紧凑模式匹配侧边 11px 排版，避免影响全局页面。
+- 验证：`npx tsc --noEmit` 通过、3.7F 专项 26/26、`git diff --check` 通过；未修改后端、SSE 协议、Store 状态结构与业务逻辑，未执行任何 git 写操作。
+
+## 2026-08-14（阶段 3.7F 浏览器呈现第二轮返修）
+
+- 用户复验发现：发送后先出现只有光标的空白气泡；真实模型回复携带双重转义排版符时，Markdown 正文显示字面量 `\\n`，列表仍无法成形。
+- Store 改为发送时不预建空 `streamingMessage`，继续显示既有打字动画；首个非空 delta 到达后才创建并追加唯一流式消息。
+- `DigitalHumanService` 在结构化结果校验后统一规范 reply：仅恢复单层字面量 `\\r\\n`、`\\n`、`\\t`，双反斜杠文本保持不变；SSE、持久化与历史恢复共享同一规范化结果。
+- 验证：可靠性 + SSE 专项 28/28、`npx tsc --noEmit`、`git diff --check` 通过；未修改 Runtime、劳动规则、审批、数据库结构或迁移。
+
+## 2026-08-14（阶段 3.7F 第一部分验收通过并收尾）
+
+- 用户完成真实浏览器验收并确认无问题：增量呈现、结构化输出可靠性、Markdown 正文渲染与主聊天/侧边一致性全部通过。
+- 收尾期间补充：解析后的 reply 对单层字面量 `\n`、`\r\n`、`\t` 做受控反转义（保留双反斜杠文本），恢复 Markdown 段落与列表排版；等待阶段保留打字动画，收到首个非空 delta 后才创建流式气泡，消除空白光标气泡；对应新增双转义排版符与转义保留专项测试。
+- 最终验证：可靠性专项 16/16、3.7F 流式专项 12/12、3.7F + 3.7D + 3.7E 全量回归 53/53、`npx tsc --noEmit`、Python `compileall`、`git diff --check` 均通过。
+- 任务状态更新为 `COMPLETED`；工作区改动未提交，由用户自行决定提交时机。服务端取消、语音与口型动画留待后续部分。
+
+## 2026-08-14（阶段 3.7F 第二部分：服务端取消）
+
+- 用户确认完成整个 3.7F（第二部分范围仅服务端取消，语音/口型继续暂缓）。实施：新增 `services/conversation/cancel.py`（进程级取消注册表 15min TTL + 0.5s 节流 DB 轮询双通道、`ConversationCancelled` 不继承 RuntimeError）；`digital_human_requests` 增加 cancelling/cancelled 状态（自由字符串，无迁移）；`mark_cancelling` 保留租约与检查点、`mark_cancelled` 租约断言后清租约保留 checkpoint/resources；`begin_request` 取消重试分支（有检查点幂等恢复 / 无检查点重跑 / cancelling 有效租约拒绝穿透）与会话活跃冲突计入 cancelling。
+- Orchestrator 最小接入：arm/disarm、begin_request 前后双检查、`_ensure_not_cancelled` 四个检查点（动作快路径前、动作执行前、动作执行后、完成前）；except 分支按取消分流到 mark_cancelled。LLM 分块循环每 chunk 检查取消 → break + 显式 close() 中止 httpx 模型流（经 GeneratorExit → openai Stream.close → httpx 关闭链，已查证）；重试第二次 stream 同样检查。动作执行中不强制中断，副作用幂等保留。
+- 新增 `POST /api/digital-human/chat/cancel`（幂等；404/403/400）；非流式 /chat 映射 409 CANCELLED；SSE 复用 error 事件（code=CANCELLED, retryable=true）。前端：`cancelDigitalHumanChatRequest`、在途 `activeRequestId`、停止按钮先通知服务端再本地 abort、CANCELLED 特判（不追加错误气泡，提示"已停止回复"）。
+- 验证：取消专项 23/23（注册表、仓库状态机、LLM 阶段/动作前/动作中/完成窗口取消、重试恢复、路由与前端守卫）；3.7F 流式 12/12、可靠性 16/16、3.7D/3.7E 25/25 合计 76/76；`npx tsc --noEmit`、Python compileall、`git diff --check` 通过。未修改数据库结构、迁移、Runtime Graph、劳动规则或审批协议。
+
+## 2026-08-15（阶段 3.7F 第二部分返修：完成窗口竞态与停止提示）
+
+- 用户验收反馈两项：P1 状态竞态 —— `mark_action_completed()` 与 `complete_request()` 之间到达的取消会被覆盖写成 completed；P2 停止提示 —— `cancelRequest()` 清空 `streamFallbackNotice` 后，异步 CANCELLED 分支因操作序列已失效被跳过，提示不显示。
+- P1 修复（仅 `repository.py` + `orchestrator.py`）：`_execute_recoverable_action` 在 `mark_action_completed` 后、`complete_request` 前增加一次 `_ensure_not_cancelled`；`complete_request` 增加允许完成状态白名单 `ALLOWED_COMPLETE_STATUSES`（processing/action_completed），发现 cancelling/cancelled 抛 `ConversationCancelled` 拒绝写 completed（由 orchestrator except 分流落 cancelled 终态），其余状态抛 RequestInProgress。动作副作用仍幂等保留，检查点不丢。
+- P2 修复（仅 `digitalHumanStore.ts`）：`cancelRequest` 点击即同步设置 `streamFallbackNotice: '已停止回复'` 且不再清空；保留 sendMessage 的 CANCELLED 特判分支覆盖非本端发起的取消；下一次发送/加载会话/新会话仍按既有逻辑清空提示。
+- 测试：新增仓库单测 `test_complete_request_rejects_cancelled_statuses`（cancelling/cancelled 拒绝完成、无 assistant 消息、租约与 response_json 不变）；集成测试 `test_cancel_landing_between_action_completed_and_complete_request`（动作完成瞬间取消 → CANCELLED、检查点保留、同 request_id 重试幂等恢复、Matter 不重复）；前端守卫 `test_frontend_stop_notice_synchronous_without_error_bubble`（提示同步给出、不清空、不追加错误气泡）。
+- 验证：取消专项 26/26；3.7F 流式 12/12、可靠性 16/16、3.7D 12/12、3.7E 13/13，合计 79/79；`npx tsc --noEmit`、Python `compileall`、`git diff --check` 通过。未修改数据库结构、迁移、Runtime Graph、劳动规则或审批协议。
+
+## 2026-08-15（阶段 3.7F 第二部分验收通过并整体收尾）
+
+- 用户对返修（完成窗口竞态 + 停止提示）验收通过，3.7F 第二部分与 3.7F 整体收尾：`CURRENT_TASK` 状态更新为 `COMPLETED`，`NEXT_STEP` 更新为 3.7G → 3.7H 依赖顺序，不自动启动后续阶段。
+- 最终验证基线：取消专项 26/26、3.7F 流式 12/12、可靠性 16/16、3.7D 12/12、3.7E 13/13，合计 79/79；`npx tsc --noEmit`、Python `compileall`、`git diff --check` 通过。
+- 工作区改动未提交，由用户自行决定提交时机。

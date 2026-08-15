@@ -2,14 +2,35 @@
 
 import json
 import re
+import time
 import uuid
 from typing import Dict, List, Optional
 
+from langchain_core.messages import HumanMessage
+
 from core.database import SessionLocal
 from core.logger import app_logger
-from models.db_models import DigitalHumanMessage, DigitalHumanSession
+from models.db_models import DigitalHumanMessage, DigitalHumanRequest, DigitalHumanSession
 from services.llm_factory import LLMFactory
 from services.conversation import ConversationOrchestrator
+from services.conversation.cancel import (
+    ConversationCancelled,
+    is_cancelled,
+    set_cancelled,
+)
+from services.conversation.repository import ConversationRepository, RequestInProgress
+from services.conversation.sse import (
+    DEFAULT_CHUNK_DELAY,
+    EVENT_COMPLETED,
+    EVENT_DELTA,
+    EVENT_ERROR,
+    EVENT_STATUS,
+    STATUS_ACCEPTED,
+    STATUS_THINKING,
+    encode_event,
+    iter_text_chunks,
+    stream_error_data,
+)
 
 
 INTENT_ROUTE_MAP = {
@@ -93,35 +114,72 @@ agent_continue、workspace_guidance、high_risk_handoff。
 confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 general_chat，并通过回复询问用户需要什么帮助。"""
 
     @staticmethod
-    def _invoke_llm_streaming(messages: List, llm) -> str:
-        chunks: List[str] = []
-        for chunk in llm.stream(messages):
-            content = getattr(chunk, "content", "")
-            if isinstance(content, str):
-                chunks.append(content)
-        response = "".join(chunks).strip()
-        if not response:
+    def _invoke_llm_streaming(
+        messages: List,
+        llm,
+        request_id: Optional[str] = None,
+    ) -> str:
+        raw = DigitalHumanService._stream_joined(llm, messages, request_id)
+        if not raw:
             raise ValueError("大模型返回了空内容")
-        return response
+        if DigitalHumanService._parse_raw_json(raw, log_failure=False) is not None:
+            return raw
+        # 真实模型偶发忽略JSON格式要求：强化格式指令重试一次，
+        # 重试仍失败时交由解析层做纯文本可靠降级。
+        app_logger.warning(
+            f"数字人LLM首次响应不是有效JSON(len={len(raw)})，强化格式要求重试一次"
+        )
+        retry_messages = [
+            *messages,
+            HumanMessage(content=(
+                "请严格只返回一个合法JSON对象，格式为 "
+                '{"reply":"给用户的中文回复","intent":"general_chat",'
+                '"conversation_route":"normal_chat","emotion":"talk_normal","confidence":0.8}，'
+                "不要输出任何其他文字或Markdown。"
+            )),
+        ]
+        raw = DigitalHumanService._stream_joined(llm, retry_messages, request_id)
+        if not raw:
+            raise ValueError("大模型返回了空内容")
+        if DigitalHumanService._parse_raw_json(raw, log_failure=False) is None:
+            app_logger.warning(
+                f"数字人LLM重试响应仍不是有效JSON(len={len(raw)})，交由解析层降级"
+            )
+        return raw
+
+    @staticmethod
+    def _stream_joined(llm, messages, request_id: Optional[str] = None) -> str:
+        chunks: List[str] = []
+        stream = llm.stream(messages)
+        try:
+            for chunk in stream:
+                if request_id and is_cancelled(request_id, poll_db=True):
+                    # 停止消费并显式关闭流：GeneratorExit 沿
+                    # langchain/openai/httpx 关闭链中止在途模型请求。
+                    break
+                content = getattr(chunk, "content", "")
+                if isinstance(content, str):
+                    chunks.append(content)
+        finally:
+            close = getattr(stream, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except Exception:
+                    pass
+        if request_id and is_cancelled(request_id):
+            raise ConversationCancelled()
+        return "".join(chunks).strip()
 
     @staticmethod
     def _parse_llm_response(raw_response: str) -> Dict:
         """
         解析大语言模型(LLM)的原始响应，并将其转换为结构化的字典格式。
-        该方法会尝试从原始响应中提取有效JSON数据，并进行必要的验证和规范化处理。
-        如果解析失败或数据不符合要求，将返回默认的回退响应。
-        Args:
-            raw_response (str): 从大语言模型获取的原始响应字符串
-        Returns:
-            Dict: 包含解析后的回复内容、意图、情感和置信度的字典，格式如下：
-                {
-                    "reply": str,      # 回复内容
-                    "intent": str,     # 意图类别
-                    "emotion": str,    # 情感类别
-                    "confidence": float # 置信度(0.0-1.0)
-                }
+        解析链：清理代码围栏 → 直接JSON → 平衡提取 → 修复后解析；
+        全部失败时先降级为模型纯文本回复，最后才使用固定兜底回复。
+        路由仍由服务端确定性规则重新决定，本方法只负责展示文案与元数据。
         """
-        # 定义默认的回退响应，当解析失败时使用
+        # 定义默认的回退响应，当解析与纯文本降级均失败时使用
         fallback = {
             "reply": "我还不太确定你的需求，可以换一种简单的说法告诉我吗？",
             "intent": "general_chat",
@@ -130,27 +188,12 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
             "confidence": 0.0,
         }
 
-        # 清理原始响应，移除可能的代码块标记
-        cleaned = raw_response.strip()
-        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)  # 移除开始的代码块标记
-        cleaned = re.sub(r"\s*```$", "", cleaned)  # 移除结束的代码块标记
-
-        try:
-            # 尝试直接解析JSON
-            result = json.loads(cleaned)
-        except (json.JSONDecodeError, TypeError):
-            # 如果直接解析失败，尝试提取可能存在的JSON部分
-            start = cleaned.find("{")
-            end = cleaned.rfind("}")
-            if start < 0 or end <= start:
-                app_logger.warning("数字人响应不是有效 JSON")
-                return fallback
-            try:
-                # 尝试解析提取出的JSON部分
-                result = json.loads(cleaned[start:end + 1])
-            except json.JSONDecodeError:
-                app_logger.warning("数字人响应 JSON 解析失败")
-                return fallback
+        result = DigitalHumanService._parse_raw_json(raw_response)
+        if result is None:
+            result = DigitalHumanService._degrade_to_prose(raw_response)
+        if result is None:
+            app_logger.warning("数字人响应无法解析且无可用纯文本，使用固定兜底回复")
+            result = dict(fallback)
 
         # 验证解析结果是否为字典类型
         if not isinstance(result, dict):
@@ -160,6 +203,8 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
         reply = result.get("reply")
         if not isinstance(reply, str) or not reply.strip():
             reply = fallback["reply"]
+        else:
+            reply = DigitalHumanService._normalize_reply_text(reply)
 
         # 处理意图，确保是有效的意图类别
         intent = result.get("intent", "general_chat")
@@ -187,6 +232,136 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
             "conversation_route": conversation_route,
             "emotion": emotion,
             "confidence": confidence,
+        }
+
+    @staticmethod
+    def _normalize_reply_text(reply: str) -> str:
+        """把模型双重转义的常见排版符恢复为真实空白字符。"""
+        reply = re.sub(r"(?<!\\)\\r\\n", "\n", reply)
+        reply = re.sub(r"(?<!\\)\\n", "\n", reply)
+        return re.sub(r"(?<!\\)\\t", "\t", reply)
+
+    @staticmethod
+    def _parse_raw_json(raw_response: str, log_failure: bool = True) -> Optional[Dict]:
+        """清理代码围栏后依次尝试直接解析、平衡提取与修复解析。"""
+        cleaned = raw_response.strip()
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)  # 移除开始的代码块标记
+        cleaned = re.sub(r"\s*```$", "", cleaned)  # 移除结束的代码块标记
+        if not cleaned:
+            if log_failure:
+                app_logger.warning("数字人响应为空，无法解析JSON")
+            return None
+        parsed = DigitalHumanService._load_json_attempts(cleaned)
+        if parsed is None and log_failure:
+            app_logger.warning(
+                "数字人响应不是有效JSON，原始响应头部为："
+                f"{re.sub(r'\\s+', ' ', cleaned)[:200]!r}"
+            )
+        return parsed
+
+    @staticmethod
+    def _load_json_attempts(cleaned: str) -> Optional[Dict]:
+        """直接解析 → 平衡提取 → 修复后解析；全部失败返回None。"""
+        try:
+            result = json.loads(cleaned)
+            if isinstance(result, dict):
+                return result
+        except (json.JSONDecodeError, TypeError):
+            pass
+        candidate = DigitalHumanService._extract_json_candidate(cleaned)
+        if candidate is not None:
+            try:
+                result = json.loads(candidate)
+                if isinstance(result, dict):
+                    return result
+            except (json.JSONDecodeError, TypeError):
+                pass
+            repaired = DigitalHumanService._repair_json_text(candidate)
+            if repaired != candidate:
+                try:
+                    result = json.loads(repaired)
+                    if isinstance(result, dict):
+                        return result
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        return None
+
+    @staticmethod
+    def _extract_json_candidate(text: str) -> Optional[str]:
+        """提取第一个括号平衡的JSON对象；找不到或括号不平衡返回None。"""
+        start = text.find("{")
+        while start >= 0:
+            depth = 0
+            in_string = False
+            escaped = False
+            for index in range(start, len(text)):
+                char = text[index]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                elif char == '"':
+                    in_string = True
+                elif char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return text[start:index + 1]
+            start = text.find("{", start + 1)
+        return None
+
+    @staticmethod
+    def _repair_json_text(candidate: str) -> str:
+        """修复真实模型常见畸形：字符串内裸换行/制表符、尾逗号。"""
+        parts: List[str] = []
+        in_string = False
+        escaped = False
+        for char in candidate:
+            if in_string:
+                if escaped:
+                    parts.append(char)
+                    escaped = False
+                elif char == "\\":
+                    parts.append(char)
+                    escaped = True
+                elif char == "\n":
+                    parts.append("\\n")
+                elif char == "\r":
+                    parts.append("\\r")
+                elif char == "\t":
+                    parts.append("\\t")
+                else:
+                    parts.append(char)
+            else:
+                if char == '"':
+                    in_string = True
+                parts.append(char)
+        repaired = "".join(parts)
+        return re.sub(r",\s*([}\]])", r"\1", repaired)
+
+    @staticmethod
+    def _degrade_to_prose(raw_response: str) -> Optional[Dict]:
+        """解析全部失败时，把模型纯文本作为降级回复。
+
+        只接受不含花括号的短文本；含花括号说明更可能是损坏的JSON，
+        不冒险把半成品JSON展示给用户。路由仍由确定性规则重新决定。
+        """
+        text = re.sub(r"\s+", " ", raw_response).strip(" `\t\n\r")
+        text = text.replace("**", "")
+        if not (2 <= len(text) <= 800):
+            return None
+        if "{" in text or "}" in text:
+            return None
+        return {
+            "reply": text,
+            "intent": "general_chat",
+            "conversation_route": None,
+            "emotion": "talk_normal",
+            "confidence": 0.0,
         }
 
     def chat(
@@ -224,6 +399,123 @@ confidence 必须是 0 到 1 之间的数字。用户意图不明确时使用 ge
             session_id=session_id,
             llm=llm,
         )
+
+    def chat_stream(
+        self,
+        question: str,
+        client_id: str,
+        request_id: str,
+        session_id: Optional[str] = None,
+        custom_config: Optional[Dict[str, str]] = None,
+        chunk_delay: float = DEFAULT_CHUNK_DELAY,
+    ):
+        """生成SSE增量呈现事件流。
+
+        事件顺序固定为 accepted → thinking → delta* → completed，
+        处理异常时以 error 事件收尾。生成器先完整复用 chat() 的
+        解析、路由、安全校验与持久化，再对已验证 reply 分块下发；
+        只呈现结果，不输出原始LLM Token，也不提供服务端取消。
+        """
+        question = question.strip() if isinstance(question, str) else ""
+        if not question:
+            raise ValueError("问题不能为空")
+
+        session_id = session_id or f"dh_{uuid.uuid4().hex}"
+        if not session_id.startswith("dh_"):
+            raise ValueError("数字人会话 ID 必须以 dh_ 开头")
+        if not isinstance(request_id, str) or not request_id.startswith("dhr_"):
+            raise ValueError("缺少或无效的 request_id")
+
+        llm = self.llm
+        if custom_config and custom_config.get("api_key"):
+            llm = LLMFactory.create_llm(
+                api_key=custom_config["api_key"],
+                base_url=custom_config.get("base_url"),
+                model=custom_config.get("model"),
+            )
+
+        orchestrator = getattr(self, "_orchestrator", None)
+        if orchestrator is None:
+            orchestrator = self._build_orchestrator()
+            self._orchestrator = orchestrator
+
+        def generate():
+            yield encode_event(
+                EVENT_STATUS,
+                {"status": STATUS_ACCEPTED, "message": "已收到消息，正在处理"},
+                request_id,
+            )
+            yield encode_event(
+                EVENT_STATUS,
+                {"status": STATUS_THINKING, "message": "正在整理回答"},
+                request_id,
+            )
+            try:
+                result = orchestrator.chat(
+                    question=question,
+                    client_id=client_id,
+                    request_id=request_id,
+                    session_id=session_id,
+                    llm=llm,
+                )
+            except Exception as exc:
+                yield encode_event(EVENT_ERROR, stream_error_data(exc), request_id)
+                return
+            reply = result.get("reply")
+            if not isinstance(reply, str):
+                reply = ""
+            for chunk in iter_text_chunks(reply):
+                yield encode_event(EVENT_DELTA, {"text": chunk}, request_id)
+                if chunk_delay > 0:
+                    time.sleep(chunk_delay)
+            yield encode_event(EVENT_COMPLETED, result, request_id)
+
+        return generate()
+
+    def cancel_request(self, request_id: str, client_id: str) -> Dict:
+        """幂等取消在途数字人请求；返回最新状态。
+
+        进程标志先生效（请求行尚未创建也能拦截即将开始的执行），
+        随后在会话锁内把活跃请求标记为 cancelling，由在途线程
+        或分块循环轮询发现并落 cancelled 终态。
+        """
+        set_cancelled(request_id)
+        db = SessionLocal()
+        try:
+            record = db.get(DigitalHumanRequest, request_id)
+            if record is None:
+                raise LookupError("数字人请求不存在")
+            if record.client_id != client_id:
+                raise PermissionError("无权取消该请求")
+            session_id = record.session_id
+            status = record.status
+        finally:
+            db.close()
+        if status not in ConversationRepository.IN_FLIGHT_STATUSES:
+            return {"cancelled": False, "request_id": request_id, "status": status}
+
+        orchestrator = getattr(self, "_orchestrator", None)
+        if orchestrator is None:
+            orchestrator = self._build_orchestrator()
+            self._orchestrator = orchestrator
+        for _ in range(3):
+            try:
+                with orchestrator.session_lock.acquire(session_id):
+                    new_status = orchestrator.repository.mark_cancelling(request_id)
+                return {
+                    "cancelled": new_status == "cancelling",
+                    "request_id": request_id,
+                    "status": new_status,
+                }
+            except RequestInProgress:
+                # 锁只被短事务持有；短暂争抢时重试。
+                time.sleep(0.05)
+        return {
+            "cancelled": False,
+            "request_id": request_id,
+            "status": status,
+            "error": "该会话正在处理另一条消息，请稍后重试",
+        }
 
     @staticmethod
     def list_sessions(client_id: str) -> List[Dict]:
