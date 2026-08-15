@@ -189,12 +189,16 @@ interface Props {
   monthlySalary: string;
   missingFacts: string[];
   disabled?: boolean;
+  // 橙色缺失态门控：仅在校验真正触发（提交尝试 / Agent 定位缺失）时点亮，
+  // 未填写的必填项平时只显示红色 *，避免表单持续"报警"。
+  highlightMissing?: boolean;
   onChange: (value: LaborDisputeFormValue) => void;
   onMonthlySalaryChange: (value: string) => void;
 }
 
 export default function LaborDisputeForm({
-  value, monthlySalary, missingFacts, disabled = false, onChange, onMonthlySalaryChange,
+  value, monthlySalary, missingFacts, disabled = false, highlightMissing = false,
+  onChange, onMonthlySalaryChange,
 }: Props) {
   const claims = splitValues(value.claim_types);
   const has = (terms: string[]) => claims.some((claim) => terms.some((term) => claim.includes(term)));
@@ -214,7 +218,8 @@ export default function LaborDisputeForm({
   ]);
   const set = (field: keyof LaborDisputeFormValue, next: string) => onChange({ ...value, [field]: next });
   const fieldClass = (fields: string[]) => [
-    fields.some((field) => missing.has(field)) ? styles.missing : '',
+    // 橙色边框/黄底只在校验触发后出现，让警告色真正具有定位问题的意义。
+    highlightMissing && fields.some((field) => missing.has(field)) ? styles.missing : '',
     fields.some((field) => required.has(field)) ? styles.required : '',
   ].filter(Boolean).join(' ');
 

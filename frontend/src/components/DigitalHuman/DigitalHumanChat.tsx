@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, FileSearch, History, MessageCircle, Minus, Plus, RotateCcw, Square, Trash2, Volume2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileSearch, History, Minus, Plus, RotateCcw, Square, Trash2, Volume2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -11,25 +11,26 @@ import { useVoiceReady } from '@/lib/voice/useVoiceReady';
 import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
 import ConversationComposer from './ConversationComposer';
 import ConversationMessageContent from './ConversationMessageContent';
-import DigitalHumanCompanion from './DigitalHumanCompanion';
 import LaborTriageCard from './LaborTriageCard';
-import DigitalHumanMatterWorkspace from './DigitalHumanMatterWorkspace';
+import MatterEntryCard from './MatterEntryCard';
 import { useLaborTriage } from './useLaborTriage';
 
 export default function DigitalHumanChat() {
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
+  const [caseEntryExpanded, setCaseEntryExpanded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const laborTriage = useLaborTriage();
   const {
     close,
+    currentMatterId,
     deleteSession,
     emotion,
     historyError,
     isLoading,
     messages,
     loadSession,
+    openWorkspace,
     refreshHistory,
     setEmotion,
     sessions,
@@ -41,16 +42,19 @@ export default function DigitalHumanChat() {
     streamFallbackNotice,
     streamingMessage,
     voiceSpeaking,
+    workspaceOpen,
   } = useDigitalHumanStore();
   const voiceReady = useVoiceReady();
   const ttsSupported = voiceReady && isTtsSupported();
 
   useEffect(() => {
     const container = messagesRef.current;
-    if (container) {
+    // 工作台打开时聊天列被 display:none 隐藏，此时 scrollHeight 为 0，
+    // 若照常滚动会把 scrollTop 置 0；返回对话时依赖变化重新滚动到底部。
+    if (container && !workspaceOpen) {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages, streamingMessage, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading]);
+  }, [messages, streamingMessage, isLoading, laborTriage.snapshot, laborTriage.agentRun, laborTriage.isLoading, workspaceOpen]);
 
   const handleRoute = (route: string) => {
     setEmotion('handoff');
@@ -61,26 +65,29 @@ export default function DigitalHumanChat() {
   };
 
   return (
-    <section className={`dh-panel ${workspaceExpanded ? 'dh-panel-expanded' : ''}`} role="dialog" aria-label="法小助数字人智能助手">
+    <section className="dh-panel" role="dialog" aria-label="法小助数字人智能助手">
       <header className="dh-panel-header">
         <div>
           <div className="dh-title-row">
             <h2>法小助</h2>
             <span className="dh-online-dot" aria-label="在线" />
           </div>
-          <p>{workspaceExpanded ? '案件工作台 · 材料、事实与法源' : EMOTION_LABELS[emotion]}</p>
+          <p>{EMOTION_LABELS[emotion]}</p>
         </div>
         <div className="dh-header-actions">
           <button
             type="button"
             className="dh-workspace-switch"
-            onClick={() => setWorkspaceExpanded((value) => !value)}
-            aria-label={workspaceExpanded ? '返回对话' : '进入案件工作台'}
-            aria-pressed={workspaceExpanded}
-            title={workspaceExpanded ? '返回对话' : '进入案件工作台'}
+            onClick={() => {
+              // 有关联案件直接进入工作台；无当前案件先展开轻量入口，不直接进完整工作台。
+              if (currentMatterId) openWorkspace();
+              else setCaseEntryExpanded((open) => !open);
+            }}
+            aria-label={currentMatterId ? '进入案件工作台' : '案件工作台入口'}
+            title={currentMatterId ? '进入案件工作台' : '案件工作台入口'}
           >
-            {workspaceExpanded ? <MessageCircle size={16} /> : <FileSearch size={16} />}
-            <span>{workspaceExpanded ? '返回对话' : '案件工作台'}</span>
+            <FileSearch size={16} />
+            <span>案件工作台</span>
           </button>
           <button
             type="button"
@@ -232,6 +239,9 @@ export default function DigitalHumanChat() {
           onSubmit={laborTriage.submitFacts}
           onRetry={laborTriage.retry}
         />
+        {(currentMatterId || caseEntryExpanded) && (
+          <MatterEntryCard expanded={caseEntryExpanded} />
+        )}
       </div>
 
       {streamFallbackNotice && (
@@ -240,14 +250,6 @@ export default function DigitalHumanChat() {
       <ConversationComposer />
       <p className="dh-disclaimer">回答仅供参考，重要法律事项请咨询专业律师</p>
       </div>
-      {workspaceExpanded && <div className="dh-workspace-layout">
-        <div className="dh-workspace-column">
-          <DigitalHumanMatterWorkspace />
-        </div>
-        <div className="dh-companion-column">
-          <DigitalHumanCompanion />
-        </div>
-      </div>}
       </div>
     </section>
   );

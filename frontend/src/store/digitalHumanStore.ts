@@ -31,6 +31,22 @@ export interface DigitalHumanMessage {
   createdAt: number;
 }
 
+// 案件工作台四阶段（纯前端信息架构，不改变后端模型）。
+export type CaseStage = 'jurisdiction' | 'material' | 'facts' | 'analysis';
+
+export const CASE_STAGE_LABELS: Record<CaseStage, string> = {
+  jurisdiction: '目标与法域',
+  material: '材料整理',
+  facts: '事实与证据',
+  analysis: '分析与文书',
+};
+
+export interface DigitalHumanMatterBrief {
+  matter_id: string;
+  title: string;
+  goal: string;
+}
+
 interface DigitalHumanStore {
   isOpen: boolean;
   emotion: DigitalHumanEmotion;
@@ -62,6 +78,18 @@ interface DigitalHumanStore {
   open: () => void;
   close: () => void;
   toggle: () => void;
+  workspaceOpen: boolean;
+  openWorkspace: () => void;
+  closeWorkspace: () => void;
+  activeStage: CaseStage;
+  setActiveStage: (stage: CaseStage) => void;
+  sidebarTab: 'sessions' | 'matters';
+  setSidebarTab: (tab: 'sessions' | 'matters') => void;
+  assistantCollapsed: boolean;
+  setAssistantCollapsed: (collapsed: boolean) => void;
+  workspaceGoalDraft: string | null;
+  setWorkspaceGoalDraft: (draft: string | null) => void;
+  currentMatter: DigitalHumanMatterBrief | null;
   setEmotion: (emotion: DigitalHumanEmotion) => void;
   sendMessage: (question: string) => Promise<void>;
   reset: () => Promise<void>;
@@ -116,6 +144,12 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
   persist(
     (set, get) => ({
       isOpen: false,
+      workspaceOpen: false,
+      activeStage: 'jurisdiction',
+      sidebarTab: 'sessions',
+      assistantCollapsed: false,
+      workspaceGoalDraft: null,
+      currentMatter: null,
       emotion: 'idle',
       messages: [],
       sessionId: null,
@@ -160,7 +194,13 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
       close: () => {
         ttsController.cancel();
         voicePlayer.clear();
-        set({ isOpen: false, emotion: 'idle', voiceSpeaking: false, speakingMessageId: null });
+        set({
+          isOpen: false,
+          workspaceOpen: false,
+          emotion: 'idle',
+          voiceSpeaking: false,
+          speakingMessageId: null,
+        });
       },
 
       toggle: () => {
@@ -170,6 +210,25 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           get().open();
         }
       },
+
+      // 进入案件工作台：纯视图切换。不 abort 在途 SSE、不清语音队列；
+      // 工作台由 CaseWorkspaceShell 常驻挂载（仅 CSS 隐藏），草稿与在途上传不丢失。
+      openWorkspace: () => {
+        set({ workspaceOpen: true });
+      },
+
+      // 返回对话：纯视图切换，同样不打断任何在途请求与播放。
+      closeWorkspace: () => {
+        set({ workspaceOpen: false });
+      },
+
+      setActiveStage: (stage) => set({ activeStage: stage }),
+
+      setSidebarTab: (tab) => set({ sidebarTab: tab }),
+
+      setAssistantCollapsed: (collapsed) => set({ assistantCollapsed: collapsed }),
+
+      setWorkspaceGoalDraft: (draft) => set({ workspaceGoalDraft: draft }),
 
       setEmotion: (emotion) => set({ emotion }),
 
@@ -281,6 +340,8 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
               isLoading: false,
               streamingMessage: null,
               currentMatterId: matterId || state.currentMatterId,
+              currentMatter: matterId && matterId !== state.currentMatterId
+                ? null : state.currentMatter,
               currentTriage: matterId && matterId !== state.currentMatterId
                 ? null : state.currentTriage,
               currentAgentRun: matterId && matterId !== state.currentMatterId
@@ -341,6 +402,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           emotion: 'welcome',
           isLoading: false,
           currentMatterId: null,
+          currentMatter: null,
           currentTriage: null,
           currentAgentRun: null,
           laborTriageError: '',
@@ -374,6 +436,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         set({
           sessionId: workspace.session_id,
           currentMatterId: null,
+          currentMatter: null,
           currentTriage: null,
           currentAgentRun: null,
           workspacePresentation: workspace.presentation,
@@ -413,6 +476,13 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
             })) : [WELCOME_MESSAGE],
             emotion: 'idle',
             currentMatterId: matterId,
+            currentMatter: workspace.matter
+              ? {
+                  matter_id: workspace.matter.matter_id,
+                  title: workspace.matter.title,
+                  goal: workspace.matter.goal,
+                }
+              : null,
             currentTriage: workspace.triage,
             currentAgentRun: workspace.run,
             laborTriageError: '',
@@ -480,6 +550,13 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           }
           return {
             currentMatterId: matterId,
+            currentMatter: workspace.matter
+              ? {
+                  matter_id: workspace.matter.matter_id,
+                  title: workspace.matter.title,
+                  goal: workspace.matter.goal,
+                }
+              : null,
             currentTriage: workspace.triage,
             currentAgentRun: workspace.run,
             workspacePresentation: workspace.presentation,
@@ -503,7 +580,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         if (get().sessionId === sessionId) {
           set({
             sessionId: null, messages: [WELCOME_MESSAGE], emotion: 'welcome',
-            currentMatterId: null, currentTriage: null, currentAgentRun: null,
+            currentMatterId: null, currentMatter: null, currentTriage: null, currentAgentRun: null,
             workspacePresentation: null, workspaceError: '',
             workspaceVersion: 0,
             streamingMessage: null,
@@ -535,6 +612,7 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
           emotion: 'welcome',
           isLoading: false,
           currentMatterId: null,
+          currentMatter: null,
           currentTriage: null,
           currentAgentRun: null,
           laborTriageError: '',
@@ -672,6 +750,13 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
               }
               return {
                 currentMatterId: selectedId,
+                currentMatter: workspace.matter
+                  ? {
+                      matter_id: workspace.matter.matter_id,
+                      title: workspace.matter.title,
+                      goal: workspace.matter.goal,
+                    }
+                  : null,
                 currentTriage: workspace.triage,
                 currentAgentRun: workspace.run,
                 workspacePresentation: workspace.presentation,

@@ -1,6 +1,9 @@
 .card {
   margin: 4px 0 14px;
   padding: 12px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   color: #294866;
   background: #fff;
   border: 1px solid #bfdbfe;
@@ -28,7 +31,7 @@
 .section li { margin: 3px 0; line-height: 1.5; }
 .tags { color: #475569; }
 .next { padding: 8px; border-radius: 8px; background: #eff6ff; }
-.next p { margin: 4px 0 0; line-height: 1.55; }
+.next p { margin: 4px 0 0; line-height: 1.55; overflow-wrap: anywhere; }
 .review { color: #9a3412; font-weight: 650; }
 
 .form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #dbeafe; }

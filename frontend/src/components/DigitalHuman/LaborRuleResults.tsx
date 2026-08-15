@@ -4,7 +4,7 @@ import type { LaborRuleDecision } from '@/services/digitalHumanApi';
 import styles from './LaborRuleResults.module.css';
 import { laborFactLabel } from './LaborDisputeForm';
 
-const ISSUE_LABELS: Record<string, string> = {
+export const LABOR_ISSUE_LABELS: Record<string, string> = {
   wage_arrears: '欠薪核算', probation: '试用期核对', termination: '解除路径',
   economic_compensation: '补偿/赔偿核算',
   overtime_pay: '加班费核算',
@@ -32,15 +32,15 @@ function displayValue(value: unknown): string {
 export default function LaborRuleResults({ decisions }: { decisions: LaborRuleDecision[] }) {
   if (!decisions.length) return null;
   return <section className={styles.results}>
-    <strong>实体规则结果（{decisions.length}项，均需人工复核）</strong>
+    <strong>规则详情（{decisions.length}项，均需人工复核）</strong>
     {decisions.map((decision) => <article key={decision.issue_tag}>
-      <header><b>{ISSUE_LABELS[decision.issue_tag] || decision.issue_tag}</b><span>{decision.status === 'completed' ? '已完成初步核对' : '等待补充'}</span></header>
+      <header><b>{LABOR_ISSUE_LABELS[decision.issue_tag] || '待核对事项'}</b><span>{decision.status === 'completed' ? '已完成初步核对' : '等待补充'}</span></header>
       <p>{decision.assessment}</p>
-      {Object.keys(decision.calculations).length > 0 && <dl>{Object.entries(decision.calculations).map(([key, value]) => <div key={key}><dt>{CALCULATION_LABELS[key] || key}</dt><dd>{displayValue(value)}</dd></div>)}</dl>}
+      {Object.keys(decision.calculations).length > 0 && <dl>{Object.entries(decision.calculations).map(([key, value]) => <div key={key}><dt>{CALCULATION_LABELS[key] || '计算项目'}</dt><dd>{displayValue(value)}</dd></div>)}</dl>}
       {decision.missing_facts.length > 0 && <small>缺失事实：{decision.missing_facts.map(laborFactLabel).join('、')}</small>}
       {decision.assumptions.map((item) => <small key={item}>假设：{item}</small>)}
       {decision.warnings.map((item) => <small key={item}>提示：{item}</small>)}
-      <footer>事实引用 {decision.fact_refs.length} · 材料引用 {decision.evidence_refs.length} · 法源引用 {decision.authority_refs.length} · 规则 {decision.rule_version}</footer>
+      {decision.manual_review_required && <footer>本项结果仅供初步判断，仍需人工复核。</footer>}
     </article>)}
   </section>;
 }

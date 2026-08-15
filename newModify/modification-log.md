@@ -1038,3 +1038,60 @@
 - 测试：新增 `test_digital_human_trace.py` 10/10（JSONL 写入与容错、run 关联、同 trace_id 全链事件序、取消事件、劳动动作 matter/run 事件与关联、三处挂点源码守卫）；全量回归 152/152；compileall、diff-check 通过。
 - 模块文档：新增 `法律AI/模块地图/链路追踪.md`（按功能段模板，一级调用链可点击）。
 - 边界：前端零改动；不改 Agent 业务逻辑；步骤级明细仍以 DB AgentRun.steps 为准。
+
+## 2026-08-15（法小助前端布局重构 P1：视图骨架 + store 纯 UI 状态 + chat↔workspace 切换）
+
+- 用户规格：普通聊天态（384×650 悬浮）保持不变，案件工作台从"聊天面板 920×760 展开态"改为独立全屏办理空间（顶部为原站导航留出 80px）；本 Patch 只搭骨架，不拆 MatterWorkspace、不改业务逻辑。
+- `digitalHumanStore.ts`：新增纯 UI 状态 `workspaceOpen`（不持久化）与动作 `openWorkspace`/`closeWorkspace`——纯视图切换，**不 abort 在途 SSE、不清语音队列、不动 sessionId**；`close()` 同时复位 `workspaceOpen`（收起面板后重开回到聊天态）。
+- 新增 `CaseWorkspaceShell.tsx`：全屏 Shell（`.dh-workspace-shell`，fixed 覆盖、top 80px 避开 TopNavbar z-50），头部"劳动纠纷办理中心 + 返回对话 + 收起"，中间区整体承载现有 `DigitalHumanMatterWorkspace`（max-width 960 居中，不复刻旧 920×760 布局）。
+- `DigitalHumanFloat.tsx`：三态编排（launcher / 聊天 / 工作台）；聊天与工作台**双挂载、CSS 切换可见性**（`.dh-chat-hidden`）——工作台首次打开后常驻挂载，返回对话不卸载，MatterWorkspace 本地草稿（约 20 项 state）、在途上传（organize 180s）与聊天滚动位置不丢失；styled-jsx 只追加新 class（dh-chat-hidden/dh-workspace-shell-*/dh-workspace-in），已有 class 未删未改。
+- `DigitalHumanChat.tsx`：删除本地 `workspaceExpanded` 与内嵌工作台/陪伴渲染；"案件工作台"按钮改调 `openWorkspace`；`dh-panel-expanded` 相关 CSS 保留未用（按 CODE_RULES 不删除已有 class）。`DigitalHumanCompanion` 暂无人渲染（P3 将演化为案件上下文助手）。
+- 验证：`npx tsc --noEmit` 通过、`git diff --check` 通过；浏览器人工验收步骤已交付待用户执行。
+- 边界：P2/P3/P4 未启动；`dh-panel-expanded` 死样式、工作台内部标题与 Shell 标题重复等收尾项留到 P4 处理。
+
+## 2026-08-15（法小助前端布局重构 P2+P3+P4：阶段工作台 / 侧栏 / 案件上下文助手 / 移动端，一次完成）
+
+- 用户确认追加约束并批准一次性完成全部 Patch：P2 只拆 UI/展示职责（业务 state 与跨阶段动作保留统一逻辑容器）；keep-mounted 非强制、按真实生命周期取舍；侧栏案件状态优先复用已有 API 字段、避免 N+1。
+- `digitalHumanStore.ts`：新增纯前端 UI 状态（不持久化，partialize 不变）——`activeStage`（四阶段，类型 CaseStage + CASE_STAGE_LABELS）、`sidebarTab`、`assistantCollapsed`、`workspaceGoalDraft`（聊天"从当前对话创建案件"预填目标，用后即清）、`currentMatter`（matter_id/title/goal 简报，随 loadSession/applyWorkspaceContext/selectCurrentMatter 同步，供聊天入口卡片）。
+- 新增 `useMatterWorkspace.ts` 统一逻辑容器：原 DigitalHumanMatterWorkspace 全部业务 state 与动作原样搬移（createMatter/confirmJurisdiction/organizeFile/analyze/runLaborWorkflow/approveLaborDraft/exportLaborDraft/restoreMatter/startNewMatter/removeMatter 等），新增 switchMaterialKind（原 UI 内联的格式切换逻辑收进容器）、`deriveCaseStage` 阶段推导（案件变化/恢复时按 workflow 状态：未确认法域→①、awaiting_information→③、awaiting_draft_approval/completed/blocked_authority→④、其余→②；用户手动切换优先）、侧栏案件状态批量补齐（getLaborDisputeWorkflow 并行 + 按 matterId 缓存 + 只补缺失，无逐行 N+1；matters 列表接口确认无 status 字段后采用）。
+- 新增四个 Stage 纯展示组件（只接收 props，无业务逻辑）：`JurisdictionStage`（建案/目标/中国法域）、`MaterialStage`（上传/整理稿/已有与缺失材料）、`FactEvidenceStage`（候选与确认事实/时间线/原文出处/证据缺口/正式事实表单 + 启动分析）、`AnalysisDocumentStage`（规则分析/官方法源/期限/补偿估算/Agent 状态/**用户审批只在这里**/草稿/Word/PDF 导出）。
+- 新增 `CaseWorkspaceShell`（重写 P1 壳）：桌面 = WorkspaceHeader + WorkspaceSidebar(250px，[会话][案件] Tab，会话≠案件文案 + 关联案件标注) + CaseStageNav(四阶段，顶部只展示进度) + CaseStageContent(只渲染当前 Stage) + 底部风险/人工复核/草稿声明 + DigitalHumanCaseAssistant(320px↔64px 可收起；只展示当前案件/阶段上下文；快捷操作经 Composer preset 预填、发送前用户确认，不代审批；返回对话)。
+- `DigitalHumanChat.tsx`：`MatterEntryCard` 轻量案件入口——有关联案件显示状态卡片 + [继续办理→]；无当前案件时"案件工作台"按钮只展开轻量入口（从当前对话创建案件=预填最近一条用户问题/打开历史案件=侧栏案件页），不直接进完整工作台（用户规格）。
+- `ConversationComposer.tsx`：新增可选 `preset`/`onPresetConsumed`/`focusSignal` props（助手快捷操作与"继续提问"聚焦），聊天入口原行为不变。
+- 删除 `DigitalHumanMatterWorkspace.tsx`、`DigitalHumanCompanion.tsx`（逻辑已搬入容器/Stage/助手）；`DigitalHumanFloat.tsx` 的 styled-jsx 只保留 `dh-chat-hidden`（P1 临时 shell class 移入 Workspace.module.css），既有 class 未删未改；新增 `Workspace.module.css` 承载全部新组件样式 + ≤640px 移动端（侧栏抽屉、助手 Bottom Sheet/圆形入口、阶段横滚、底部声明隐藏）。
+- 验证：`npx tsc --noEmit` 通过、`git diff --check` 通过；模块地图《工作台.md》重写前端信息架构并标日期、《数字人对话.md》补视图状态与入口说明。
+- 遗留（待用户浏览器验收后按需处理）：`dh-panel-expanded` 等旧样式类与部分 dh-matter-* 全局类已无引用（按 CODE_RULES 保留未删）；工作台 Shell top 偏移写死 80px；焦点管理未做陷阱；移动端底部声明隐藏。
+
+## 2026-08-16（布局重构返修：chat→workspace→minimize→chat 状态恢复修复）
+
+- 复现链路逐段比较（Float 渲染分支 / isOpen / workspaceOpen / workspaceMounted / 挂载 / scrollTop）发现两处残留状态：
+  1. `DigitalHumanFloat.workspaceMounted` 只置 true 从不复位：收起面板后重开，隐藏的工作台 Shell 永久驻留 DOM（多一个隐藏 role="dialog"），且每次重开白跑 matters/detail/workflow/法源库 4 个请求；
+  2. 聊天消息视口在工作台打开期间被 display:none 隐藏，SSE 到达时滚动 effect 仍执行 scrollTo(0)（scrollHeight=0），返回对话后依赖不变不再重滚，聊天停在最旧消息。
+- 只修状态恢复（未重构聊天/工作台/Agent Runtime）：
+  - `DigitalHumanFloat.tsx`：workspaceMounted 生命周期改为 isOpen=false 时复位（工作台随面板卸载，与重构前行为一致；聊天↔工作台切换仍双挂载保草稿）；
+  - `DigitalHumanChat.tsx`：滚动 effect 依赖增加 workspaceOpen，并在隐藏期间跳过滚动（scrollHeight=0 不再把 scrollTop 置 0），返回对话时恢复到底部。
+- 附带发现（按用户"只修状态恢复"范围未修，记录待批）：助手面板 `dh-companion-messages` 缺 flex:1，消息较多时助手输入框可能被裁切（一行 CSS 可修）。
+- 验证：`npx tsc --noEmit`、`git diff --check` 通过；浏览器回归场景见 CURRENT_TASK。
+
+## 2026-08-16（局部修复：返回对话后聊天布局被压缩 / 内容横向裁切）
+
+- 根因：MatterEntryCard 位于 .dh-messages 之外，返回对话后 currentMatterId 有值时案件卡成为 .dh-chat-column 的额外 Grid 行，持续挤占消息区高度；分流卡内长字符串（labor_case_analysis / awaiting_jurisdiction 等）在窄容器内无法换行导致横向撑开。
+- 修复（仅两处，未动 Store/API/工作台业务/案件关联逻辑；保留 workspaceMounted 生命周期修复与 workspaceOpen 滚动保护）：
+  - `DigitalHumanChat.tsx`：MatterEntryCard 移入 .dh-messages 滚动容器末尾（判断条件 currentMatterId || caseEntryExpanded 不变），案件卡随消息区滚动，不再占聊天主布局固定高度；
+  - `LaborTriageCard.module.css`：.card 增加 min-width:0 / max-width:100% / box-sizing:border-box；.next p 增加 overflow-wrap:anywhere（最小防溢出，未用全局 overflow:hidden）。
+- 尺寸：聊天窗 384×650 与移动端尺寸未动。
+- 验证：`npx tsc --noEmit`、`git diff --check` 通过；浏览器验收（消息区高度恢复 / 入口卡在滚动区内可点击 / 长字符串换行 / 连续切换与收起重开无残留布局）待用户执行。
+
+## 2026-08-16（案件工作台 UI 布局与信息层级优化：最小范围视觉收敛）
+
+- 用户规格：不重新设计，在现有工作台上做视觉收敛；禁改业务逻辑/Agent/SSE/案件状态机/表单数据结构/接口协议；保持蓝白政务风。
+- 阶段四重构（用户已完成部分，本条目合并记录）：`AnalysisDocumentStage.tsx` 改为工作台式信息层级（案件分析结论/争议焦点/风险待确认、可主张金额测算 details、仲裁申请草稿卡、已验证依据、运行详情折叠），配套 `Workspace.module.css` 新样式；`LaborRuleResults.tsx` 导出 `LABOR_ISSUE_LABELS`。
+- 助手摘要化（用户已完成部分）：`DigitalHumanCaseAssistant.tsx` 新增导出 `buildCaseAssistantSummary`（判断/下一步/缺失待确认，只压缩既有案件结果不产生新判断），右栏改工作摘要 + 可折叠"最近上下文"；删除重复"返回对话"（统一保留顶部右上角）。
+- 侧栏降噪（用户已完成部分 + 本次补齐）：当前会话独立分组、最近会话默认 4 条 + "查看全部会话（N）"、删除钮 hover/focus 显隐、案件列表当前案件置顶。
+- 本次补齐（Claude）：
+  - 三栏比例：左侧 250→200px、右侧 320→360px（收起 64px 不变）、中间 flex 剩余；shellBody 增加 12px 间距让三张卡片分离（移动端复位为 0）；
+  - 侧栏新增"当前案件"置顶块（标题摘要 + 当前阶段 + 状态，读 store currentMatter/activeStage + matterStatuses）；会话/案件条目去卡片化（透明底、hover 高亮、标题 2 行 clamp）；
+  - 阶段条主次层级：非当前阶段透明降权、当前阶段保持实心蓝、徽标弱化（"执行中"不再抢主阶段视觉）；
+  - 表单橙色门控：`LaborDisputeForm` 新增 `highlightMissing` prop（默认 false）——未填写必填项只显示红色 *，橙色边框/黄底只在校验触发后点亮（用户点击"检查证据、期限和法源"且有缺失、或 Agent 处于 awaiting_information）；`FactEvidenceStage` 新增本地 UI 状态 validationAttempted，点击有缺失时只点亮定位、**绝不启动分析**（业务安全边界不变：loading/blocked_authority/awaiting_approval 仍按原条件禁用）；
+  - 助手快捷操作补"相关法律依据"（preset 问题、发送前用户确认，2×2 排布）；助手身份区压缩（头像 34px、padding 收紧）；
+- 验证：`npx tsc --noEmit`、`git diff --check` 通过；1920/1600/1440/1366 与移动端视觉验收待用户浏览器确认。

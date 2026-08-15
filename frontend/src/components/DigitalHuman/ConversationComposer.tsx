@@ -10,15 +10,38 @@ import { useVoiceReady } from '@/lib/voice/useVoiceReady';
 
 interface ConversationComposerProps {
   compact?: boolean;
+  // 外部预填问题（如助手快捷操作）：只填入输入框，发送前仍由用户确认。
+  preset?: string | null;
+  onPresetConsumed?: () => void;
+  // 外部聚焦请求（如"继续提问"）：变化时聚焦输入框。
+  focusSignal?: number;
 }
 
-export default function ConversationComposer({ compact = false }: ConversationComposerProps) {
+export default function ConversationComposer({
+  compact = false,
+  preset = null,
+  onPresetConsumed,
+  focusSignal = 0,
+}: ConversationComposerProps) {
   const [question, setQuestion] = useState('');
   const [sttActive, setSttActive] = useState(false);
   const [sttError, setSttError] = useState('');
   const sttControllerRef = useRef<SttController | null>(null);
   const sttBaseRef = useRef('');
   const sttInterimRef = useRef('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (preset) {
+      setQuestion(preset);
+      onPresetConsumed?.();
+      textareaRef.current?.focus();
+    }
+  }, [preset, onPresetConsumed]);
+
+  useEffect(() => {
+    if (focusSignal > 0) textareaRef.current?.focus();
+  }, [focusSignal]);
   const {
     cancelRequest,
     isLoading,
@@ -106,6 +129,7 @@ export default function ConversationComposer({ compact = false }: ConversationCo
         onSubmit={submit}
       >
         <textarea
+          ref={textareaRef}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={handleKeyDown}

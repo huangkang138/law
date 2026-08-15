@@ -1,19 +1,43 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { MessageCircleMore } from 'lucide-react';
 
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 
+import CaseWorkspaceShell from './CaseWorkspaceShell';
 import DigitalHumanAvatar from './DigitalHumanAvatar';
 import DigitalHumanChat from './DigitalHumanChat';
 
 export default function DigitalHumanFloat() {
-  const { emotion, isOpen, open } = useDigitalHumanStore();
+  const { emotion, isOpen, open, workspaceOpen } = useDigitalHumanStore();
+  // 工作台挂载生命周期：
+  // - 聊天 ↔ 工作台切换（isOpen 不变）：双挂载 + CSS 隐藏，草稿/在途上传/滚动位置不丢；
+  // - 收起整个面板（isOpen=false）：工作台随面板卸载（与重构前行为一致），
+  //   下次进入工作台全新挂载并按案件状态重新推导阶段，不留隐藏 DOM 与无效请求。
+  const [workspaceMounted, setWorkspaceMounted] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setWorkspaceMounted(false);
+    } else if (workspaceOpen) {
+      setWorkspaceMounted(true);
+    }
+  }, [isOpen, workspaceOpen]);
 
   return (
     <div className="dh-root">
       {isOpen ? (
-        <DigitalHumanChat />
+        <>
+          <div className={workspaceOpen ? 'dh-chat-hidden' : ''}>
+            <DigitalHumanChat />
+          </div>
+          {workspaceMounted && (
+            <div className={workspaceOpen ? '' : 'dh-chat-hidden'}>
+              <CaseWorkspaceShell />
+            </div>
+          )}
+        </>
       ) : (
         <div className="dh-launcher-wrap">
           <div className="dh-invite" aria-hidden="true">
@@ -32,7 +56,7 @@ export default function DigitalHumanFloat() {
           position: fixed;
           right: 24px;
           bottom: 24px;
-          z-index: 9999;
+          z-index: 40;
           font-family: var(--font-sans), system-ui, sans-serif;
         }
 
@@ -193,6 +217,11 @@ export default function DigitalHumanFloat() {
           overflow-y: auto;
           padding: 20px 24px 24px;
           background: rgba(248, 251, 255, .86);
+        }
+
+        /* 视图切换隐藏层：聊天与工作台双挂载，仅 CSS 控制可见性。 */
+        .dh-chat-hidden {
+          display: none;
         }
 
         .dh-panel-header {
