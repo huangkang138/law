@@ -1,13 +1,21 @@
 'use client';
 
 import Image from 'next/image';
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 import type { DigitalHumanEmotion } from '@/services/digitalHumanApi';
 
+import { resolveAvatarVisualState } from './AvatarController';
+import type { AvatarState } from './AvatarStateAdapter';
+
 interface DigitalHumanAvatarProps {
   emotion: DigitalHumanEmotion;
+  state?: AvatarState;
   size?: 'small' | 'large';
+  isLoading?: boolean;
+  voiceSpeaking?: boolean;
+  // 保留给后续的局部嘴型覆盖；当前完整 PNG 不叠加任何 AI 拆层素材。
+  mouthOpen?: boolean;
 }
 
 const EMOTION_LABELS: Record<DigitalHumanEmotion, string> = {
@@ -23,10 +31,26 @@ const EMOTION_LABELS: Record<DigitalHumanEmotion, string> = {
 
 export default function DigitalHumanAvatar({
   emotion,
+  state,
   size = 'large',
+  isLoading,
+  voiceSpeaking,
+  mouthOpen = false,
 }: DigitalHumanAvatarProps) {
   const isSmall = size === 'small';
   const pixelSize = isSmall ? 96 : 148;
+  const visualState = resolveAvatarVisualState({ emotion, state, isLoading, voiceSpeaking, mouthOpen });
+  const [current, setCurrent] = useState(visualState);
+  const [previous, setPrevious] = useState<typeof visualState | null>(null);
+
+  useEffect(() => {
+    if (current.image === visualState.image) return;
+    setPrevious(current);
+    setCurrent(visualState);
+    const timer = window.setTimeout(() => setPrevious(null), 280);
+    return () => window.clearTimeout(timer);
+  }, [current, visualState]);
+
   const criticalStyle = {
     position: 'relative',
     width: `var(--dh-avatar-size, ${pixelSize}px)`,
@@ -39,21 +63,32 @@ export default function DigitalHumanAvatar({
   return (
     <div
       className={`dh-avatar ${isSmall ? 'dh-avatar-small' : 'dh-avatar-large'} ${
-        emotion === 'thinking' ? 'dh-avatar-thinking' : ''
-      }`}
+        current.state === 'thinking' ? 'dh-avatar-thinking' : ''
+      } dh-avatar-state-${current.state}`}
       style={criticalStyle}
-      aria-label={EMOTION_LABELS[emotion]}
+      aria-label={EMOTION_LABELS[current.image]}
     >
+      {previous && (
+        <Image
+          key={`previous-${previous.image}`}
+          src={`/digital-human/first-gen/${previous.image}.png`}
+          alt=""
+          aria-hidden="true"
+          width={pixelSize}
+          height={pixelSize}
+          sizes={isSmall ? '104px' : '148px'}
+          className="dh-avatar-image dh-avatar-image-outgoing"
+        />
+      )}
       <Image
-        key={emotion}
-        src={`/digital-human/first-gen/${emotion}.png`}
-        alt={`法小助：${EMOTION_LABELS[emotion]}`}
+        key={`current-${current.image}`}
+        src={`/digital-human/first-gen/${current.image}.png`}
+        alt={`法小助：${EMOTION_LABELS[current.image]}`}
         width={pixelSize}
         height={pixelSize}
-        priority={emotion === 'idle'}
+        priority={current.image === 'idle'}
         sizes={isSmall ? '104px' : '148px'}
-        className="dh-avatar-image"
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        className="dh-avatar-image dh-avatar-image-current"
       />
       <span className="dh-avatar-shine" aria-hidden="true" />
     </div>

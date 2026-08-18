@@ -172,7 +172,7 @@ export default function DigitalHumanChat() {
       <div className="dh-chat-column">
       <div className="dh-portrait-stage">
         <div className="dh-portrait-halo" aria-hidden="true" />
-        <DigitalHumanAvatar emotion={voiceSpeaking ? 'talk_normal' : emotion} />
+        <DigitalHumanAvatar emotion={emotion} isLoading={isLoading} voiceSpeaking={voiceSpeaking} />
       </div>
 
       <div ref={messagesRef} className="dh-messages" aria-live="polite">

@@ -1,5 +1,14 @@
 # 当前任务
 
+- 阶段/任务名称：完整 PNG 状态数字人（暂停 Rive 骨骼拆分）
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-08-18；自动类型检查通过，待浏览器视觉与交互验收）
+- 目标：以 `public/digital-human/first-gen/` 的完整角色 PNG 作为唯一正式视觉主体；保留统一头像状态入口与 `mouthOpen` 预留接口，Rive 仅保留为未来可选方向。
+- 本次实现：新增纯展示层 `AvatarController` / `AvatarStateAdapter`，将现有 `emotion`、`isLoading`、`voiceSpeaking` 收敛为 idle/listening/thinking/speaking/success/warning 六态；聊天、悬浮入口和工作台助手全部复用同一映射。图片切换用 280ms crossfade，过渡结束立即卸载旧图；idle 呼吸、thinking 轻摆、speaking 律动、success 单次反馈、warning 静态。
+- 边界：未使用或接入 `frontend/digital-human/fa-xiao-zhu/` 的 AI 拆层素材；未修改角色比例、`digitalHumanStore`、SSE、TTS、取消链、聊天/工作台业务结构；未引入 Rive 依赖或 `.riv`。
+- 验证：`npx tsc --noEmit`、`npm run build`、`git diff --check` 通过；浏览器需检查六态视觉、切换无闪图、聊天与工作台一致，以及语音播放/停止和 SSE 取消保持原行为。
+
+> 以下为已完成的工作台 UI 历史任务记录；不再作为当前实施目标。
+
 - 阶段/任务名称：案件工作台 UI 布局与信息层级优化（最小范围视觉收敛）
 - 当前状态：`IMPLEMENTING` → 实施完成待验收（2026-08-16 全部改动完成，tsc/diff-check 通过，已提交 `数字人前端优化`；浏览器视觉验收待用户执行 → 验收后 `COMPLETED`）
 - 目标（用户规格）：不重新设计，在现有工作台做最小范围、高收益视觉收敛——三栏比例（左约 190~220px / 中自动剩余 / 右约 340~380px）；左栏降噪（当前案件置顶、最近会话限量、删除钮 hover、标题 1~2 行）；阶段条当前突出、非当前降权；表单橙色只在校验触发后出现（未填写只显示红色 *，顶部"还缺 N 项"常显）；右栏助手加宽并改为工作台式信息层级（判断/下一步/缺失待确认）；快捷操作 4 项（解释当前步骤/帮我检查材料/相关法律依据/继续提问，均走 preset 预填、用户确认发送）；返回对话统一只保留顶部右上角一个入口；输入区固定底部。

@@ -10,7 +10,7 @@ import DigitalHumanAvatar from './DigitalHumanAvatar';
 import DigitalHumanChat from './DigitalHumanChat';
 
 export default function DigitalHumanFloat() {
-  const { emotion, isOpen, open, workspaceOpen } = useDigitalHumanStore();
+  const { emotion, isOpen, isLoading, open, voiceSpeaking, workspaceOpen } = useDigitalHumanStore();
   // 工作台挂载生命周期：
   // - 聊天 ↔ 工作台切换（isOpen 不变）：双挂载 + CSS 隐藏，草稿/在途上传/滚动位置不丢；
   // - 收起整个面板（isOpen=false）：工作台随面板卸载（与重构前行为一致），
@@ -45,7 +45,7 @@ export default function DigitalHumanFloat() {
             有法律问题？问问法小助
           </div>
           <button type="button" className="dh-launcher" onClick={open} aria-label="打开法小助数字人助手">
-            <DigitalHumanAvatar emotion={emotion} size="small" />
+            <DigitalHumanAvatar emotion={emotion} isLoading={isLoading} voiceSpeaking={voiceSpeaking} size="small" />
             <span className="dh-launcher-status" aria-hidden="true" />
           </button>
         </div>
@@ -144,9 +144,22 @@ export default function DigitalHumanFloat() {
         }
 
         .dh-avatar-image {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
           object-fit: cover;
           transform: scale(1.12);
-          animation: dh-avatar-change 360ms cubic-bezier(.2,.8,.2,1) both;
+        }
+
+        .dh-avatar-image-current {
+          z-index: 1;
+          animation: dh-avatar-crossfade-in 280ms ease-out both;
+        }
+
+        .dh-avatar-image-outgoing {
+          z-index: 0;
+          animation: dh-avatar-crossfade-out 280ms ease-in both;
         }
 
         .dh-avatar-shine {
@@ -160,6 +173,12 @@ export default function DigitalHumanFloat() {
         .dh-avatar-thinking {
           animation: dh-think-pulse 1.4s ease-in-out infinite;
         }
+
+        .dh-avatar-state-idle { animation: dh-avatar-idle 4.8s ease-in-out infinite; }
+        .dh-avatar-state-thinking { animation: dh-avatar-thinking-sway 2.8s ease-in-out infinite; }
+        .dh-avatar-state-speaking { animation: dh-avatar-speaking 720ms ease-in-out infinite; }
+        .dh-avatar-state-success { animation: dh-avatar-success 640ms cubic-bezier(.22, 1.35, .36, 1) both; }
+        .dh-avatar-state-warning { animation: none; }
 
         .dh-panel {
           width: min(384px, calc(100vw - 32px));
@@ -965,6 +984,38 @@ export default function DigitalHumanFloat() {
         @keyframes dh-avatar-change {
           from { opacity: 0; transform: scale(1.08); }
           to { opacity: 1; transform: scale(1.12); }
+        }
+
+        @keyframes dh-avatar-crossfade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes dh-avatar-crossfade-out {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+
+        @keyframes dh-avatar-idle {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-1px) scale(1.008); }
+        }
+
+        @keyframes dh-avatar-thinking-sway {
+          0%, 100% { transform: rotate(0deg); }
+          35% { transform: rotate(-0.7deg); }
+          70% { transform: rotate(0.7deg); }
+        }
+
+        @keyframes dh-avatar-speaking {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-1.5px); }
+        }
+
+        @keyframes dh-avatar-success {
+          0% { transform: scale(1); }
+          45% { transform: scale(1.035); }
+          100% { transform: scale(1); }
         }
 
         @keyframes dh-think-pulse {

@@ -201,7 +201,7 @@ npm run dev
 - `frontend/src/store/digitalHumanStore.ts`：使用 Zustand 持久化当前 `session_id` 与消息。
 - `frontend/src/services/digitalHumanApi.ts`：封装数字人聊天和重置请求。
 - `frontend/src/app/layout.tsx`：全局挂载数字人悬浮组件。
-- `frontend/public/digital-human/first-gen/`：存放 8 张数字人状态图；当前通过状态图切换、呼吸、浮动、淡入和思考脉冲形成动态效果，不是逐帧或骨骼动画。
+- `frontend/public/digital-human/first-gen/`：存放 8 张完整数字人状态图，是正式运行路径唯一的视觉主体。`AvatarController`/`AvatarStateAdapter` 将既有 `emotion`、加载与语音播放状态收敛为六态，使用短暂 crossfade 切图并在过渡后卸载旧图；`mouthOpen` 仅保留接口，未叠加拆层嘴型或改变角色造型。Rive 骨骼方案与 `frontend/digital-human/fa-xiao-zhu/` AI 拆层素材均暂停，未进入运行路径。
 
 本地联调注意：Windows 环境可能将 `localhost` 优先解析为 IPv6 回环地址 `::1`，而 Flask 当前监听 `0.0.0.0:8001`（IPv4）。如果 Next.js 代理出现 `ECONNREFUSED ::1:8001`，应让代理明确使用 `127.0.0.1:8001`，并重启前端开发服务器。
 

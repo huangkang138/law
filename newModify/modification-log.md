@@ -2,6 +2,14 @@
 
 本文件用于持续记录每次项目解析、文档修改、代码修改和配置调整。后续默认追加到本文件，便于按时间和会话追溯。
 
+## 2026-08-18（完整 PNG 状态数字人：暂停 Rive 骨骼拆分）
+
+- 原因与边界：AI 生成的 body/arm/cape 拆层素材无法与原始法小助 PNG 保持像素级透视、比例和造型一致，故 `frontend/digital-human/fa-xiao-zhu/` 未接入、未提交，Rive 仅保留为未来可选方向。
+- 新增 `AvatarController.ts` 与 `AvatarStateAdapter.ts`：纯展示映射层，保留 `mouthOpen` 可选接口；根据既有 `emotion`、`isLoading`、`voiceSpeaking` 输出 idle/listening/thinking/speaking/success/warning 六态，且不写入或重构 `digitalHumanStore`。
+- `DigitalHumanAvatar.tsx` 改为只读取 `public/digital-human/first-gen/` 完整状态图；两层 PNG 仅在 280ms crossfade 内共存，过渡结束即卸载旧图。`DigitalHumanFloat.tsx` 追加 idle 呼吸、thinking 轻摆、speaking 律动、success 一次轻弹与 warning 静态样式，不改变图像比例或引入拆层素材。
+- 聊天区、悬浮入口和案件工作台助手均把既有加载/朗读状态传给同一头像映射层；SSE、TTS、取消、案件工作台和接口链路零改动。
+- 验证：`npx tsc --noEmit`、`npm run build`、`git diff --check` 通过；浏览器视觉验收待用户执行。
+
 ## 2026-07-09 11:01:58 +08:00
 
 - 会话 ID：`019f44b9-02ee-71d1-a9cb-cb659cb92392`
