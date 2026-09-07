@@ -28,7 +28,7 @@ interface SearchSession {
   documentId?: number;
 }
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = '';
 
 const DOCUMENT_TEMPLATES = [
   { id: 'free', name: '自由起草', desc: '灵活起草各类法律文书', icon: Sparkles },

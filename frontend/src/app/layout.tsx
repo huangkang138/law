@@ -3,7 +3,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import TopNavbar from '@/components/TopNavbar';
-import DigitalHumanFloat from '@/components/DigitalHuman/DigitalHumanFloat';
 import { usePathname } from 'next/navigation';
 
 export default function RootLayout({
@@ -44,8 +43,6 @@ export default function RootLayout({
         <main className={`flex flex-1 flex-col min-h-screen pt-20 ${isHomePage ? '' : 'overflow-y-auto'}`}>
           {children}
         </main>
-
-        <DigitalHumanFloat />
       </body>
     </html>
   );

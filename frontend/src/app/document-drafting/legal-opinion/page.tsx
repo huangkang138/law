@@ -28,7 +28,7 @@ interface SearchSession {
   documentId?: number;
 }
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = '';
 
 const COURTS = [
   '最高人民法院',

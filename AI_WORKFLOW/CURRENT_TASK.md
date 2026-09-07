@@ -1,5 +1,13 @@
 # 当前任务
 
+- 阶段/任务名称：开学演示隐藏后续数字人及其 Agent 工作台入口
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-03；类型检查、生产构建与 diff-check 通过，待浏览器确认入口不可见）
+- 目标：当前完整项目继续保留数字人、劳动争议 Agent 和案件工作台代码，但开学演示时前端不展示入口，也不存在可点击触发元素。
+- 修改范围：仅移除 `frontend/src/app/layout.tsx` 中全站 `DigitalHumanFloat` 挂载；不删除数字人组件，不修改原项目已有 `/agents` 页面、后端、API、数据库或业务状态。
+- 验收：全站页面无数字人悬浮入口；DOM 不挂载数字人聊天/案件工作台；`npx tsc --noEmit`、`npm run build`、`git diff --check` 已通过。
+
+> 以下为已暂停的历史任务记录；不再作为当前实施目标。
+
 - 阶段/任务名称：完整 PNG 状态数字人（暂停 Rive 骨骼拆分）
 - 当前状态：`READY_FOR_ACCEPTANCE`（2026-08-18；自动类型检查通过，待浏览器视觉与交互验收）
 - 目标：以 `public/digital-human/first-gen/` 的完整角色 PNG 作为唯一正式视觉主体；保留统一头像状态入口与 `mouthOpen` 预留接口，Rive 仅保留为未来可选方向。

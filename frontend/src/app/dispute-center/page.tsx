@@ -120,7 +120,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/dispute/organize`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/dispute/organize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input_content: inputContent, input_type: 'text' }),
@@ -148,7 +148,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/evidence/collect`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/evidence/collect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -181,7 +181,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/protection/plan`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/protection/plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispute_id: disputeId }),
@@ -209,7 +209,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/document/generate`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/document/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -240,7 +240,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/prediction/analyze`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/prediction/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispute_id: disputeId }),
@@ -268,7 +268,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/reminder/create`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/reminder/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispute_id: disputeId }),
@@ -296,7 +296,7 @@ function DisputeCenterPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/warning/analyze`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/warning/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispute_id: disputeId }),
@@ -333,7 +333,7 @@ function DisputeCenterPageContent() {
     const session = sessions.find(s => s.id === sessionId);
     if (session?.disputeId) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/dispute/${session.disputeId}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/dispute/${session.disputeId}`, {
           method: 'DELETE',
         });
       } catch (err) {

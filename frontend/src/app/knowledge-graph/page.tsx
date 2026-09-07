@@ -145,7 +145,7 @@ export default function KnowledgeGraphPage() {
     if (!nodeToDelete) return;
     
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/nodes/${nodeToDelete}?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/nodes/${nodeToDelete}?graph_id=${graphId}`, {
         method: 'DELETE',
       });
       
@@ -187,7 +187,7 @@ export default function KnowledgeGraphPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/structure?graph_id=${graphId}`);
+      const response = await fetch(`/api/knowledge-graph/structure?graph_id=${graphId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -216,7 +216,7 @@ export default function KnowledgeGraphPage() {
     if (!searchQuery.trim()) return;
     
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/search?q=${encodeURIComponent(searchQuery)}&graph_id=${graphId}`);
+      const response = await fetch(`/api/knowledge-graph/search?q=${encodeURIComponent(searchQuery)}&graph_id=${graphId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -246,7 +246,7 @@ export default function KnowledgeGraphPage() {
   // 创建节点
   const handleCreateNode = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/nodes?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/nodes?graph_id=${graphId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +280,7 @@ export default function KnowledgeGraphPage() {
     if (!editNode) return;
     
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/nodes/${editNode.id}?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/nodes/${editNode.id}?graph_id=${graphId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -321,7 +321,7 @@ export default function KnowledgeGraphPage() {
   // 创建关系
   const handleCreateRelationship = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/relationships?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/relationships?graph_id=${graphId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -353,7 +353,7 @@ export default function KnowledgeGraphPage() {
   // 构建知识图谱
   const handleBuildGraph = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/build?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/build?graph_id=${graphId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -402,7 +402,7 @@ export default function KnowledgeGraphPage() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch(`http://localhost:8001/api/knowledge-graph/upload?graph_id=${graphId}`, {
+      const response = await fetch(`/api/knowledge-graph/upload?graph_id=${graphId}`, {
         method: 'POST',
         body: formData,
       });

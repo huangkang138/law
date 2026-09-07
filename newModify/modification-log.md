@@ -1103,3 +1103,17 @@
   - 表单橙色门控：`LaborDisputeForm` 新增 `highlightMissing` prop（默认 false）——未填写必填项只显示红色 *，橙色边框/黄底只在校验触发后点亮（用户点击"检查证据、期限和法源"且有缺失、或 Agent 处于 awaiting_information）；`FactEvidenceStage` 新增本地 UI 状态 validationAttempted，点击有缺失时只点亮定位、**绝不启动分析**（业务安全边界不变：loading/blocked_authority/awaiting_approval 仍按原条件禁用）；
   - 助手快捷操作补"相关法律依据"（preset 问题、发送前用户确认，2×2 排布）；助手身份区压缩（头像 34px、padding 收紧）；
 - 验证：`npx tsc --noEmit`、`git diff --check` 通过；1920/1600/1440/1366 与移动端视觉验收待用户浏览器确认。
+
+## 2026-09-03（开学演示：隐藏后续数字人及 Agent 工作台入口）
+
+- 用户目标：继续使用当前完整项目演示，但不向他人展示后来新增的数字人及其内部 Agent/案件工作台，也不能从页面点击触发。
+- 最小修改：移除 `frontend/src/app/layout.tsx` 对 `DigitalHumanFloat` 的 import 与全站挂载；数字人聊天、案件工作台和劳动争议 Agent 的前端触发链因此不进入 React 组件树。
+- 保留边界：未删除数字人/Agent 源码，未修改后端、API、数据库、Store、SSE/TTS；原始项目在初始化提交中已有的 `/agents` 页面保持不变。
+- 验证：`npx tsc --noEmit`、`npm run build` 与 `git diff --check` 全部通过；待浏览器人工确认全站不再显示数字人入口。
+
+## 2026-09-04（演示部署配置）
+
+- 用户目标：为快速演示准备最小部署配置，不连接服务器、不扩展生产架构。
+- 实际修改：前端后端请求统一使用同源 `/api`；模拟法庭 WebSocket 根据当前页面协议生成 `ws://`/`wss://`；补齐 Flask、SQLAlchemy、PostgreSQL 驱动和 Gunicorn 依赖；新增前后端 Dockerfile、Docker Compose、Nginx 配置。
+- 部署边界：后端固定单 worker 以保持进程内模拟法庭会话；PostgreSQL、上传文件、日志和 Chroma 使用 Docker volume 持久化；Nginx 转发 API、SSE 与 WebSocket。
+- 验证：前端 `npx tsc --noEmit`、`npm run build` 通过；后端 `python -m compileall -q flask_app` 执行；`git diff --check` 需在提交前复核。

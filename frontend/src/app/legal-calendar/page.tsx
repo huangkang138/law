@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, CheckCircle2, AlertCircle, Plus, History, Trash2, Pin, Edit, MoreHorizontal } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 export default function LegalCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());

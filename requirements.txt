@@ -1,6 +1,14 @@
-# FastAPI Core
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
+# Flask runtime
+Flask>=3.0.0
+Flask-CORS>=4.0.0
+Flask-Sock>=0.7.0
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.9
+gunicorn>=22.0.0
+
+# Compatibility / validation models
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
@@ -57,9 +65,6 @@ python-multipart>=0.0.6
 
 # SSE Support
 sse-starlette>=1.6.5
-
-# WebSocket Support
-flask-sock>=0.7.0
 
 # Retry Mechanism
 tenacity>=8.2.3

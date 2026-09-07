@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Calculator, DollarSign, Users, Car, History, Plus, FileText, Trash2, Pin, Edit, MoreHorizontal, Settings } from 'lucide-react';
 import Link from 'next/link';
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 export default function LegalCalculatorPage() {
   const [activeTab, setActiveTab] = useState('interest');

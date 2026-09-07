@@ -110,9 +110,9 @@ export function VoiceCourtroom({ sessionId, userRole, caseDescription = '', onEn
     }
     
     const currentConnectionId = ++connectionIdRef.current;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
     const encodedCaseDescription = encodeURIComponent(caseDescription);
-    const wsUrl = `${apiUrl.replace('http', 'ws')}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
     
     console.log('[VoiceCourtroom] 连接 WebSocket:', wsUrl, 'connectionId:', currentConnectionId);
     const ws = new WebSocket(wsUrl);
@@ -629,9 +629,9 @@ export function VoiceCourtroom({ sessionId, userRole, caseDescription = '', onEn
     } else {
       console.error('[VoiceCourtroom] WebSocket 连接未打开，无法发送用户输入');
       // 尝试重新连接
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
       const encodedCaseDescription = encodeURIComponent(caseDescription);
-      const wsUrl = `${apiUrl.replace('http', 'ws')}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
       const newWs = new WebSocket(wsUrl);
       newWs.onopen = () => {
         console.log('[VoiceCourtroom] WebSocket 重新连接成功，发送用户输入');
@@ -665,9 +665,9 @@ export function VoiceCourtroom({ sessionId, userRole, caseDescription = '', onEn
     } else {
       console.error('[VoiceCourtroom] WebSocket 连接未打开，无法发送跳过发言');
       // 尝试重新连接
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
       const encodedCaseDescription = encodeURIComponent(caseDescription);
-      const wsUrl = `${apiUrl.replace('http', 'ws')}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/api/courtroom/ws/${sessionId}?user_role=${userRole}&case_description=${encodedCaseDescription}`;
       const newWs = new WebSocket(wsUrl);
       newWs.onopen = () => {
         console.log('[VoiceCourtroom] WebSocket 重新连接成功，发送跳过发言');

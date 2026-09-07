@@ -267,7 +267,7 @@ function DisputeOrganizePageContent() {
         formData.append('input_content', inputContent);
         formData.append('audio', audioBlob, 'recording.wav');
         formData.append('input_type', 'audio');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/dispute/organize-with-files`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/dispute/organize-with-files`, {
           method: 'POST',
           body: formData,
         });
@@ -325,7 +325,7 @@ function DisputeOrganizePageContent() {
     const session = sessions.find(s => s.id === sessionId);
     if (session?.disputeId) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/dispute/${session.disputeId}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/dispute/${session.disputeId}`, {
           method: 'DELETE',
         });
       } catch (err) {

@@ -88,7 +88,7 @@ export default function DebatePage() {
     });
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const response = await fetch(`${apiUrl}/api/debate/${id}/full-details`);
       
       if (!response.ok) {
@@ -376,7 +376,7 @@ export default function DebatePage() {
 
   // 建立SSE连接
   const setupSSE = useCallback((sid: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const eventSource = new EventSource(`${apiUrl}/api/debate/stream/${sid}`);
     
     // 消息队列，确保按顺序处理
@@ -562,7 +562,7 @@ export default function DebatePage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       
       // 第一步：启动模拟法庭
       const response = await fetch(`${apiUrl}/api/analysis/debate/start`, {
@@ -612,7 +612,7 @@ export default function DebatePage() {
       console.error('辩论失败:', err);
       
       if (err.message.includes('Failed to fetch')) {
-        setError(`无法连接到服务器，请确保后端服务已启动 (${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'})`);
+        setError(`无法连接到服务器，请确保后端服务已启动 (${process.env.NEXT_PUBLIC_API_URL || ''})`);
       } else {
         setError(err.message || '辩论模拟失败，请重试');
       }
@@ -1027,7 +1027,7 @@ export default function DebatePage() {
                     // 提交用户输入
                     if (userInput.trim()) {
                       // 发送用户输入到服务器
-                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
                       fetch(`${apiUrl}/api/analysis/debate/user-input`, {
                         method: 'POST',
                         headers: {

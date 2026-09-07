@@ -56,7 +56,7 @@ export default function KnowledgeGraphsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/knowledge-graphs');
+      const response = await fetch('/api/knowledge-graphs');
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -81,7 +81,7 @@ export default function KnowledgeGraphsPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:8001/api/knowledge-graphs', {
+      const response = await fetch('/api/knowledge-graphs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ export default function KnowledgeGraphsPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graphs/${editingGraph.id}`, {
+      const response = await fetch(`/api/knowledge-graphs/${editingGraph.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ export default function KnowledgeGraphsPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8001/api/knowledge-graphs/${graphId}`, {
+      const response = await fetch(`/api/knowledge-graphs/${graphId}`, {
         method: 'DELETE',
       });
 
@@ -194,7 +194,7 @@ export default function KnowledgeGraphsPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:8001/api/knowledge-graphs/batch-delete', {
+      const response = await fetch('/api/knowledge-graphs/batch-delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

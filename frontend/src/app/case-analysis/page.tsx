@@ -127,7 +127,7 @@ export default function CaseAnalysisPage() {
       setCurrentRole('assistant');
       setCurrentMessage('');
 
-      const response = await fetch('http://localhost:8001/api/analysis/case-analysis', {
+      const response = await fetch('/api/analysis/case-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ case_description: messageText }),

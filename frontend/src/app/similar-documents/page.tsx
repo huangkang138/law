@@ -127,7 +127,7 @@ export default function SimilarDocumentsPage() {
       setCurrentRole('assistant');
       setCurrentMessage('');
 
-      const response = await fetch('http://localhost:8001/api/analysis/similar-documents', {
+      const response = await fetch('/api/analysis/similar-documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_content: messageText }),

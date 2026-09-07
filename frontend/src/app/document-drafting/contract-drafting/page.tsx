@@ -27,7 +27,7 @@ interface SearchSession {
   documentId?: number;
 }
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = '';
 
 const RECOMMENDED_COMMANDS = [
   { name: '劳动合同', description: '标准劳动合同模板，包含基本条款和双方权利义务', icon: 'HeartHandshake' },

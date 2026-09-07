@@ -20,12 +20,12 @@ const nextConfig = {
   // 优化包体积
   swcMinify: true,
 
-  // 配置rewrites
+  // 开发环境可通过 Next 代理访问后端；生产环境由 Nginx 负责 /api 转发。
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8001/api/:path*',
+        destination: `${process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8001'}/api/:path*`,
       },
     ]
   },

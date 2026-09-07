@@ -558,7 +558,7 @@ export default function HistoryPage() {
 
   const handleGenerateDebatePDF = async (debate: DebateHistoryItem) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const response = await fetch(`${apiUrl}/api/debate/${debate.id}/full-details`);
       
       if (!response.ok) {

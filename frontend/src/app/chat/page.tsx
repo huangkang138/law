@@ -186,7 +186,7 @@ export default function ChatPage() {
       if (errorMsg.includes('Rate limit') || errorMsg.includes('rate_limit_exceeded')) {
         errorMsg = '⚠️ API 速率限制：今日配额已用完\n\n请等待约 10 分钟后重试，或前往设置页面更换 API Key。\n\n提示：Groq 免费版每天有 100,000 tokens 限制。';
       } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
-        errorMsg = '⚠️ 网络连接失败\n\n请检查：\n1. 后端服务是否已启动（http://localhost:8001）\n2. 网络连接是否正常';
+        errorMsg = '⚠️ 网络连接失败\n\n请检查：\n1. 后端服务是否已启动（）\n2. 网络连接是否正常';
       }
       
       const errorMessage: Message = { 

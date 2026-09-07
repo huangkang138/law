@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, Plus, Trash2, Pin, Edit, MoreHorizontal } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 3000) => {
   const controller = new AbortController();

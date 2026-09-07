@@ -67,7 +67,7 @@ export default function AgentsOverviewPage() {
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
     loadAgents();

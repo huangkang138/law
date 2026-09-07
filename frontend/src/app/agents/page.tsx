@@ -326,7 +326,7 @@ export default function AgentsPage() {
     is_active: true,
   });
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
     loadAgents();
