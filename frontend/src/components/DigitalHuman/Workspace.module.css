@@ -988,12 +988,12 @@
 }
 
 .shellAssistantCollapsed {
-  --dh-assistant-w: 64px;
+  --dh-assistant-w: 76px;
 }
 
 .assistantRail {
   display: none;
-  width: 64px;
+  width: 76px;
   flex: none;
   flex-direction: column;
   align-items: center;
@@ -1005,19 +1005,18 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 70px;
+  height: 86px;
   padding: 0;
   background: transparent;
   border: 0;
-  border-radius: 50%;
+  border-radius: 12px;
   cursor: pointer;
 }
 
-.assistantRail :global(.dh-avatar-small) {
-  --dh-avatar-size: 48px;
-  width: 48px;
-  height: 48px;
+.assistantRail :global(.dh-avatar-compact) {
+  width: 70px;
+  height: 86px;
 }
 
 .railStatus {
@@ -1108,10 +1107,9 @@
   gap: 8px;
 }
 
-.assistantHead :global(.dh-avatar-small) {
-  --dh-avatar-size: 34px;
-  width: 34px;
-  height: 34px;
+.assistantHead :global(.dh-avatar-compact) {
+  width: 44px;
+  height: 54px;
 }
 
 .assistantHeadText {
@@ -1457,7 +1455,7 @@
     display: none;
   }
 
-  /* 助手改浮动 Bottom Sheet：收起为右下角圆形入口。 */
+  /* 助手改浮动 Bottom Sheet：收起为透明矩形入口。 */
   .assistant {
     position: fixed;
     right: 12px;
@@ -1475,9 +1473,9 @@
     right: 12px;
     bottom: 12px;
     left: auto;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
+    width: 70px;
+    height: 88px;
+    border-radius: 16px;
   }
 
   .assistantCollapsed .assistantRail {
@@ -1487,8 +1485,8 @@
   }
 
   .assistantCollapsed .assistantExpand {
-    width: 56px;
-    height: 56px;
+    width: 70px;
+    height: 88px;
   }
 
   .assistantCollapsed .railStage {

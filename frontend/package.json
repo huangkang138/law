@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@rive-app/react-webgl2": "4.34.1",
     "@tailwindcss/typography": "^0.5.19",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",

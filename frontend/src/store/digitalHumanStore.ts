@@ -211,9 +211,10 @@ export const useDigitalHumanStore = create<DigitalHumanStore>()(
         }
       },
 
-      // 进入案件工作台：纯视图切换。不 abort 在途 SSE、不清语音队列；
-      // 工作台由 CaseWorkspaceShell 常驻挂载（仅 CSS 隐藏），草稿与在途上传不丢失。
+      // 进入案件工作台：支持从顶栏独立入口直接打开，也支持从数字人聊天转入。
+      // 已打开时仍是纯视图切换；从关闭态进入时先初始化共享会话上下文。
       openWorkspace: () => {
+        if (!get().isOpen) get().open();
         set({ workspaceOpen: true });
       },
 

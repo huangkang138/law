@@ -24,7 +24,11 @@ const STAGE_ORDER_INDEX: Record<string, number> = {
  * 移动端 = 侧栏抽屉 + 阶段横滚 + Bottom Sheet 助手。
  * 业务逻辑统一由 useMatterWorkspace 持有（挂载一次），四个 Stage 只接收 props 展示。
  */
-export default function CaseWorkspaceShell() {
+interface CaseWorkspaceShellProps {
+  visible?: boolean;
+}
+
+export default function CaseWorkspaceShell({ visible = true }: CaseWorkspaceShellProps) {
   const {
     close,
     closeWorkspace,
@@ -111,6 +115,7 @@ export default function CaseWorkspaceShell() {
         <DigitalHumanCaseAssistant
           stageLabel={CASE_STAGE_LABELS[activeStage]}
           summary={assistantSummary}
+          visible={visible}
         />
       </div>
     </section>

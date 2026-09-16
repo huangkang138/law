@@ -1117,3 +1117,69 @@
 - 实际修改：前端后端请求统一使用同源 `/api`；模拟法庭 WebSocket 根据当前页面协议生成 `ws://`/`wss://`；补齐 Flask、SQLAlchemy、PostgreSQL 驱动和 Gunicorn 依赖；新增前后端 Dockerfile、Docker Compose、Nginx 配置。
 - 部署边界：后端固定单 worker 以保持进程内模拟法庭会话；PostgreSQL、上传文件、日志和 Chroma 使用 Docker volume 持久化；Nginx 转发 API、SSE 与 WebSocket。
 - 验证：前端 `npx tsc --noEmit`、`npm run build` 通过；后端 `python -m compileall -q flask_app` 执行；`git diff --check` 需在提交前复核。
+
+## 2026-09-07（恢复全站数字人入口）
+
+- 用户目标：撤销开学演示期间的临时隐藏，恢复当前完整项目的数字人功能入口。
+- 最小修改：在 `frontend/src/app/layout.tsx` 恢复 `DigitalHumanFloat` 的 import 与根布局挂载；点击行为继续复用原数字人聊天、劳动争议 Agent 和案件工作台链路。
+- 保留边界：未修改数字人内部实现、Store、API、SSE/TTS、后端、数据库和原项目 `/agents` 页面；未触碰未跟踪的数字人素材目录。
+- 验证：`npx tsc --noEmit`、`npm run build`、首页 HTTP 200 且“有法律问题？问问法小助”已渲染、`git diff --check` 全部通过；开发服务已重新启动在 3000 端口。
+
+## 2026-09-07（数字人 Rive 可组合素材规范化）
+
+- 用户目标：修正原数字人组件画布尺寸、坐标和锚点不一致，产出可在同一 Rive Artboard 直接叠加的透明 PNG 图层；保留原素材不覆盖。
+- 新增 `frontend/digital-human/tools/build_rig_v2.py`：只使用原始带 Alpha 的 PNG 做确定性缩放、镜像、定位和表情切片，不再用生成式模型分别重绘组件。
+- 新增 `frontend/digital-human/lvxiaozhi_rig_v2/`：统一为 `2000×2400` RGBA 画布，包含头壳、面屏、身体、双臂、双手、7 个眼睛状态、8 个嘴部状态、透明/浅色组合预览及 Rive 导入说明。
+- Rive 统一参数：Artboard `2000×2400`；所有图层 `Position X=1000, Y=1200`、`Scale=100%`、`Rotation=0`，只切换一组眼睛与一组嘴部图层可见性。
+- 验证：共 24 个 PNG，尺寸均为 `2000×2400`、模式均为 RGBA；除浅色预览外均检测到 `0–255` Alpha 范围；组合预览已人工检查。原始素材未修改。
+
+## 2026-09-08（律小智新角色 AI 拆分源素材）
+
+- 用户确认新的蓝白金法务制服 Q 版青年角色形象后，新增 `frontend/digital-human/law_xiaozhi/`，保留原有数字人素材目录不覆盖。
+- 素材包含全身正稿、头部近景、身体/裸头/前后发基础层、3 组眉毛、6 组眼睛和 6 组嘴型，共 21 个透明 PNG。
+- 已逐文件检查 PNG Alpha：最终交付文件均为 `Format32bppArgb` 且角点 Alpha 为 0；生成过程中出现的假透明棋盘格文件未纳入交付。
+- 边界：本次仅生成并整理 Rive 输入源素材，未生成 `.riv`，未修改前端组件、Store、SSE、TTS、后端、API 或数据库；独立生成图层仍需在 Rive 中统一画布并人工校准锚点与边缘。
+
+## 2026-09-08（修正律小智头身连接素材）
+
+- 根据 Rive 拼装截图确认原 `head_base.png` 的脖子过长且下端外扩，单纯移动层级无法获得自然的衣领衔接。
+- 新增 `frontend/digital-human/law_xiaozhi/head_base_v2.png`：保留原头型、耳朵、肤色和空白表情区域，只将脖子缩短、收窄并取消下端外扩；原图未覆盖。
+- 验证：新旧头部素材均为 `1254×1254`；修正版为 `Format32bppArgb`，角点 Alpha 为 0，可作为透明 PNG 导入 Rive。
+- 边界：未生成 `.riv`，未修改前端运行组件、Store、SSE、TTS、后端、API 或数据库。
+
+## 2026-09-08（改为鼻子与脸底图一体素材）
+
+- 独立鼻子层方案经拼装检查后被用户否决；此前生成的 `nose.png` 已移除，不再作为交付素材。
+- 按用户要求改为鼻子与脸底图一体生成：新增 `frontend/digital-human/law_xiaozhi/head_base_v3.png`，基于短脖子的 `head_base_v2.png`，只在脸中央融合低对比度暖肤色短弧阴影，不含白色圆形高光、圆点、豆状块或独立竖线。
+- `head_base_v3.png` 保持 `1254×1254` 透明画布、原头型、耳朵和短窄脖子；原 `head_base.png` 与 `head_base_v2.png` 均未覆盖。
+- 边界：仅调整 Rive 输入源素材与说明，未修改前端运行逻辑或 `.riv` 配置。
+
+## 2026-09-09（法小助 Rive 数字人最终接入）
+
+- 将 `law-xiaozhi.riv` 与匹配的 `rive.wasm` 放入前端公共资源，接入 `@rive-app/react-webgl2@4.34.1`。
+- 新增 `RiveDigitalHuman`，通过 `expression`、`speaking`、`blink` 绑定现有头像状态；PNG 仅用于加载期或失败回退。
+- 悬浮入口、聊天和工作台使用 launcher / portrait / compact 矩形视口，移除正常 Rive 展示的圆形裁切、白色描边和旧光圈；隐藏视图不保留活跃 Rive Canvas。
+- 主项目验证：`npx tsc --noEmit`、`git diff --check` 通过；桌面页面为 1 个 Rive Canvas、0 个 PNG，控制台无错误，悬浮入口与聊天面板均显示 `.riv` 蓝发人物。当前深色矩形背板来自 `.riv` 素材本身，移动端真实视口待验收。
+
+## 2026-09-09（法小助无背景 Rive 正式资源替换）
+
+- 资源：保留 `frontend/digital-human/law_xiaozhi/无背景.riv` 源文件，将其复制覆盖正式运行资源 `frontend/public/digital-human/law-xiaozhi/law-xiaozhi.riv`；已有旧资源副本 `untitled.riv` 未删除。源文件、运行文件和本地 Next 服务实际响应均为 5,150,645 bytes，SHA-256 为 `FE1EFD70967A31A1C9D83DF8E903E8B255300E2F173C6038ED55942E7EA7AAF8`。
+- 可见性：`DigitalHumanAvatar` 在 `visible=false` 时不再挂载 PNG 回退节点，避免聊天与工作台双挂载时隐藏视图残留 PNG；重新可见时的加载期与 Rive 失败回退不变。未修改 `@rive-app/react-webgl2`、`rive.wasm`、Artboard/StateMachine/ViewModel 合同、`expression`/`speaking`/`blink` 映射、后端、API、SSE、TTS 或案件业务。
+- 浏览器：重启 Next 开发服务后，右下角、聊天和工作台分别确认 1 个 Rive Canvas、0 个数字人 PNG；外层背景透明、无边框、无圆角裁切和旧光圈，控制台 0 error。
+- 验证：`npx tsc --noEmit`、`git diff --check` 通过；`GET /digital-human/law-xiaozhi/law-xiaozhi.riv` 经本地 Next 服务返回 200 且哈希匹配。移动端真实视口仍待人工验收。
+
+## 2026-09-09（拆分数字人咨询入口与案件工作台入口）
+
+- 用户目标：数字人保持咨询助手心智，案件工作台不再依附于点击数字人后的内部入口。
+- 入口调整：`TopNavbar` 在现有导航宽度内将“纠纷管理”整理为“案件与纠纷”，下拉菜单新增“案件工作台”独立入口；数字人聊天标题栏原“案件工作台”改为上下文动作“转入办理/继续办理”。
+- 状态复用：`openWorkspace` 支持从关闭态初始化共享会话并直接打开工作台；聊天与工作台继续双挂载，Session、Matter、SSE、TTS、草稿、上传与滚动状态不拆分。
+- 即时渲染：从顶栏直接进入时立即挂载 `CaseWorkspaceShell`，避免等待 effect 的空白帧。
+- 边界：未修改后端、API、数据库、Agent Runtime、案件流程、审批或法律安全边界。
+- 验证：`npx tsc --noEmit`、`git diff --check` 通过；浏览器确认独立入口、返回对话、数字人只开咨询和聊天转办文案。`npm run build` 受已有 Next 进程占用 `.next/trace` 阻塞，未停止用户进程，待空闲时补跑。
+
+### 返工：跨页面跳转后工作台持续覆盖
+
+- 复现证据：工作台打开时点击“合同审查”，URL 已切换到 `/contract`，合同页面 DOM 已加载，但根布局中的固定定位工作台仍保持可见，造成“卡住且跳转失败”的表象。
+- 根因：`DigitalHumanFloat` 挂载在根布局，路由切换不会卸载；`workspaceOpen` 未随 `pathname` 变化复位。
+- 最小修复：`DigitalHumanFloat` 记录上一条 `pathname`，检测到跨页面导航后调用现有 `close()`，统一复位 `isOpen/workspaceOpen`；不重复实现清理逻辑。
+- 回归：重复“打开工作台 → 点击合同审查”，工作台自动收起，`/contract` 页面完整显示，数字人恢复为悬浮入口，浏览器控制台 0 error；`npx tsc --noEmit`、`git diff --check` 通过。

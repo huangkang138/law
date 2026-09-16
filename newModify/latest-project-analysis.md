@@ -26,6 +26,13 @@
 - AI：通过 OpenAI-compatible 接口调用 DeepSeek 类模型。
 - 实时能力：合同审查使用 SSE，模拟法庭/语音庭审使用 WebSocket。
 
+## 数字人 Rive 接入现状（2026-09-09）
+
+- 正常视觉主体为 `frontend/public/digital-human/law-xiaozhi/law-xiaozhi.riv`，使用 `@rive-app/react-webgl2@4.34.1` 和同目录本地 WASM。
+- Rive 合同为 `Artboard 1`、`AvatarStateMachine`、`ViewModel1`；`expression`、`speaking`、`blink` 复用现有业务状态映射。
+- 悬浮入口、聊天和工作台使用矩形 Rive 视口，PNG 只作为加载或失败回退；该变化不涉及后端、API、数据库、SSE、TTS 或案件业务。
+- 正式运行资源已替换为 `frontend/digital-human/law_xiaozhi/无背景.riv`，源文件与运行文件 SHA-256 均为 `FE1EFD70967A31A1C9D83DF8E903E8B255300E2F173C6038ED55942E7EA7AAF8`。桌面右下角、聊天和工作台均验证为 1 个 Rive Canvas、0 个数字人 PNG、0 控制台 error；Canvas 外层透明且无圆形裁切、白框或旧光圈。不可见的双挂载实例不再保留 PNG 节点，失败兜底不变；移动端真实视口待验收。
+
 ## 产品聚焦与下一阶段规划（2026-07-21，文档决策）
 
 当前确认的产品方向是“劳动用工法律服务”，以大学生实习、兼职和毕业初期青年劳动者作为第一批用户入口。青年就业是产品切入场景，不是新的技术 Domain；底层继续使用通用 Runtime 和 `cn_labor` 劳动领域能力包，未来可扩展普通劳动者、灵活就业者、平台用工和工伤等场景。
@@ -34,7 +41,7 @@
 
 - Agent 负责案件分流、材料和事实、证据、计划、工具、法源、计算、文书、审批和审计。
 - 数字人负责通俗问答、逐个追问、材料上传引导、任务状态解释、语音和表现反馈。
-- 两者在架构上解耦，在用户入口上逐步融合。通用普通聊天不会无条件启动任意法律 Agent；但已支持的劳动场景会创建/绑定 Matter、执行 Triage、校验 `recommended_task_type`、启动对应劳动 Agent Run，并同步 Workspace。非劳动领域的通用自动分流仍未实现。
+- 两者在架构和主入口上均已区分：数字人悬浮入口只打开咨询聊天，案件工作台由全站顶栏独立进入；聊天仍可通过“转入办理/继续办理”共享同一 Session、Matter 与 Agent 上下文。通用普通聊天不会无条件启动任意法律 Agent；但已支持的劳动场景会创建/绑定 Matter、执行 Triage、校验 `recommended_task_type`、启动对应劳动 Agent Run，并同步 Workspace。非劳动领域的通用自动分流仍未实现。
 
 LangGraph 与 Plan 的后续边界已经明确：
 

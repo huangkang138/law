@@ -7,13 +7,16 @@ import type { DigitalHumanEmotion } from '@/services/digitalHumanApi';
 
 import { resolveAvatarVisualState } from './AvatarController';
 import type { AvatarState } from './AvatarStateAdapter';
+import RiveDigitalHuman from './RiveDigitalHuman';
 
 interface DigitalHumanAvatarProps {
   emotion: DigitalHumanEmotion;
   state?: AvatarState;
   size?: 'small' | 'large';
+  variant?: 'launcher' | 'portrait' | 'compact';
   isLoading?: boolean;
   voiceSpeaking?: boolean;
+  visible?: boolean;
   // 保留给后续的局部嘴型覆盖；当前完整 PNG 不叠加任何 AI 拆层素材。
   mouthOpen?: boolean;
 }
@@ -33,8 +36,10 @@ export default function DigitalHumanAvatar({
   emotion,
   state,
   size = 'large',
+  variant = 'portrait',
   isLoading,
   voiceSpeaking,
+  visible = true,
   mouthOpen = false,
 }: DigitalHumanAvatarProps) {
   const isSmall = size === 'small';
@@ -42,6 +47,7 @@ export default function DigitalHumanAvatar({
   const visualState = resolveAvatarVisualState({ emotion, state, isLoading, voiceSpeaking, mouthOpen });
   const [current, setCurrent] = useState(visualState);
   const [previous, setPrevious] = useState<typeof visualState | null>(null);
+  const [riveReady, setRiveReady] = useState(false);
 
   useEffect(() => {
     if (current.image === visualState.image) return;
@@ -51,24 +57,27 @@ export default function DigitalHumanAvatar({
     return () => window.clearTimeout(timer);
   }, [current, visualState]);
 
+  useEffect(() => {
+    if (!visible) setRiveReady(false);
+  }, [visible]);
+
   const criticalStyle = {
     position: 'relative',
-    width: `var(--dh-avatar-size, ${pixelSize}px)`,
-    height: `var(--dh-avatar-size, ${pixelSize}px)`,
-    overflow: 'hidden',
     flex: 'none',
-    borderRadius: '9999px',
   } as CSSProperties;
+
+  // 聊天和工作台双挂载时，非活动实例不能保留 PNG 回退节点。
+  if (!visible) return null;
 
   return (
     <div
-      className={`dh-avatar ${isSmall ? 'dh-avatar-small' : 'dh-avatar-large'} ${
+      className={`dh-avatar dh-avatar-${variant} ${isSmall ? 'dh-avatar-small' : 'dh-avatar-large'} ${
         current.state === 'thinking' ? 'dh-avatar-thinking' : ''
       } dh-avatar-state-${current.state}`}
       style={criticalStyle}
       aria-label={EMOTION_LABELS[current.image]}
     >
-      {previous && (
+      {!riveReady && previous && (
         <Image
           key={`previous-${previous.image}`}
           src={`/digital-human/first-gen/${previous.image}.png`}
@@ -80,17 +89,25 @@ export default function DigitalHumanAvatar({
           className="dh-avatar-image dh-avatar-image-outgoing"
         />
       )}
-      <Image
-        key={`current-${current.image}`}
-        src={`/digital-human/first-gen/${current.image}.png`}
-        alt={`法小助：${EMOTION_LABELS[current.image]}`}
-        width={pixelSize}
-        height={pixelSize}
-        priority={current.image === 'idle'}
-        sizes={isSmall ? '104px' : '148px'}
-        className="dh-avatar-image dh-avatar-image-current"
+      {!riveReady && (
+        <Image
+          key={`current-${current.image}`}
+          src={`/digital-human/first-gen/${current.image}.png`}
+          alt={`法小助：${EMOTION_LABELS[current.image]}`}
+          width={pixelSize}
+          height={pixelSize}
+          priority={current.image === 'idle'}
+          sizes={isSmall ? '104px' : '148px'}
+          className="dh-avatar-image dh-avatar-image-current"
+        />
+      )}
+      <RiveDigitalHuman
+        visualState={current}
+        voiceSpeaking={voiceSpeaking ?? false}
+        visible={visible}
+        onReady={() => setRiveReady(true)}
+        onError={() => setRiveReady(false)}
       />
-      <span className="dh-avatar-shine" aria-hidden="true" />
     </div>
   );
 }

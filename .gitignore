@@ -25,6 +25,7 @@ wheels/
 *.egg
 MANIFEST
 /outputs/learning-plan/
+.png
 
 # Virtual Environment
 venv/

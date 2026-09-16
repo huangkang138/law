@@ -5,6 +5,7 @@ import { Menu, X, Home, MessageSquare, FileText, Shield, Settings, Brain, Scale,
 import ScaleIcon from '@/components/ScaleIcon';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 
 import type { LucideIcon } from 'lucide-react';
 
@@ -15,6 +16,8 @@ interface MenuItem {
   children?: { name: string; href: string; icon: LucideIcon }[];
 }
 
+const CASE_WORKSPACE_ACTION = '/case-workspace';
+
 export default function TopNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -23,9 +26,14 @@ export default function TopNavbar() {
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const { openWorkspace, workspaceOpen } = useDigitalHumanStore();
 
   // 处理导航点击
   const handleNavigation = (href: string) => {
+    if (href === CASE_WORKSPACE_ACTION) {
+      openWorkspace();
+      return;
+    }
     router.push(href);
   };
 
@@ -74,10 +82,11 @@ export default function TopNavbar() {
       ]
     },
     {
-      name: '纠纷管理',
+      name: '案件与纠纷',
       href: '/dispute-management',
       icon: LayoutGrid,
       children: [
+        { name: '案件工作台', href: CASE_WORKSPACE_ACTION, icon: Briefcase },
         { name: '纠纷整理', href: '/dispute-organize', icon: FolderOpen },
         { name: '纠纷中心', href: '/dispute-center', icon: LayoutGrid },
       ]
@@ -116,9 +125,11 @@ export default function TopNavbar() {
     { name: '历史记录', href: '/history', icon: History },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => href === CASE_WORKSPACE_ACTION ? workspaceOpen : pathname === href;
   const isChildActive = (children?: { href: string }[]) => {
-    return children?.some(child => pathname === child.href) || false;
+    return children?.some((child) => (
+      child.href === CASE_WORKSPACE_ACTION ? workspaceOpen : pathname === child.href
+    )) || false;
   };
 
   return (

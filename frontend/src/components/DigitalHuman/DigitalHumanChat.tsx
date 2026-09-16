@@ -15,7 +15,11 @@ import LaborTriageCard from './LaborTriageCard';
 import MatterEntryCard from './MatterEntryCard';
 import { useLaborTriage } from './useLaborTriage';
 
-export default function DigitalHumanChat() {
+interface DigitalHumanChatProps {
+  avatarVisible?: boolean;
+}
+
+export default function DigitalHumanChat({ avatarVisible = true }: DigitalHumanChatProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [caseEntryExpanded, setCaseEntryExpanded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -79,15 +83,15 @@ export default function DigitalHumanChat() {
             type="button"
             className="dh-workspace-switch"
             onClick={() => {
-              // 有关联案件直接进入工作台；无当前案件先展开轻量入口，不直接进完整工作台。
+              // 聊天内只提供上下文转办；工作台的全局主入口位于顶栏。
               if (currentMatterId) openWorkspace();
               else setCaseEntryExpanded((open) => !open);
             }}
-            aria-label={currentMatterId ? '进入案件工作台' : '案件工作台入口'}
-            title={currentMatterId ? '进入案件工作台' : '案件工作台入口'}
+            aria-label={currentMatterId ? '继续案件办理' : '转入案件办理'}
+            title={currentMatterId ? '继续案件办理' : '转入案件办理'}
           >
             <FileSearch size={16} />
-            <span>案件工作台</span>
+            <span>{currentMatterId ? '继续办理' : '转入办理'}</span>
           </button>
           <button
             type="button"
@@ -171,8 +175,13 @@ export default function DigitalHumanChat() {
       <div className="dh-panel-body">
       <div className="dh-chat-column">
       <div className="dh-portrait-stage">
-        <div className="dh-portrait-halo" aria-hidden="true" />
-        <DigitalHumanAvatar emotion={emotion} isLoading={isLoading} voiceSpeaking={voiceSpeaking} />
+        <DigitalHumanAvatar
+          emotion={emotion}
+          isLoading={isLoading}
+          voiceSpeaking={voiceSpeaking}
+          variant="portrait"
+          visible={avatarVisible}
+        />
       </div>
 
       <div ref={messagesRef} className="dh-messages" aria-live="polite">

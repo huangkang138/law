@@ -72,12 +72,14 @@ export function buildCaseAssistantSummary({
 interface DigitalHumanCaseAssistantProps {
   stageLabel: string;
   summary: CaseAssistantSummary;
+  visible?: boolean;
 }
 
 /** 右栏只保留当前案件摘要与主动展开的最近上下文，完整聊天仍在对话态。 */
 export default function DigitalHumanCaseAssistant({
   stageLabel,
   summary,
+  visible = true,
 }: DigitalHumanCaseAssistantProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const {
@@ -121,7 +123,14 @@ export default function DigitalHumanCaseAssistant({
   return <aside className={`${styles.assistant} ${assistantCollapsed ? styles.assistantCollapsed : ''}`} aria-label="法小助案件上下文助手">
     <div className={styles.assistantRail}>
       <button type="button" className={styles.assistantExpand} onClick={() => setAssistantCollapsed(false)} aria-label="展开法小助助手">
-        <DigitalHumanAvatar emotion={emotion} isLoading={isLoading} voiceSpeaking={voiceSpeaking} size="small" />
+        <DigitalHumanAvatar
+          emotion={emotion}
+          isLoading={isLoading}
+          voiceSpeaking={voiceSpeaking}
+          size="small"
+          variant="compact"
+          visible={visible && assistantCollapsed}
+        />
         <span className={styles.railStatus} aria-hidden="true" />
         {emotion === 'thinking' && <span className={styles.railThinking} aria-label="正在思考" />}
         {voiceSpeaking && <span className={styles.railWave} aria-hidden="true"><i /><i /><i /></span>}
@@ -132,7 +141,14 @@ export default function DigitalHumanCaseAssistant({
 
     <div className={styles.assistantBody}>
       <div className={styles.assistantHead}>
-        <DigitalHumanAvatar emotion={emotion} isLoading={isLoading} voiceSpeaking={voiceSpeaking} size="small" />
+        <DigitalHumanAvatar
+          emotion={emotion}
+          isLoading={isLoading}
+          voiceSpeaking={voiceSpeaking}
+          size="small"
+          variant="compact"
+          visible={visible && !assistantCollapsed}
+        />
         <div className={styles.assistantHeadText}><strong>法小助 🟢</strong><small>当前：{stageLabel}</small></div>
         <button type="button" className={styles.assistantCollapse} onClick={() => setAssistantCollapsed(true)} aria-label="收起法小助助手" title="收起助手"><ChevronRight size={16} /></button>
       </div>

@@ -1,0 +1,83 @@
+{
+  "coordinateSystem": "1024x1536 full canvas; screen/viewer left and right naming",
+  "layerOrderBottomToTop": [
+    "arm_viewer_left_*",
+    "arm_viewer_right_*",
+    "body_static.png",
+    "shoulder_overlay.png",
+    "existing head layers"
+  ],
+  "body": {
+    "file": "body_static.png",
+    "canvas": [
+      1024,
+      1536
+    ]
+  },
+  "shoulderOverlay": {
+    "file": "shoulder_overlay.png",
+    "canvas": [
+      1024,
+      1536
+    ],
+    "purpose": "render above both arms to conceal the shoulder roots"
+  },
+  "idle": {
+    "left": {
+      "file": "arm_viewer_left_idle.png",
+      "canvas": [
+        1024,
+        1536
+      ],
+      "shoulderAnchor": [
+        356,
+        326
+      ]
+    },
+    "right": {
+      "file": "arm_viewer_right_idle.png",
+      "canvas": [
+        1024,
+        1536
+      ],
+      "shoulderAnchor": [
+        668,
+        326
+      ]
+    }
+  },
+  "answer": {
+    "left": {
+      "file": "arm_viewer_left_answer.png",
+      "canvas": [
+        1024,
+        1536
+      ],
+      "shoulderAnchor": [
+        376,
+        326
+      ],
+      "sourceScale": 0.36,
+      "sourceOffset": [
+        55,
+        300
+      ]
+    },
+    "right": {
+      "file": "arm_viewer_right_answer.png",
+      "canvas": [
+        1024,
+        1536
+      ],
+      "shoulderAnchor": [
+        648,
+        326
+      ],
+      "sourceScale": 0.36,
+      "sourceOffset": [
+        621,
+        303
+      ]
+    }
+  }
+}

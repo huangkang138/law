@@ -1,7 +1,35 @@
 # 当前任务
 
+- 阶段/任务名称：法小助 Rive 数字人最终接入与完整角色展示
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-09；无背景正式资源、桌面三处入口与 PNG 卸载已验证）
+- 目标：使用正式 `.riv` 作为数字人主体；右下角、聊天面板和工作台助手展示真实 Rive 角色，不再沿用 PNG 阶段的圆形头像壳。
+- 修改范围：仅前端数字人展示层、Rive 资源与可见性控制；不修改后端、API、数据库、Agent、SSE、TTS 或案件业务。
+- 已确认：运行资源 `public/digital-human/law-xiaozhi/law-xiaozhi.riv` 已由保留的源文件 `digital-human/law_xiaozhi/无背景.riv` 覆盖，SHA-256 均为 `FE1EFD70967A31A1C9D83DF8E903E8B255300E2F173C6038ED55942E7EA7AAF8`；本地 `rive.wasm`、`Artboard 1`、`AvatarStateMachine`、`ViewModel1` 与 `expression`/`speaking`/`blink` 映射未变。
+- 已确认：桌面浏览器的右下角、聊天与工作台各为 1 个 Rive Canvas、0 个数字人 PNG，Canvas 外层透明且无边框、圆角或旧光圈，控制台 0 error。不可见的双挂载实例不再渲染 PNG，重新显示和 Rive 加载失败时仍保留 PNG 兜底。
+- 遗留：移动端真实视口仍待人工验收。
+
+> 以下为上一项入口拆分任务记录。
+
+- 阶段/任务名称：拆分数字人咨询入口与案件工作台入口
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-09；入口拆分与跨页面覆盖返工均已通过类型检查、浏览器回归和 diff-check）
+- 目标：数字人悬浮入口只表达咨询助手；案件工作台在全站顶栏提供独立入口。数字人聊天仅保留“转入案件办理”的上下文动作，不再把工作台作为数字人自身功能入口。
+- 修改范围：仅调整前端入口与视图编排；继续复用现有 `digitalHumanStore`、`CaseWorkspaceShell`、session/matter/Agent/SSE/TTS 状态，不修改后端、API、数据库、案件流程或审批边界。
+- 已确认决策：拆入口与界面职责，不拆底层上下文；保持聊天与工作台双挂载，避免切换导致草稿、在途上传、SSE 或滚动位置丢失。
+- 返工根因：`DigitalHumanFloat` 位于根布局，路由变化不会卸载；普通导航只执行 `router.push`，未复位 `isOpen/workspaceOpen`，导致目标页面已加载但仍被固定定位的工作台覆盖。
+- 验收：已在浏览器确认“案件与纠纷 → 案件工作台”可直接打开工作台、返回对话正常、关闭后点击数字人只打开咨询聊天、聊天内显示“转入办理”；返工后从工作台点击“合同审查”，URL 与目标页面均正常切换且工作台自动收起，控制台无错误。`npx tsc --noEmit` 与 `git diff --check` 通过。`npm run build` 因已有 Next 进程占用 `frontend/.next/trace` 长时间停在初始化，未擅自停止用户进程，需空闲时补跑。
+
+> 以下为上一项待验收任务记录，不再作为当前实施目标。
+
+- 阶段/任务名称：恢复全站数字人入口
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-07；类型检查、生产构建、运行页面与 diff-check 已通过）
+- 目标：撤销开学演示期间的临时隐藏，恢复完整数字人、劳动争议 Agent 和案件工作台的前端入口。
+- 修改范围：仅恢复 `frontend/src/app/layout.tsx` 对 `DigitalHumanFloat` 的导入与全站挂载；不修改数字人内部逻辑、后端、API、数据库或业务状态。
+- 验收：全站重新显示数字人悬浮入口，点击继续使用原有数字人聊天及其工作台；`npx tsc --noEmit`、`npm run build`、首页 HTTP 200 与入口文案渲染、`git diff --check` 已通过。
+
+> 以下为已结束的临时展示任务记录。
+
 - 阶段/任务名称：开学演示隐藏后续数字人及其 Agent 工作台入口
-- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-03；类型检查、生产构建与 diff-check 通过，待浏览器确认入口不可见）
+- 当前状态：`COMPLETED` 后按用户 2026-09-07 指令撤销隐藏
 - 目标：当前完整项目继续保留数字人、劳动争议 Agent 和案件工作台代码，但开学演示时前端不展示入口，也不存在可点击触发元素。
 - 修改范围：仅移除 `frontend/src/app/layout.tsx` 中全站 `DigitalHumanFloat` 挂载；不删除数字人组件，不修改原项目已有 `/agents` 页面、后端、API、数据库或业务状态。
 - 验收：全站页面无数字人悬浮入口；DOM 不挂载数字人聊天/案件工作台；`npx tsc --noEmit`、`npm run build`、`git diff --check` 已通过。
