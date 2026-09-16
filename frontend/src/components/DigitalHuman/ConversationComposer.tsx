@@ -15,6 +15,8 @@ interface ConversationComposerProps {
   onPresetConsumed?: () => void;
   // 外部聚焦请求（如"继续提问"）：变化时聚焦输入框。
   focusSignal?: number;
+  // 仅同步浏览器 STT 的展示状态，不改变 Store 或发送语义。
+  onListeningChange?: (active: boolean) => void;
 }
 
 export default function ConversationComposer({
@@ -22,6 +24,7 @@ export default function ConversationComposer({
   preset = null,
   onPresetConsumed,
   focusSignal = 0,
+  onListeningChange,
 }: ConversationComposerProps) {
   const [question, setQuestion] = useState('');
   const [sttActive, setSttActive] = useState(false);
@@ -52,7 +55,10 @@ export default function ConversationComposer({
   } = useDigitalHumanStore();
   const voiceReady = useVoiceReady();
 
-  useEffect(() => () => sttControllerRef.current?.abort(), []);
+  useEffect(() => () => {
+    sttControllerRef.current?.abort();
+    onListeningChange?.(false);
+  }, [onListeningChange]);
 
   // 不支持语音的浏览器：按钮不渲染，文字聊天完全不受影响（水合后判定）。
   const sttSupported = voiceReady && isSttSupported();
@@ -66,6 +72,7 @@ export default function ConversationComposer({
     sttBaseRef.current = '';
     sttInterimRef.current = '';
     setSttActive(false);
+    onListeningChange?.(false);
     return text;
   };
 
@@ -92,9 +99,11 @@ export default function ConversationComposer({
         sttBaseRef.current = '';
         sttInterimRef.current = '';
         setSttActive(false);
+        onListeningChange?.(false);
       },
     });
     setSttActive(true);
+    onListeningChange?.(true);
   };
 
   const toggleStt = () => {

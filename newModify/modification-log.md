@@ -2,6 +2,26 @@
 
 本文件用于持续记录每次项目解析、文档修改、代码修改和配置调整。后续默认追加到本文件，便于按时间和会话追溯。
 
+## 2026-09-16（/chat 重做为法小助日常交流页）
+
+- 目标：将旧普法问答页替换为以真实 Rive 数字人为中心的日常交流页；顶部导航保留，左侧展示 `digitalHumanStore` 会话记录，中央承载完整多轮消息、流式回答、语音和快捷提问。
+- 实现：新增 `DailyConversationPage` 及页面样式；`/chat/page.tsx` 仅负责挂载页面；复用 `digitalHumanStore`、`ConversationComposer`、`DigitalHumanAvatar`、`LaborTriageCard`、`MatterEntryCard` 和现有路由。快捷问题只预填，路由按钮由真实 `route/routeLabel` 驱动，劳动案件继续通过既有工作台/分流链路处理。
+- 边界：旧 `chatStore` 保留；未修改后端、API、数据库、Agent、SSE 或 TTS 契约。`DigitalHumanFloat` 仅在 `/chat` 隐藏，其他页面继续保留悬浮入口；`ConversationComposer` 只新增 STT 监听展示回调。
+- 验证：`npx tsc --noEmit`、`npm run build`、`git diff --check` 通过；浏览器确认桌面 1366×768、1440×900 和移动端 375×812 均无横向溢出，页面为单一 Rive Canvas，Rive 加载完成后无 PNG；已验证 SSE 回答、会话记录、复制、快捷问题预填、合同审查路由和离开 `/chat` 后悬浮入口恢复。等待用户手动确认麦克风权限下的 STT 和完整 TTS 体验。
+
+## 2026-09-16（按最新方案补充 /chat 右栏与主视觉）
+
+- 目标：在不改变回答卡片尺寸和后端契约的前提下，为 `/chat` 增加基于真实 Store/后端状态的右侧上下文栏，并将 Rive 数字人居中放大、柔和遮挡下半身。
+- 实现：新增 `DailyConversationContextPanel`，读取当前会话、案件、劳动分流、Agent Run、Workspace Presenter、最近提问和语音/服务状态；无真实数据时只展示空态，不编造摘要或法律结论。`DailyConversationPage.module.css` 保持 `.messageCard` 的既有 `max-width` 与内边距，新增约 300px 右栏、窄桌面单列主视觉和移动端纵向排布，Rive Canvas 底部使用页面背景渐变遮挡。
+- 边界：`DigitalHumanFloat` 在 `/chat` 常态隐藏；从真实案件上下文打开工作台时恢复既有 `CaseWorkspaceShell`，避免重复入口。未修改后端、API、数据库、Agent、SSE、TTS 或案件状态机。
+- 验证：`npx tsc --noEmit`、`npm run build`、`git diff --check` 通过；内置预览 `http://localhost:3001/chat` 已从当前工作树启动，桌面与 375×812 移动视口无横向溢出，Rive 加载后为单一 Canvas，控制台无 error。
+
+## 2026-09-16（继续收敛案件工作台右栏）
+
+- 依据当前会话最新确认的右栏方案，保留工作台右侧案件上下文助手的职责边界：展开约 360px、收起精确 64px；只展示既有案件结果的当前判断、下一步建议、缺失/待确认和最近上下文。
+- 实现：`Workspace.module.css` 将收起 rail 从 76px 调整为 64px，并同步头像容器尺寸，避免收起态超出右栏；展开态、四个快捷操作、用户确认发送、移动端 Bottom Sheet 和审批边界保持不变。
+- 验证：浏览器确认展开 360px、收起 64px；快捷操作只预填；375×812 移动端 Bottom Sheet 展开/收起正常、页面无横向溢出。未修改业务逻辑、Agent、SSE、取消链、案件状态机、接口协议或后端。
+
 ## 2026-08-18（完整 PNG 状态数字人：暂停 Rive 骨骼拆分）
 
 - 原因与边界：AI 生成的 body/arm/cape 拆层素材无法与原始法小助 PNG 保持像素级透视、比例和造型一致，故 `frontend/digital-human/fa-xiao-zhu/` 未接入、未提交，Rive 仅保留为未来可选方向。
@@ -1183,3 +1203,22 @@
 - 根因：`DigitalHumanFloat` 挂载在根布局，路由切换不会卸载；`workspaceOpen` 未随 `pathname` 变化复位。
 - 最小修复：`DigitalHumanFloat` 记录上一条 `pathname`，检测到跨页面导航后调用现有 `close()`，统一复位 `isOpen/workspaceOpen`；不重复实现清理逻辑。
 - 回归：重复“打开工作台 → 点击合同审查”，工作台自动收起，`/contract` 页面完整显示，数字人恢复为悬浮入口，浏览器控制台 0 error；`npx tsc --noEmit`、`git diff --check` 通过。
+
+## 2026-09-16（普法问答页空间比例返工）
+
+- 目标：按参考效果收敛 `/chat` 的纵向层级，让轻量 Hero 负责数字人氛围、独立消息区承担主要交流内容。
+- 页面层：`DailyConversationPage` 新增四个真实功能入口；法律咨询与案件/纠纷只预填问题，合同审查与文书起草沿用 `/contract`、`/document-drafting` 路由，不自动发送或建案。
+- 布局层：`DailyConversationPage.module.css` 将 Hero 固定为约 252–294px，头像容器裁切为胸像并用渐变隐藏下半身；消息区独立滚动并扩展 AI/用户气泡上限，底部快捷问题与 `ConversationComposer` 保持固定承载。
+- 边界：未修改 Rive 资源、状态机、Store、SSE、STT/TTS、后端、API、数据库、案件流程或公开契约。
+- 验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；`npm run build` 启动后长时间无输出，已停止本次构建命令，未停止其他 Next 进程，待空闲环境补跑。
+
+## 2026-09-16（窄桌面预览返工）
+
+- 根据约 1009×898 内置预览反馈，将右栏隐藏断点提前至 `1180px`，将左栏收起断点设为 `900px`，把中间消息主舞台优先让给聊天内容；移动端仍按原顺序堆叠并恢复侧栏/上下文栏。
+- 修正头像视口：`.dh-avatar` 从 Hero 容器顶部进入，避免头部被裁掉；下半身仍由容器底部渐变淡出，Rive 资源、布局和状态机未改。
+- 验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；未启动新服务器，现有 3002 服务可热更新。
+
+## 2026-09-16（头像半身视口尺寸微调）
+
+- 仅调整 `DailyConversationPage.module.css` 的 `.avatarStage .dh-avatar`：桌面视口改为 `360–440px` 量级并设置正向顶部偏移，移动端使用较小的 `250–320px` 范围；头部保持在 Hero 可视区，底部继续由容器渐变裁切。
+- 未修改 Rive 资源、状态机、组件结构、业务逻辑或其他页面样式；`npx tsc --noEmit --incremental false`、`git diff --check` 通过。

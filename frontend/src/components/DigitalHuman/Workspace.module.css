@@ -988,12 +988,12 @@
 }
 
 .shellAssistantCollapsed {
-  --dh-assistant-w: 76px;
+  --dh-assistant-w: 64px;
 }
 
 .assistantRail {
   display: none;
-  width: 76px;
+  width: 64px;
   flex: none;
   flex-direction: column;
   align-items: center;
@@ -1005,8 +1005,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 70px;
-  height: 86px;
+  width: 58px;
+  height: 76px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -1015,8 +1015,8 @@
 }
 
 .assistantRail :global(.dh-avatar-compact) {
-  width: 70px;
-  height: 86px;
+  width: 58px;
+  height: 76px;
 }
 
 .railStatus {

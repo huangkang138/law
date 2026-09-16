@@ -192,13 +192,13 @@ export default function DigitalHumanChat({ avatarVisible = true }: DigitalHumanC
                 role={message.role}
                 content={message.content}
               />
-              {message.role === 'assistant' && message.route && message.routeLabel && (
+              {message.role === 'assistant' && message.route && message.routeLabel && message.route !== '/chat' && (
                 <button
                   type="button"
                   className="dh-route-button"
                   onClick={() => handleRoute(message.route as string)}
                 >
-                  去{message.routeLabel}看看
+                  打开{message.routeLabel}
                   <ArrowRight size={15} />
                 </button>
               )}
