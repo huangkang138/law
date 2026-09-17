@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check, Copy, FilePenLine, FileText, Gavel, History, MessageCircle, Plus, RotateCcw, Settings, Square, Trash2, Volume2 } from 'lucide-react';
+import { ArrowRight, Check, Copy, FilePenLine, FileText, Gavel, History, Lightbulb, MessageCircle, Plus, RotateCcw, Settings, Square, Trash2, Volume2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { isTtsSupported } from '@/lib/voice/ttsController';
@@ -18,18 +18,17 @@ import DailyConversationContextPanel from './DailyConversationContextPanel';
 import { useLaborTriage } from './useLaborTriage';
 import styles from './DailyConversationPage.module.css';
 
-const QUICK_PROMPTS = [
-  '试用期被辞退怎么办',
-  '拖欠工资怎么维权',
-  '劳动合同解除赔偿',
-  '竞业限制是否有效',
-];
+const QUICK_PROMPT_GROUPS = [
+  ['试用期被辞退怎么办', '拖欠工资怎么维权', '劳动合同解除赔偿', '竞业限制是否有效'],
+  ['租房押金不退怎么办', '交通事故责任如何认定', '合同违约怎么处理', '欠款不还如何起诉'],
+] as const;
 
 const HERO_ACTIONS = [
   {
     label: '法律咨询',
     description: '先说说你的情况',
     icon: MessageCircle,
+    tone: 'blue',
     preset: '请帮我分析一下我的法律问题',
     route: undefined,
   },
@@ -37,6 +36,7 @@ const HERO_ACTIONS = [
     label: '合同审查',
     description: '进入合同审查',
     icon: FileText,
+    tone: 'teal',
     route: '/contract',
     preset: undefined,
   },
@@ -44,6 +44,7 @@ const HERO_ACTIONS = [
     label: '案件与纠纷',
     description: '先判断处理方式',
     icon: Gavel,
+    tone: 'violet',
     preset: '我遇到劳动争议，想先了解该怎么处理',
     route: undefined,
   },
@@ -51,6 +52,7 @@ const HERO_ACTIONS = [
     label: '文书起草',
     description: '进入文书起草',
     icon: FilePenLine,
+    tone: 'orange',
     route: '/document-drafting',
     preset: undefined,
   },
@@ -62,6 +64,14 @@ function formatSessionDate(value: string | null): string {
   if (Number.isNaN(date.getTime())) return '刚刚';
   return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
 }
+
+function formatMessageTime(value: number): string {
+  if (!value) return '刚刚';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '刚刚';
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function DailyConversationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,6 +80,7 @@ export default function DailyConversationPage() {
   const [isListening, setIsListening] = useState(false);
   const [preset, setPreset] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [quickPromptGroup, setQuickPromptGroup] = useState(0);
   const voiceReady = useVoiceReady();
   const ttsSupported = voiceReady && isTtsSupported();
   const laborTriage = useLaborTriage();
@@ -252,8 +263,7 @@ export default function DailyConversationPage() {
             <h1 id="daily-conversation-title">法小助</h1>
             <p>您的智能法律助手</p>
             <div className={styles.heroMeta}>
-              <span className={styles.onlineStatus}><i /> 在线</span>
-              <span className={styles.statusText}>{statusLabel}</span>
+              <span className={styles.onlineStatus}><i /> 在线 · 随时为你服务</span>
             </div>
             <div className={styles.heroHint}>
               不知道该去哪个功能？先告诉我你的情况。
@@ -281,6 +291,7 @@ export default function DailyConversationPage() {
                   type="button"
                   key={action.label}
                   className={styles.heroAction}
+                  data-tone={action.tone}
                   onClick={() => action.route ? handleRoute(action.route) : handlePreset(action.preset)}
                 >
                   <span className={styles.heroActionIcon}><Icon size={17} /></span>
@@ -303,10 +314,19 @@ export default function DailyConversationPage() {
               const isSpeaking = speakingMessageId === message.id && voiceSpeaking;
               return (
                 <article key={message.id} className={`${styles.messageRow} ${message.role === 'user' ? styles.userRow : styles.assistantRow}`}>
-                  {message.role === 'assistant' && <div className={styles.messageMarker}><MessageCircle size={14} /></div>}
-                  <div className={`${styles.messageCard} ${message.role === 'assistant' ? styles.assistantCard : styles.userCard} ${isLatestAssistant ? styles.latestCard : ''}`}>
+                  {message.role === 'assistant' && (
+                    <div className={styles.messageMarker} aria-label="法小助头像"><MessageCircle size={15} /></div>
+                  )}
+                  <div className={`${styles.messageCard} ${message.role === 'assistant' ? styles.assistantCard : styles.userCard}`}>
+                    {message.role === 'assistant' && (
+                      <div className={styles.messageHeader}>
+                        <strong>法小助</strong>
+                        <time dateTime={new Date(message.createdAt).toISOString()}>{formatMessageTime(message.createdAt)}</time>
+                      </div>
+                    )}
                     {isLatestAssistant && <span className={styles.latestLabel}>最新回答</span>}
                     <ConversationMessageContent role={message.role} content={message.content} />
+                    {message.role === 'user' && <time className={styles.userMessageTime} dateTime={new Date(message.createdAt).toISOString()}>{formatMessageTime(message.createdAt)}</time>}
                     {canRoute && (
                       <button type="button" className={styles.routeButton} onClick={() => handleRoute(message.route as string)}>
                         打开{message.routeLabel}
@@ -334,8 +354,9 @@ export default function DailyConversationPage() {
 
             {streamingMessage && (
               <article className={`${styles.messageRow} ${styles.assistantRow}`}>
-                <div className={styles.messageMarker}><MessageCircle size={14} /></div>
+                <div className={styles.messageMarker} aria-label="法小助头像"><MessageCircle size={15} /></div>
                 <div className={`${styles.messageCard} ${styles.assistantCard} ${styles.latestCard}`} aria-label="法小助正在回答">
+                  <div className={styles.messageHeader}><strong>法小助</strong><time>现在</time></div>
                   <span className={styles.latestLabel}>实时回答</span>
                   <ConversationMessageContent role="assistant" content={streamingMessage.content} streaming />
                 </div>
@@ -365,11 +386,16 @@ export default function DailyConversationPage() {
 
         <section className={styles.composerArea} aria-label="继续提问">
           <div className={styles.quickHeader}>
-            <span>你也可以这样问</span>
-            <small>点击后可修改，确认后再发送</small>
+            <span className={styles.quickTitle}><Lightbulb size={14} />你也可以这样问</span>
+            <div className={styles.quickHeaderActions}>
+              <small>点击后可修改，确认后再发送</small>
+              <button type="button" className={styles.quickRefresh} onClick={() => setQuickPromptGroup((group) => (group + 1) % QUICK_PROMPT_GROUPS.length)}>
+                <RotateCcw size={12} />换一批
+              </button>
+            </div>
           </div>
           <div className={styles.quickPrompts}>
-            {QUICK_PROMPTS.map((question) => (
+            {QUICK_PROMPT_GROUPS[quickPromptGroup].map((question) => (
               <button type="button" key={question} onClick={() => handlePreset(question)}>
                 <FileText size={14} />
                 {question}

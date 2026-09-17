@@ -2,6 +2,13 @@
 
 本文件用于持续记录每次项目解析、文档修改、代码修改和配置调整。后续默认追加到本文件，便于按时间和会话追溯。
 
+## 2026-09-16（/chat 普法问答页限定范围 UI 精修）
+
+- 目标：在既有 Rive 数字人 `/chat` 页面上收敛视觉层级，不改变顶部导航、三栏结构、会话记录、Store/API、案件关联、语音/TTS 或状态机逻辑。
+- 实现：调整 `DailyConversationPage.tsx` 的入口辅助色、在线 pill、消息身份信息、用户时间、快捷问题分组与“换一批”；调整 `DailyConversationPage.module.css` 的浅蓝渐变 Hero、Rive 背后光晕、四功能卡、消息宽度/间距/ghost 操作、快捷 chips、Composer focus 与按钮层级；调整 `DailyConversationContextPanel.tsx` 为当前会话/当前案件/处理进度/服务状态独立卡片，补充未关联案件的既有关联入口、四阶段进度和弱装饰卡。
+- Rive 边界：Hero 仍由 `DigitalHumanAvatar → RiveDigitalHuman` 使用 `/digital-human/law-xiaozhi/law-xiaozhi.riv`；未引入旧 PNG 头像、未重复挂载 Rive、未改 `AvatarStateMachine` / `ViewModel1` / `expression` / `speaking` / `blink`。
+- 验证：`cd frontend && npx tsc --noEmit` 通过；`git diff --check` 通过。`npm run build` 在 Next 初始化阶段长时间无输出，考虑到现有 Next 进程/`.next` 锁状态已停止本次构建；浏览器控制端返回 `nodeRepl.fetch request failed`，真实渲染待人工检查。
+
 ## 2026-09-16（/chat 重做为法小助日常交流页）
 
 - 目标：将旧普法问答页替换为以真实 Rive 数字人为中心的日常交流页；顶部导航保留，左侧展示 `digitalHumanStore` 会话记录，中央承载完整多轮消息、流式回答、语音和快捷提问。

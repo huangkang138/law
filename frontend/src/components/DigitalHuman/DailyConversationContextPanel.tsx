@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, FileText, MessageCircle } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, FileText, Link2, MessageCircle, Mic2, Scale, Sparkles } from 'lucide-react';
 
 import { laborFactLabel } from './LaborDisputeForm';
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -45,6 +45,8 @@ const RUN_STATUS_LABELS: Record<string, string> = {
   cancelled: '已取消',
 };
 
+const PROGRESS_STEPS = ['咨询中', '待整理', '待建案', '完成'];
+
 function formatUpdatedAt(value: string | null | undefined): string {
   if (!value) return '暂无更新时间';
   const date = new Date(value);
@@ -71,7 +73,6 @@ export default function DailyConversationContextPanel({
     currentTriage,
     laborTriageError,
     laborTriageLoading,
-    messages,
     sessionId,
     sessions,
     voiceEnabled,
@@ -82,7 +83,6 @@ export default function DailyConversationContextPanel({
   } = useDigitalHumanStore();
 
   const currentSession = sessions.find((session) => session.id === sessionId);
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
   const currentStep = currentAgentRun?.steps.find((step) => step.id === currentAgentRun.current_step_id);
   const missingItems = uniqueItems([
     ...(currentTriage?.result.missing_facts || []),
@@ -91,6 +91,22 @@ export default function DailyConversationContextPanel({
     ...(currentAgentRun?.questions || []),
   ]).slice(0, 4);
   const errorMessage = workspaceError || laborTriageError;
+  const progressIndex = currentAgentRun?.status === 'completed'
+    ? 3
+    : currentMatterId
+      ? 2
+      : currentTriage
+        ? 1
+        : 0;
+  const progressLabel = currentAgentRun
+    ? (RUN_STATUS_LABELS[currentAgentRun.status] || currentAgentRun.status)
+    : currentMatterId
+      ? '待建案'
+      : currentTriage
+        ? '待整理'
+        : sessionId
+          ? '咨询中'
+          : '待开始';
 
   return (
     <aside className={styles.contextRail} aria-label="法小助当前会话与案件状态">
@@ -99,24 +115,25 @@ export default function DailyConversationContextPanel({
           <span className={styles.contextEyebrow}>LIVE CONTEXT</span>
           <h2>当前状态</h2>
         </div>
-        <span className={styles.contextLive}><i />真实数据</span>
+        <span className={styles.contextLive}><i />在线</span>
       </header>
 
       <div className={styles.contextScroll}>
-        <section className={styles.contextSection}>
+        <section className={`${styles.contextSection} ${styles.contextSectionBlue}`}>
           <div className={styles.contextSectionTitle}>
-            <MessageCircle size={14} />
+            <span className={`${styles.contextIcon} ${styles.contextIconBlue}`}><MessageCircle size={14} /></span>
             <span>当前会话</span>
-            <span className={styles.contextBadge}>{sessionId ? '已连接' : '未建立'}</span>
+            <span className={`${styles.contextBadge} ${sessionId ? styles.contextBadgeGreen : styles.contextBadgeSlate}`}>{sessionId ? '已连接' : '待开始'}</span>
           </div>
           <strong className={styles.contextPrimary}>{currentSession?.title || '法小助日常交流'}</strong>
           <p>{currentSession ? `最近更新 ${formatUpdatedAt(currentSession.updated_at)}` : sessionId ? '当前会话正在使用' : '发送问题后会保存到历史记录'}</p>
         </section>
 
-        <section className={styles.contextSection}>
+        <section className={`${styles.contextSection} ${styles.contextSectionViolet}`}>
           <div className={styles.contextSectionTitle}>
-            <FileText size={14} />
+            <span className={`${styles.contextIcon} ${styles.contextIconViolet}`}><FileText size={14} /></span>
             <span>当前案件</span>
+            <span className={`${styles.contextBadge} ${currentMatterId ? styles.contextBadgeBlue : styles.contextBadgeOrange}`}>{currentMatterId ? '已关联' : '未关联'}</span>
           </div>
           {currentMatterId ? (
             <>
@@ -127,16 +144,36 @@ export default function DailyConversationContextPanel({
               </button>
             </>
           ) : (
-            <p className={styles.contextEmpty}>当前对话暂未关联案件，普通咨询不会自动创建案件。</p>
+            <>
+              <p className={styles.contextEmpty}>当前对话暂未关联案件，普通咨询不会自动创建案件。</p>
+              <button type="button" className={styles.contextAction} onClick={onOpenWorkspace}>
+                <Link2 size={14} /> 关联案件 <ArrowRight size={14} />
+              </button>
+            </>
           )}
         </section>
 
-        <section className={styles.contextSection}>
+        <section className={`${styles.contextSection} ${styles.contextSectionOrange}`}>
           <div className={styles.contextSectionTitle}>
-            <span>劳动分流</span>
-            <span className={styles.contextBadge}>{currentTriage ? '已同步' : laborTriageLoading ? '同步中' : '暂无记录'}</span>
+            <span className={`${styles.contextIcon} ${styles.contextIconOrange}`}><Sparkles size={14} /></span>
+            <span>处理进度</span>
+            <span className={`${styles.contextBadge} ${progressIndex === 3 ? styles.contextBadgeGreen : progressIndex > 0 ? styles.contextBadgeBlue : styles.contextBadgeSlate}`}>{progressLabel}</span>
           </div>
-          {currentTriage ? (
+          <div className={styles.progressTrack} aria-label={`当前进度：${PROGRESS_STEPS[progressIndex]}`}>
+            {PROGRESS_STEPS.map((step, index) => (
+              <div key={step} className={`${styles.progressStep} ${index <= progressIndex ? styles.progressStepActive : ''}`}>
+                <span className={styles.progressDot}>{index < progressIndex ? <CheckCircle2 size={10} /> : index === progressIndex ? <span /> : null}</span>
+                <small>{step}</small>
+              </div>
+            ))}
+          </div>
+          {currentAgentRun ? (
+            <>
+              <strong className={styles.contextPrimary}>{currentStep?.name || '案件任务处理中'}</strong>
+              {currentAgentRun.blocked_reason && <p>{currentAgentRun.blocked_reason}</p>}
+              {currentAgentRun.approval?.prompt && <p className={styles.contextNext}>{currentAgentRun.approval.prompt}</p>}
+            </>
+          ) : currentTriage ? (
             <>
               <div className={styles.contextMetrics}>
                 <div><small>场景</small><strong>{TRIAGE_LABELS[currentTriage.result.triage_type] || currentTriage.result.triage_type}</strong></div>
@@ -145,8 +182,14 @@ export default function DailyConversationContextPanel({
               <p>{RELATIONSHIP_LABELS[currentTriage.result.relationship_status] || currentTriage.result.relationship_status}</p>
               <p className={styles.contextNext}>{currentTriage.result.recommended_next_step}</p>
             </>
+          ) : workspacePresentation ? (
+            <>
+              <strong className={styles.contextPrimary}>{workspacePresentation.headline}</strong>
+              <p>{workspacePresentation.summary}</p>
+              {workspacePresentation.requires_user_action && <p className={styles.contextNext}>{workspacePresentation.next_action.label}</p>}
+            </>
           ) : (
-            <p className={styles.contextEmpty}>{laborTriageLoading ? '正在读取真实分流状态…' : '当前暂无真实劳动分流结果。'}</p>
+            <p className={styles.contextEmpty}>{laborTriageLoading || workspaceLoading ? '正在同步真实处理状态…' : '发送问题后会显示处理阶段。'}</p>
           )}
           {missingItems.length > 0 && (
             <div className={styles.contextMissing}>
@@ -156,44 +199,30 @@ export default function DailyConversationContextPanel({
           )}
         </section>
 
-        <section className={styles.contextSection}>
+        <section className={`${styles.contextSection} ${styles.contextSectionTeal}`}>
           <div className={styles.contextSectionTitle}>
-            <span>处理进度</span>
-            <span className={styles.contextBadge}>
-              {currentAgentRun ? (RUN_STATUS_LABELS[currentAgentRun.status] || currentAgentRun.status) : workspaceLoading ? '同步中' : '待开始'}
-            </span>
+            <span className={`${styles.contextIcon} ${styles.contextIconTeal}`}><Mic2 size={14} /></span>
+            <span>服务状态</span>
           </div>
-          {currentAgentRun ? (
-            <>
-              <strong className={styles.contextPrimary}>{currentStep?.name || '案件任务处理中'}</strong>
-              {currentAgentRun.blocked_reason && <p>{currentAgentRun.blocked_reason}</p>}
-              {currentAgentRun.approval?.prompt && <p className={styles.contextNext}>{currentAgentRun.approval.prompt}</p>}
-            </>
-          ) : workspacePresentation ? (
-            <>
-              <strong className={styles.contextPrimary}>{workspacePresentation.headline}</strong>
-              <p>{workspacePresentation.summary}</p>
-              {workspacePresentation.requires_user_action && <p className={styles.contextNext}>{workspacePresentation.next_action.label}</p>}
-            </>
-          ) : (
-            <p className={styles.contextEmpty}>当前暂无案件工作台状态。</p>
-          )}
-        </section>
-
-        <section className={styles.contextSection}>
-          <div className={styles.contextSectionTitle}><span>最近提问</span></div>
-          <p className={lastUserMessage ? styles.contextQuote : styles.contextEmpty}>
-            {lastUserMessage || '还没有用户消息'}
-          </p>
-        </section>
-
-        <section className={styles.contextSection}>
-          <div className={styles.contextSectionTitle}><span>服务状态</span></div>
-          <div className={styles.contextServiceRow}><span>法小助</span><strong>{statusLabel}</strong></div>
-          <p>语音播报：{voiceSpeaking ? '进行中' : voiceEnabled ? '已开启' : '未开启'}</p>
+          <div className={styles.contextServiceGrid}>
+            <div className={styles.contextServiceMetric}>
+              <small>法小助</small>
+              <strong className={statusLabel === '正在思考' ? styles.contextServiceBusy : styles.contextServiceOnline}>{statusLabel}</strong>
+            </div>
+            <div className={styles.contextServiceMetric}>
+              <small>语音播报</small>
+              <strong>{voiceSpeaking ? '进行中' : voiceEnabled ? '已开启' : '未开启'}</strong>
+            </div>
+          </div>
         </section>
 
         {errorMessage && <p className={styles.contextError}>{errorMessage}</p>}
+
+        <section className={styles.contextDecoration} aria-label="普法服务寄语">
+          <div className={styles.contextDecorationArt} aria-hidden="true"><BookOpen size={22} /><Scale size={22} /></div>
+          <strong>让法律更近，让服务更有温度</strong>
+          <p>从一个清晰的问题开始，逐步找到适合你的处理路径。</p>
+        </section>
       </div>
 
       <footer className={styles.contextFooter}>右栏只展示当前 Store 与后端返回的数据，不生成新的法律结论。</footer>
