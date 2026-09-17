@@ -1229,3 +1229,59 @@
 
 - 仅调整 `DailyConversationPage.module.css` 的 `.avatarStage .dh-avatar`：桌面视口改为 `360–440px` 量级并设置正向顶部偏移，移动端使用较小的 `250–320px` 范围；头部保持在 Hero 可视区，底部继续由容器渐变裁切。
 - 未修改 Rive 资源、状态机、组件结构、业务逻辑或其他页面样式；`npx tsc --noEmit --incremental false`、`git diff --check` 通过。
+
+# 2026-09-17 普法问答页刷新时旧机器人闪现修复
+
+- 根因：`DigitalHumanAvatar` 在 Rive 尚未 ready 时主动渲染 `public/digital-human/first-gen/*.png`，导致 `/chat` 刷新时根据加载时序短暂显示旧版机器人。
+- 修复：为共享数字人组件增加兼容开关，仅在 `DailyConversationPage` 关闭旧 PNG 回退，从首帧起使用当前 Rive 数字人；其他入口默认行为不变。
+- 范围：仅 `DigitalHumanAvatar.tsx` 和 `DailyConversationPage.tsx` 的加载回退逻辑，不改状态、动作、尺寸、位置、Store/API/SSE/TTS 或业务逻辑。
+- 验证：`npx tsc --noEmit --incremental false` 与 `git diff --check` 通过；主项目预览启动于 `http://localhost:3003/chat`，刷新首屏由用户手动验收。
+
+## 2026-09-17（案件工作台提问回复可见性修复）
+
+- 根因：工作台右栏与普法问答页共用同一份消息状态，但右栏把最近消息放在默认收起的“最近上下文”中；发送成功后没有展开，因此回复只在普法问答页显得可见。
+- 修复：工作台内发送新问题并进入加载状态时，自动展开“最近上下文”，继续沿用原消息列表、流式回复与滚动逻辑；用户仍可手动收起。
+- 边界：仅修改 `DigitalHumanCaseAssistant` 的本地展示状态，不改 Store、API、SSE、TTS、案件流程或普法问答页。
+- 验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；浏览器实测发送后上下文自动展开，用户问题、思考状态与最终回复均在右栏可见，并可再次手动收起。
+
+# 2026-09-17 劳动事实表单条件必填统一
+
+- 根因：条件必填的缺失计算与红星展示分别维护，导致经济补偿/赔偿需要解除日期但页面未标星；欠薪二选一、加班组合输入和试用期合同期限也存在展示与实际规则不一致。
+- 修复：新增轻量条件必填规则函数，统一驱动红星、缺失统计、橙色定位与提交拦截；补齐解除/补偿、欠薪、加班、试用期条件，并提示劳动关系存续状态冲突及非标准工时人工核算边界。
+- 范围：仅劳动事实表单、局部提示样式和专项规则测试；未修改后端、Runtime、API、数据库、法源、审批或计算规则，保留工作区其他未提交改动。
+- 验证：条件规则专项测试 7/7 通过；`npx tsc --noEmit --incremental false`、`git diff --check` 通过；动态红星和冲突提示待浏览器人工视觉确认。
+
+## 2026-09-17（劳动事实表单红星状态修复）
+
+- 红星由“该字段属于必填项”改为“该字段当前仍缺失”：用户填完整后红星立即消失；未填写字段、二选一组合和底部缺失数量继续使用原条件规则。
+- 仅修改 `LaborDisputeForm` 的展示类判断并补充规则回归测试，不改提交拦截、Payload、后端或劳动争议业务规则。
+- 验证：条件规则专项测试 8/8、`npx tsc --noEmit --incremental false`、`git diff --check` 通过。
+
+## 2026-09-17（解除审查路径中文展示）
+
+- 根因：规则详情只转换了计算字段名称，没有转换 `termination_route` 的枚举值，导致页面直接显示 `undetermined_termination_route` 等后端代码。
+- 修复：增加解除路径展示映射；未确定或未来新增的未知枚举统一显示“解除路径待进一步确认”，不把内部枚举暴露给用户。
+- 边界：仅格式化前端展示文本，不修改后端解除规则、原始计算结果、状态或法律结论。
+- 验证：展示与表单专项回归测试 11/11、`npx tsc --noEmit --incremental false`、`git diff --check` 通过。
+
+## 2026-09-17（法小助全身 Rive 与身体动作接入）
+
+- 将正式运行资源切换为用户新增的 `digitalv2.riv`，保留原 `Artboard 1 / AvatarStateMachine / ViewModel1` 以及 `expression / speaking / blink` 契约。
+- 新增 `bodyState` 驱动：默认站姿 0、欢迎/成功挥手 1、思考 2、语音讲解 3、严肃状态看书 4；错误态安全回到基础站姿。
+- 范围仅限 Rive 展示层、公开静态资源与项目记录；未修改 Store、API、SSE、TTS、案件流程、页面布局或后端。
+- `/chat` 原半身裁切会遮住手臂和书本动作，现将 Rive 视口收敛到 Hero 可用高度并减弱底部渐隐，使全身动作完整可见，三栏结构和消息区尺寸不变。
+- 验证：源文件与公开资源 SHA-256 一致；`npx tsc --noEmit --incremental false`、`git diff --check` 通过；浏览器确认基础站姿完整显示，点击朗读后进入伸手讲解动作，停止朗读后恢复默认状态，控制台无报错。
+
+## 2026-09-17（全身 Rive 半身显示与动作重叠返工）
+
+- 按用户反馈恢复 `/chat` 原半身尺寸，不再把全身缩小后完整塞入 Hero。
+- 重叠根因不是多个 Rive 实例：浏览器确认 Hero 内只有 1 个 Canvas、1 个 Rive 节点；实际双影来自覆盖肩部的约 60px 页面渐变遮罩。现已移除遮罩，半身只由容器边界裁切。
+- 禁用 `/chat` 及共享数字人入口对整个头像施加的 idle/thinking/speaking/success CSS 位移、旋转和缩放；身体只由 `bodyState` 0～4 控制，脸部继续由 `expression / speaking / blink` 组合驱动。
+- 浏览器复查 idle 与朗读状态尺寸、位置一致，无白色半透明双影；三栏结构、Store/API/SSE/TTS、案件流程和后端未改。
+
+## 2026-09-17（改用 digitalv3 资源纠正重叠根因）
+
+- 用户确认 `digitalv2.riv` 的重叠来自 Rive 文件内部身体组件，而非页面渐变；前一条关于渐变是重叠根因的判断作废。
+- 正式资源切换为 `digitalv3.riv`，其 Rive 合同仍为 `Artboard 1 / AvatarStateMachine / ViewModel1`，并保留 `bodyState / expression / speaking / blink`，无需改状态映射。
+- 恢复原半身底部渐变；继续禁用页面与共享入口对整个角色施加的 CSS 身体动画，保证身体只由 `bodyState` 控制、脸部动作独立组合。
+- 源文件与公开文件 SHA-256 一致；浏览器确认 idle 与朗读组合均无身体组件重叠、Hero 内只有 1 个 Canvas，控制台无报错；`npx tsc --noEmit --incremental false` 与 `git diff --check` 通过。

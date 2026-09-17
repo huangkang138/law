@@ -28,10 +28,10 @@
 
 ## 数字人 Rive 接入现状（2026-09-09）
 
-- 正常视觉主体为 `frontend/public/digital-human/law-xiaozhi/law-xiaozhi.riv`，使用 `@rive-app/react-webgl2@4.34.1` 和同目录本地 WASM。
-- Rive 合同为 `Artboard 1`、`AvatarStateMachine`、`ViewModel1`；`expression`、`speaking`、`blink` 复用现有业务状态映射。
+- 正常视觉主体为 `frontend/public/digital-human/law-xiaozhi/digitalv3.riv`，使用 `@rive-app/react-webgl2@4.34.1` 和同目录本地 WASM。
+- Rive 合同为 `Artboard 1`、`AvatarStateMachine`、`ViewModel1`；`expression`、`speaking`、`blink` 继续复用现有业务状态映射，`bodyState` 驱动全身动作（0 基础站姿、1 挥手、2 思考、3 讲解、4 看书）。
 - 悬浮入口、聊天和工作台使用矩形 Rive 视口，PNG 只作为加载或失败回退；该变化不涉及后端、API、数据库、SSE、TTS 或案件业务。
-- 正式运行资源已替换为 `frontend/digital-human/law_xiaozhi/无背景.riv`，源文件与运行文件 SHA-256 均为 `FE1EFD70967A31A1C9D83DF8E903E8B255300E2F173C6038ED55942E7EA7AAF8`。桌面右下角、聊天和工作台均验证为 1 个 Rive Canvas、0 个数字人 PNG、0 控制台 error；Canvas 外层透明且无圆形裁切、白框或旧光圈。不可见的双挂载实例不再保留 PNG 节点，失败兜底不变；移动端真实视口待验收。
+- 正式运行资源来自 `frontend/digital-human/law_xiaozhi/digitalv3.riv`，源文件与公开文件 SHA-256 均为 `8E3252A41CF2E17DAE9592FCCC793F01C8689614BCC25F91807E5607AD702AE7`。`digitalv2.riv` 的重叠来自资源内部身体组件，页面继续保留原半身渐变；共享头像的 CSS 整体位移/缩放动画保持禁用，身体只由 `bodyState` 控制。浏览器已确认 idle 与朗读组合无身体重叠、1 个 Canvas、0 控制台 error。
 
 ## 法小助日常交流页（2026-09-16）
 

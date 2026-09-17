@@ -279,6 +279,7 @@ export default function DailyConversationPage() {
               state={isListening ? 'listening' : undefined}
               isLoading={isLoading}
               voiceSpeaking={voiceSpeaking}
+              useLegacyImageFallback={false}
               variant="portrait"
               visible
             />

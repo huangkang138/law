@@ -17,6 +17,7 @@ interface DigitalHumanAvatarProps {
   isLoading?: boolean;
   voiceSpeaking?: boolean;
   visible?: boolean;
+  useLegacyImageFallback?: boolean;
   // 保留给后续的局部嘴型覆盖；当前完整 PNG 不叠加任何 AI 拆层素材。
   mouthOpen?: boolean;
 }
@@ -40,6 +41,7 @@ export default function DigitalHumanAvatar({
   isLoading,
   voiceSpeaking,
   visible = true,
+  useLegacyImageFallback = true,
   mouthOpen = false,
 }: DigitalHumanAvatarProps) {
   const isSmall = size === 'small';
@@ -77,7 +79,7 @@ export default function DigitalHumanAvatar({
       style={criticalStyle}
       aria-label={EMOTION_LABELS[current.image]}
     >
-      {!riveReady && previous && (
+      {useLegacyImageFallback && !riveReady && previous && (
         <Image
           key={`previous-${previous.image}`}
           src={`/digital-human/first-gen/${previous.image}.png`}
@@ -89,7 +91,7 @@ export default function DigitalHumanAvatar({
           className="dh-avatar-image dh-avatar-image-outgoing"
         />
       )}
-      {!riveReady && (
+      {useLegacyImageFallback && !riveReady && (
         <Image
           key={`current-${current.image}`}
           src={`/digital-human/first-gen/${current.image}.png`}
@@ -102,6 +104,7 @@ export default function DigitalHumanAvatar({
         />
       )}
       <RiveDigitalHuman
+        emotion={emotion}
         visualState={current}
         voiceSpeaking={voiceSpeaking ?? false}
         visible={visible}

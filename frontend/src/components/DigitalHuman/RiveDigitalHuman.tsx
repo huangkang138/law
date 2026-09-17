@@ -12,9 +12,11 @@ import {
   useViewModelInstanceTrigger,
 } from '@rive-app/react-webgl2';
 
+import type { DigitalHumanEmotion } from '@/services/digitalHumanApi';
+
 import type { AvatarVisualState } from './AvatarStateAdapter';
 
-const RIVE_SRC = '/digital-human/law-xiaozhi/law-xiaozhi.riv';
+const RIVE_SRC = '/digital-human/law-xiaozhi/digitalv3.riv';
 const RIVE_WASM_SRC = '/digital-human/law-xiaozhi/rive.wasm';
 const RIVE_ARTBOARD = 'Artboard 1';
 const RIVE_STATE_MACHINE = 'AvatarStateMachine';
@@ -29,17 +31,38 @@ const EXPRESSION_VALUES = {
   surprise: 5,
 } as const;
 
+const BODY_STATE_VALUES = {
+  idle: 0,
+  wave: 1,
+  thinking: 2,
+  explaining: 3,
+  reading: 4,
+} as const;
+
 const RIVE_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.BottomCenter });
 
 RuntimeLoader.setWasmUrl(RIVE_WASM_SRC);
 RuntimeLoader.setWasmFallbackUrl(null);
 
 interface RiveDigitalHumanProps {
+  emotion: DigitalHumanEmotion;
   visualState: AvatarVisualState;
   voiceSpeaking: boolean;
   visible: boolean;
   onReady: () => void;
   onError: (error: unknown) => void;
+}
+
+function bodyStateForState(
+  emotion: DigitalHumanEmotion,
+  visualState: AvatarVisualState,
+  voiceSpeaking: boolean,
+): number {
+  if (voiceSpeaking || visualState.state === 'speaking') return BODY_STATE_VALUES.explaining;
+  if (visualState.state === 'thinking') return BODY_STATE_VALUES.thinking;
+  if (emotion === 'welcome' || visualState.state === 'success') return BODY_STATE_VALUES.wave;
+  if (emotion === 'serious') return BODY_STATE_VALUES.reading;
+  return BODY_STATE_VALUES.idle;
 }
 
 function expressionForState(image: AvatarVisualState['image']): number {
@@ -57,6 +80,7 @@ function expressionForState(image: AvatarVisualState['image']): number {
 }
 
 export default function RiveDigitalHuman({
+  emotion,
   visualState,
   voiceSpeaking,
   visible,
@@ -90,6 +114,7 @@ export default function RiveDigitalHuman({
   // autoBind 已把编辑器默认 ViewModel 实例绑定到当前 Rive 实例；直接读取它，
   // 不再通过 useViewModelInstance(useDefault) 二次创建默认实例。
   const viewModelInstance = rive?.viewModelInstance ?? null;
+  const { setValue: setBodyState } = useViewModelInstanceNumber('bodyState', viewModelInstance);
   const { setValue: setExpression } = useViewModelInstanceNumber('expression', viewModelInstance);
   const { setValue: setSpeaking } = useViewModelInstanceBoolean('speaking', viewModelInstance);
   const { trigger: triggerBlink } = useViewModelInstanceTrigger('blink', viewModelInstance);
@@ -103,10 +128,11 @@ export default function RiveDigitalHuman({
     }
     if (!rive || !viewModelInstance) return;
 
+    const bodyState = viewModelInstance.number('bodyState');
     const expression = viewModelInstance.number('expression');
     const speaking = viewModelInstance.boolean('speaking');
     const blink = viewModelInstance.trigger('blink');
-    if (!expression || !speaking || !blink) {
+    if (!bodyState || !expression || !speaking || !blink) {
       const error = new Error(`${RIVE_VIEW_MODEL} contract is incomplete or has unexpected property types`);
       setFailed(true);
       onError(error);
@@ -121,9 +147,19 @@ export default function RiveDigitalHuman({
 
   useEffect(() => {
     if (!visible || !viewModelInstance) return;
+    setBodyState(bodyStateForState(emotion, visualState, voiceSpeaking));
     setExpression(expressionForState(visualState.image));
     setSpeaking(voiceSpeaking);
-  }, [setExpression, setSpeaking, viewModelInstance, visible, visualState.image, voiceSpeaking]);
+  }, [
+    emotion,
+    setBodyState,
+    setExpression,
+    setSpeaking,
+    viewModelInstance,
+    visible,
+    visualState,
+    voiceSpeaking,
+  ]);
 
   useEffect(() => {
     if (!visible || !viewModelInstance) return;

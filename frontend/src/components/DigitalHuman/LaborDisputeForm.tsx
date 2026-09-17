@@ -1,6 +1,10 @@
 'use client';
 
 import styles from './LaborDisputeForm.module.css';
+import {
+  getLaborDisputeRequirements,
+  splitLaborValues,
+} from './laborDisputeRequirements';
 
 export interface LaborDisputeFormValue {
   employee_name: string;
@@ -77,10 +81,6 @@ const LIST_FIELDS: Array<keyof LaborDisputeFormValue> = [
   'claim_types', 'limitation_interruption_dates', 'protected_statuses',
 ];
 
-function splitValues(value: string): string[] {
-  return value.split(/[、,，\n]/).map((item) => item.trim()).filter(Boolean);
-}
-
 export function buildLaborDisputePayload(
   value: LaborDisputeFormValue,
   monthlySalary: string,
@@ -91,7 +91,7 @@ export function buildLaborDisputePayload(
     const field = key as keyof LaborDisputeFormValue;
     if (NUMBER_FIELDS.includes(field)) payload[key] = Number(raw);
     else if (BOOLEAN_FIELDS.includes(field)) payload[key] = raw === 'true';
-    else if (LIST_FIELDS.includes(field)) payload[key] = splitValues(raw);
+    else if (LIST_FIELDS.includes(field)) payload[key] = splitLaborValues(raw);
     else payload[key] = raw;
   });
   if (monthlySalary !== '') payload.monthly_salary = Number(monthlySalary);
@@ -117,6 +117,7 @@ const MISSING_LABELS: Record<string, string> = {
   limitation_start_date: '权利受损日期', wage_arrears_amount_or_salary_and_months: '欠薪总金额',
   wage_arrears_period: '欠薪开始日期', probation_period_months: '试用期月数', contract_term: '合同期限',
   termination_reason: '解除原因', termination_initiator: '解除提出方', termination_date: '解除日期',
+  employment_active: '劳动关系是否仍存续', employment_status_conflict: '劳动关系存续状态与当前诉求冲突',
   compensation_kind: '补偿或赔偿类型', local_average_monthly_salary: '当地上年度职工月平均工资',
   valid_employment_period: '有效工作期间',
   working_hours_system: '工时制度', standard_working_hours_system_required: '非标准工时审批材料和计算周期',
@@ -133,55 +134,11 @@ export function humanizeLaborMessage(message: string): string {
     .reduce((text, [field, label]) => text.replaceAll(field, label), message);
 }
 
-const BASE_REQUIRED_FACTS = [
-  'employee_name', 'employer_name', 'employment_start_date', 'monthly_salary',
-  'work_location', 'claim_types', 'demands', 'limitation_start_date',
-];
-
 export function findMissingLaborDisputeFacts(
   value: LaborDisputeFormValue,
   monthlySalary: string,
 ): string[] {
-  const claims = splitValues(value.claim_types);
-  const has = (terms: string[]) => claims.some((claim) => terms.some((term) => claim.includes(term)));
-  const missing = BASE_REQUIRED_FACTS.filter((field) => {
-    if (field === 'monthly_salary') return monthlySalary === '';
-    return value[field as keyof LaborDisputeFormValue] === '';
-  });
-  if (has(['欠薪', '工资', '劳动报酬'])) {
-    if (value.wage_arrears_amount === '') {
-      missing.push('wage_arrears_amount_or_salary_and_months');
-    }
-    if (value.wage_arrears_start_date === '') {
-      missing.push('wage_arrears_period');
-    }
-  }
-  if (has(['解除', '辞退', '解雇'])) {
-    if (value.termination_date === '') missing.push('termination_date');
-    if (value.termination_reason === '') missing.push('termination_reason');
-    if (value.termination_initiator === '') missing.push('termination_initiator');
-  }
-  if (has(['补偿', '赔偿']) && value.local_average_monthly_salary === '') {
-    missing.push('local_average_monthly_salary');
-  }
-  if (has(['加班'])) {
-    if (value.working_hours_system === '') missing.push('working_hours_system');
-    else if (value.working_hours_system !== 'standard') missing.push('standard_working_hours_system_required');
-    if (monthlySalary === '' && value.overtime_monthly_wage_base === '') missing.push('overtime_wage_base');
-    const overtimeHours = [
-      value.overtime_workday_hours,
-      value.overtime_rest_day_hours,
-      value.overtime_statutory_holiday_hours,
-    ].reduce((total, raw) => total + Number(raw || 0), 0);
-    if (overtimeHours <= 0) missing.push('overtime_hours_by_type');
-  }
-  if (has(['试用期'])) {
-    if (value.probation_period_months === '') missing.push('probation_period_months');
-    if (value.contract_term_type === '' || (
-      value.contract_term_type !== 'open_ended' && value.contract_term_months === ''
-    )) missing.push('contract_term');
-  }
-  return Array.from(new Set(missing));
+  return getLaborDisputeRequirements(value, monthlySalary).missingFacts;
 }
 
 interface Props {
@@ -200,27 +157,16 @@ export default function LaborDisputeForm({
   value, monthlySalary, missingFacts, disabled = false, highlightMissing = false,
   onChange, onMonthlySalaryChange,
 }: Props) {
-  const claims = splitValues(value.claim_types);
-  const has = (terms: string[]) => claims.some((claim) => terms.some((term) => claim.includes(term)));
-  const showWage = has(['欠薪', '工资', '劳动报酬']);
-  const showProbation = has(['试用期']);
-  const showTermination = has(['解除', '辞退', '解雇']);
-  const showCompensation = has(['补偿', '赔偿']);
-  const showOvertime = has(['加班']);
+  const requirements = getLaborDisputeRequirements(value, monthlySalary);
+  const { showWage, showProbation, showTermination, showCompensation, showOvertime } = requirements.flags;
   const missing = new Set(missingFacts);
-  const required = new Set([
-    ...BASE_REQUIRED_FACTS,
-    ...(showWage ? ['wage_arrears_amount_or_salary_and_months', 'wage_arrears_period'] : []),
-    ...(showTermination ? ['termination_date', 'termination_reason', 'termination_initiator'] : []),
-    ...(showCompensation ? ['local_average_monthly_salary'] : []),
-    ...(showOvertime ? ['working_hours_system'] : []),
-    ...(showProbation ? ['probation_period_months', 'contract_term'] : []),
-  ]);
+  const missingFields = new Set(requirements.missingFields);
   const set = (field: keyof LaborDisputeFormValue, next: string) => onChange({ ...value, [field]: next });
   const fieldClass = (fields: string[]) => [
     // 橙色边框/黄底只在校验触发后出现，让警告色真正具有定位问题的意义。
-    highlightMissing && fields.some((field) => missing.has(field)) ? styles.missing : '',
-    fields.some((field) => required.has(field)) ? styles.required : '',
+    highlightMissing && fields.some((field) => missing.has(field) || missingFields.has(field)) ? styles.missing : '',
+    // 红星表示“当前还没填”，字段满足规则后立即消失，避免已填写项仍被误认为缺失。
+    fields.some((field) => missingFields.has(field)) ? styles.required : '',
   ].filter(Boolean).join(' ');
 
   return <div className={styles.form}>
@@ -231,6 +177,9 @@ export default function LaborDisputeForm({
     {missingFacts.length > 0 && <section className={styles.missingSummary}>
       <strong>当前还缺 {missingFacts.length} 项必填信息</strong>
       <p>{missingFacts.map(laborFactLabel).join('、')}</p>
+    </section>}
+    {requirements.conflicts.length > 0 && <section className={styles.conflictSummary}>
+      {requirements.conflicts.map((item) => <p key={item}>{item}</p>)}
     </section>}
 
     <fieldset className={styles.wide}>
@@ -243,7 +192,7 @@ export default function LaborDisputeForm({
         <label className={fieldClass(['limitation_start_date'])}>知道权利受损日期<input type="date" disabled={disabled} value={value.limitation_start_date} onChange={(e) => set('limitation_start_date', e.target.value)} /></label>
         <label className={fieldClass(['monthly_salary'])}>离职前十二个月平均工资<input type="number" min="0" disabled={disabled} value={monthlySalary} onChange={(e) => onMonthlySalaryChange(e.target.value)} /></label>
         <label className={fieldClass(['work_location'])}>实际工作地点<input disabled={disabled} value={value.work_location} onChange={(e) => set('work_location', e.target.value)} /></label>
-        <label>劳动关系是否仍存续<select disabled={disabled} value={value.employment_active} onChange={(e) => set('employment_active', e.target.value)}><option value="">请选择</option><option value="true">是</option><option value="false">否</option></select></label>
+        <label className={fieldClass(['employment_active', 'employment_status_conflict'])}>劳动关系是否仍存续<select disabled={disabled} value={value.employment_active} onChange={(e) => set('employment_active', e.target.value)}><option value="">请选择</option><option value="true">是</option><option value="false">否</option></select></label>
       </div>
       <label className={fieldClass(['claim_types'])}>争议类型（顿号分隔）<input disabled={disabled} value={value.claim_types} onChange={(e) => set('claim_types', e.target.value)} placeholder="欠薪、加班费、试用期、违法解除、赔偿金" /></label>
       <label className={fieldClass(['demands'])}>具体仲裁请求<textarea rows={3} disabled={disabled} value={value.demands} onChange={(e) => set('demands', e.target.value)} /></label>
@@ -260,11 +209,11 @@ export default function LaborDisputeForm({
       <legend>欠薪事实</legend>
       <p className={styles.sectionHelp}>填写公司拖欠的工资总额，以及第一笔欠薪对应月份的开始日期。</p>
       <div className={styles.grid2}>
-        <label className={fieldClass(['wage_arrears_amount_or_salary_and_months'])}>欠薪总金额<input type="number" min="0" disabled={disabled} value={value.wage_arrears_amount} onChange={(e) => set('wage_arrears_amount', e.target.value)} placeholder="例如：17400" /></label>
-        <label>欠薪月数（选填）<input type="number" min="1" disabled={disabled} value={value.wage_arrears_months} onChange={(e) => set('wage_arrears_months', e.target.value)} placeholder="例如：2" /></label>
-        <label className={fieldClass(['wage_arrears_period'])}>欠薪开始日期<input type="date" disabled={disabled} value={value.wage_arrears_start_date} onChange={(e) => set('wage_arrears_start_date', e.target.value)} /></label>
+        <label className={fieldClass(['wage_arrears_amount'])}>欠薪总金额（二选一）<input type="number" min="0" disabled={disabled} value={value.wage_arrears_amount} onChange={(e) => set('wage_arrears_amount', e.target.value)} placeholder="例如：17400" /></label>
+        <label className={fieldClass(['wage_arrears_months'])}>欠薪月数（二选一）<input type="number" min="1" disabled={disabled} value={value.wage_arrears_months} onChange={(e) => set('wage_arrears_months', e.target.value)} placeholder="例如：2" /></label>
+        <label className={fieldClass(['wage_arrears_start_date'])}>欠薪开始日期（二选一）<input type="date" disabled={disabled} value={value.wage_arrears_start_date} onChange={(e) => set('wage_arrears_start_date', e.target.value)} /></label>
         <label>欠薪结束日期（选填）<input type="date" disabled={disabled} value={value.wage_arrears_end_date} onChange={(e) => set('wage_arrears_end_date', e.target.value)} /></label>
-        <label>此前工资支付到哪天（选填）<input type="date" disabled={disabled} value={value.wages_paid_through} onChange={(e) => set('wages_paid_through', e.target.value)} /></label>
+        <label className={fieldClass(['wages_paid_through'])}>此前工资支付到哪天（二选一）<input type="date" disabled={disabled} value={value.wages_paid_through} onChange={(e) => set('wages_paid_through', e.target.value)} /></label>
         <label>每月约定发薪日（选填）<input type="number" min="1" max="31" disabled={disabled} value={value.wage_payment_day} onChange={(e) => set('wage_payment_day', e.target.value)} placeholder="例如：10" /></label>
         <label>欠薪期间实际出勤天数（选填）<input type="number" min="0" max="366" disabled={disabled} value={value.attendance_days} onChange={(e) => set('attendance_days', e.target.value)} /></label>
       </div>
@@ -276,9 +225,9 @@ export default function LaborDisputeForm({
       <div className={styles.grid2}>
         <label className={fieldClass(['working_hours_system', 'standard_working_hours_system_required'])}>工时制度<select disabled={disabled} value={value.working_hours_system} onChange={(e) => set('working_hours_system', e.target.value)}><option value="">请选择</option><option value="standard">标准工时制</option><option value="comprehensive">综合计算工时制</option><option value="flexible">不定时工作制</option><option value="unknown">不确定</option></select></label>
         <label className={fieldClass(['overtime_wage_base'])}>加班费月工资基数<input type="number" min="0" disabled={disabled} value={value.overtime_monthly_wage_base} onChange={(e) => set('overtime_monthly_wage_base', e.target.value)} placeholder="不填则暂按月工资" /></label>
-        <label>工作日加班小时<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_workday_hours} onChange={(e) => set('overtime_workday_hours', e.target.value)} /></label>
-        <label>休息日加班小时<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_rest_day_hours} onChange={(e) => set('overtime_rest_day_hours', e.target.value)} /></label>
-        <label>法定节假日加班小时<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_statutory_holiday_hours} onChange={(e) => set('overtime_statutory_holiday_hours', e.target.value)} /></label>
+        <label className={fieldClass(['overtime_workday_hours'])}>工作日加班小时（至少一项）<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_workday_hours} onChange={(e) => set('overtime_workday_hours', e.target.value)} /></label>
+        <label className={fieldClass(['overtime_rest_day_hours'])}>休息日加班小时（至少一项）<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_rest_day_hours} onChange={(e) => set('overtime_rest_day_hours', e.target.value)} /></label>
+        <label className={fieldClass(['overtime_statutory_holiday_hours'])}>法定节假日加班小时（至少一项）<input type="number" min="0" step="0.5" disabled={disabled} value={value.overtime_statutory_holiday_hours} onChange={(e) => set('overtime_statutory_holiday_hours', e.target.value)} /></label>
         <label>休息日已补休小时<input type="number" min="0" step="0.5" disabled={disabled} value={value.rest_day_compensatory_leave_hours} onChange={(e) => set('rest_day_compensatory_leave_hours', e.target.value)} /></label>
         <label>已支付加班费<input type="number" min="0" disabled={disabled} value={value.overtime_paid_amount} onChange={(e) => set('overtime_paid_amount', e.target.value)} /></label>
       </div>
@@ -288,8 +237,8 @@ export default function LaborDisputeForm({
     {showProbation && <fieldset>
       <legend>试用期事实</legend>
       <div className={styles.grid2}>
-        <label className={fieldClass(['contract_term'])}>合同期限类型<select disabled={disabled} value={value.contract_term_type} onChange={(e) => set('contract_term_type', e.target.value)}><option value="">请选择</option><option value="fixed">固定期限</option><option value="open_ended">无固定期限</option><option value="task_based">以完成任务为期限</option></select></label>
-        <label className={fieldClass(['contract_term'])}>合同期限（月）<input type="number" min="1" disabled={disabled} value={value.contract_term_months} onChange={(e) => set('contract_term_months', e.target.value)} /></label>
+        <label className={fieldClass(['contract_term_type'])}>合同期限类型<select disabled={disabled} value={value.contract_term_type} onChange={(e) => set('contract_term_type', e.target.value)}><option value="">请选择</option><option value="fixed">固定期限</option><option value="open_ended">无固定期限</option><option value="task_based">以完成任务为期限</option></select></label>
+        <label className={fieldClass(['contract_term_months'])}>合同期限（月）<input type="number" min="1" disabled={disabled} value={value.contract_term_months} onChange={(e) => set('contract_term_months', e.target.value)} /></label>
         <label className={fieldClass(['probation_period_months'])}>约定试用期（月）<input type="number" min="0" max="12" disabled={disabled} value={value.probation_period_months} onChange={(e) => set('probation_period_months', e.target.value)} /></label>
         <label>试用期工资<input type="number" min="0" disabled={disabled} value={value.probation_salary} onChange={(e) => set('probation_salary', e.target.value)} /></label>
         <label>转正工资<input type="number" min="0" disabled={disabled} value={value.regular_salary} onChange={(e) => set('regular_salary', e.target.value)} /></label>

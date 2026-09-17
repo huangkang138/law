@@ -18,5 +18,8 @@
 .missing input, .missing select, .missing textarea { border-color: #f59e0b; background: #fffbeb; }
 .missingSummary { grid-column: 1 / -1; margin: 0; padding: 9px 12px; border-left: 3px solid #f59e0b; border-radius: 6px; background: #fffbeb; color: #92400e; }
 .missingSummary p { margin: 4px 0 0; color: #92400e; }
+.conflictSummary { grid-column: 1 / -1; padding: 9px 12px; border-left: 3px solid #dc2626; border-radius: 6px; background: #fef2f2; color: #991b1b; }
+.conflictSummary p { margin: 0; }
+.conflictSummary p + p { margin-top: 4px; }
 @media (max-width: 860px) { .form { grid-template-columns: 1fr; } .form fieldset, .wide { grid-column: 1; } .wide .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .grid2, .wide .grid2 { grid-template-columns: 1fr; } .guide { align-items: flex-start; flex-direction: column; gap: 2px; } }

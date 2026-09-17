@@ -3,6 +3,7 @@
 import type { LaborRuleDecision } from '@/services/digitalHumanApi';
 import styles from './LaborRuleResults.module.css';
 import { laborFactLabel } from './LaborDisputeForm';
+import { displayLaborCalculationValue } from './laborRuleResultFormatting';
 
 export const LABOR_ISSUE_LABELS: Record<string, string> = {
   wage_arrears: '欠薪核算', probation: '试用期核对', termination: '解除路径',
@@ -23,12 +24,6 @@ const CALCULATION_LABELS: Record<string, string> = {
   estimated_unpaid_overtime_pay: '预计欠付加班费',
 };
 
-function displayValue(value: unknown): string {
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  if (value === null || value === undefined || value === '') return '未确定';
-  return String(value);
-}
-
 export default function LaborRuleResults({ decisions }: { decisions: LaborRuleDecision[] }) {
   if (!decisions.length) return null;
   return <section className={styles.results}>
@@ -36,7 +31,7 @@ export default function LaborRuleResults({ decisions }: { decisions: LaborRuleDe
     {decisions.map((decision) => <article key={decision.issue_tag}>
       <header><b>{LABOR_ISSUE_LABELS[decision.issue_tag] || '待核对事项'}</b><span>{decision.status === 'completed' ? '已完成初步核对' : '等待补充'}</span></header>
       <p>{decision.assessment}</p>
-      {Object.keys(decision.calculations).length > 0 && <dl>{Object.entries(decision.calculations).map(([key, value]) => <div key={key}><dt>{CALCULATION_LABELS[key] || '计算项目'}</dt><dd>{displayValue(value)}</dd></div>)}</dl>}
+      {Object.keys(decision.calculations).length > 0 && <dl>{Object.entries(decision.calculations).map(([key, value]) => <div key={key}><dt>{CALCULATION_LABELS[key] || '计算项目'}</dt><dd>{displayLaborCalculationValue(key, value)}</dd></div>)}</dl>}
       {decision.missing_facts.length > 0 && <small>缺失事实：{decision.missing_facts.map(laborFactLabel).join('、')}</small>}
       {decision.assumptions.map((item) => <small key={item}>假设：{item}</small>)}
       {decision.warnings.map((item) => <small key={item}>提示：{item}</small>)}

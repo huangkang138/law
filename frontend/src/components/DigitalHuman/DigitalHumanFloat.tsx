@@ -207,15 +207,14 @@ export default function DigitalHumanFloat() {
           height: 100%;
         }
 
-        .dh-avatar-thinking {
-          animation: dh-think-pulse 1.4s ease-in-out infinite;
+        .dh-avatar-thinking,
+        .dh-avatar-state-idle,
+        .dh-avatar-state-thinking,
+        .dh-avatar-state-speaking,
+        .dh-avatar-state-success,
+        .dh-avatar-state-warning {
+          animation: none;
         }
-
-        .dh-avatar-state-idle { animation: dh-avatar-idle 4.8s ease-in-out infinite; }
-        .dh-avatar-state-thinking { animation: dh-avatar-thinking-sway 2.8s ease-in-out infinite; }
-        .dh-avatar-state-speaking { animation: dh-avatar-speaking 720ms ease-in-out infinite; }
-        .dh-avatar-state-success { animation: dh-avatar-success 640ms cubic-bezier(.22, 1.35, .36, 1) both; }
-        .dh-avatar-state-warning { animation: none; }
 
         .dh-panel {
           width: min(384px, calc(100vw - 32px));

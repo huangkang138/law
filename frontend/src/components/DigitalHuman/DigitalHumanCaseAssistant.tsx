@@ -99,8 +99,10 @@ export default function DigitalHumanCaseAssistant({
   const ttsSupported = voiceReady && isTtsSupported();
   const [preset, setPreset] = useState<string | null>(null);
   const [focusSignal, setFocusSignal] = useState(0);
+  const [contextOpen, setContextOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const lastMessageCount = useRef(0);
+  const previousStoredMessageCount = useRef(messages.length);
   const visibleMessages = [...messages, ...(streamingMessage ? [streamingMessage] : [])].slice(-4);
 
   useEffect(() => {
@@ -119,6 +121,14 @@ export default function DigitalHumanCaseAssistant({
   useEffect(() => {
     if (!assistantCollapsed) setUnread(0);
   }, [assistantCollapsed]);
+
+  useEffect(() => {
+    // 工作台内发出新问题时立即展开上下文，让用户看到自己的问题和随后到达的流式回复。
+    if (isLoading && messages.length > previousStoredMessageCount.current) {
+      setContextOpen(true);
+    }
+    previousStoredMessageCount.current = messages.length;
+  }, [isLoading, messages.length]);
 
   return <aside className={`${styles.assistant} ${assistantCollapsed ? styles.assistantCollapsed : ''}`} aria-label="法小助案件上下文助手">
     <div className={styles.assistantRail}>
@@ -176,7 +186,11 @@ export default function DigitalHumanCaseAssistant({
         <button type="button" onClick={() => setFocusSignal((value) => value + 1)}>继续提问</button>
       </div>
 
-      <details className={styles.assistantContext}>
+      <details
+        className={styles.assistantContext}
+        open={contextOpen}
+        onToggle={(event) => setContextOpen(event.currentTarget.open)}
+      >
         <summary>最近上下文{visibleMessages.length ? `（${visibleMessages.length}）` : ''}</summary>
         <div ref={messagesRef} className="dh-companion-messages" aria-live="polite">
           {visibleMessages.map((message) => <div key={message.id} className={`dh-companion-message ${message.role}`}>
