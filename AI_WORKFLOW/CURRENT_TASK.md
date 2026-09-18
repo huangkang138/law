@@ -1,11 +1,13 @@
 # 当前任务
 
-- 阶段/任务名称：普法问答聊天内容排版优化
-- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-17；类型、差异及 1440×900/375×812 浏览器视觉检查通过）
-- 目标：只优化 `/chat` 中间聊天消息区域的横向利用、AI/用户身份区分、头像、气泡宽度与信息层级。
-- 修改范围：仅 `DailyConversationPage.tsx` 的消息节点结构、`DailyConversationPage.module.css` 的消息局部样式及必要项目记录；不修改顶部导航、Hero 数字人、左侧会话、右侧状态、快捷卡片、推荐问题、输入框关系、Store/API/SSE/TTS/后端。
-- 已完成：AI 左侧复用现有法小助头部素材、用户右侧使用默认人物 Icon；桌面 AI 消息最大宽度 80%、用户消息最大宽度 60%，短消息内容自适应；名称/时间/最新回答同区，用户时间移到气泡下方；消息区域取消 860px 居中限宽并保留滚动。
-- 验收：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；独立预览在 1440×900 三栏与 375×812 移动端无横向溢出，消息身份与左右对齐清晰。
+- 阶段/任务名称：`/chat` 顶部法小助欢迎 Hero 精修
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-18；数字人尺寸、底部衔接和讲解手势可见性已完成真实浏览器验证）
+- 目标：只恢复 Hero 数字人更高、更大、更靠下的展示效果，允许身体与讲解手势自然延伸到功能卡片上沿；保持横向区域、气泡、Hero 背景、文案、功能入口及页面业务行为不变。
+- 修改范围：仅 `DailyConversationPage.module.css` 的 `.avatarStage` 与 Hero 内 `.dh-avatar` 视口样式及必要项目记录；顶部导航、左侧文案、左右栏、聊天区、四个功能入口、Store/API/SSE/TTS/后端保持不动。
+- 已确认：继续使用 `DigitalHumanAvatar → RiveDigitalHuman → /digital-human/law-xiaozhi/digitalv3.riv` 正式链路，不引入旧 PNG 或新的数字人实现。
+- 验收：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；真实浏览器确认数字人为 560px 视口并采用绝对定位，数字人局部容器允许溢出、Banner 外层继续裁切，讲解状态右手完整可见且人物下沿由功能卡片自然遮挡；无横向溢出，正式 Rive 为单 Canvas，控制台无 error；视觉完成仍以用户人工页面验收为准。
+
+> 上一项任务：普法问答聊天内容排版优化（已完成，以下记录保留作背景）。
 
 > 以下为上一项 Rive 数字人接入任务记录。
 

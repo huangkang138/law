@@ -37,10 +37,10 @@
 
 - `/chat` 已从旧普法问答页切换为 `DailyConversationPage`：左侧约 240px 为数字人会话记录，中央为法小助居中 Rive 主视觉和完整多轮对话，右侧约 300px 为 `DailyConversationContextPanel` 实时上下文栏；页面常态不显示右下角重复悬浮数字人。
 - 页面复用现有 `digitalHumanStore`、SSE、浏览器 STT/TTS、`ConversationComposer`、劳动分流卡片、案件卡片和真实功能路由；快捷问题只预填，不自动发送。普通问题直接回答，明确功能由真实 `route/routeLabel` 按钮进入。
-- 上下文栏只投影 Store/后端已有的当前会话、当前案件、劳动分流、Workspace Run/Presenter、最近提问和服务状态；没有案件或分流结果时显示明确空态，不生成新的法律结论。主列采用约 252–294px 轻量 Hero + 剩余高度独立滚动消息区 + 底部 Composer；头像只在页面容器内做胸像裁切与渐变淡出，回答卡片最大宽度扩展至约 820px，用户气泡约 520px。
+- 上下文栏只投影 Store/后端已有的当前会话、当前案件、劳动分流、Workspace Run/Presenter、最近提问和服务状态；没有案件或分流结果时显示明确空态，不生成新的法律结论。主列采用约 252–294px 轻量 Hero + 剩余高度独立滚动消息区 + 底部 Composer；Hero 使用连续浅蓝/蓝白背景，左侧约 35%～40% 为法小助信息引导，右侧为无独立底板的正式 Rive 数字人、轻微光晕和头部对话气泡；回答卡片最大宽度扩展至约 820px，用户气泡约 520px。
 - Hero 底部提供四个真实入口：法律咨询、案件与纠纷只预填问题；合同审查与文书起草沿用 `/contract`、`/document-drafting`，均不自动发送或建案。窄桌面采用两列入口，移动端保持两列堆叠且不产生横向溢出。
 - `DigitalHumanFloat` 只在 `/chat` 隐藏，其他页面行为保持；页面离开后已验证合同审查页可正常显示且悬浮入口恢复。未修改后端、API、数据库、Agent、SSE 或 TTS 契约。
-- 已验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过。`npm run build` 启动后长时间无输出，疑似现有 Next 进程占用 `.next/trace`，本次已停止构建命令但未停止其他进程；桌面与移动端的本次空间比例仍需主代理打开内置预览后人工确认，完整麦克风权限下的 STT/TTS 也需用户体验确认。窄桌面断点已调整为 `1180px` 隐藏右栏、`900px` 收起左栏，头像从容器顶部完整显示并在底部淡出。
+- 已验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；本地 Next `/chat` 返回 200，真实浏览器 1440×900 与 375×812 均无横向溢出，正式 Rive 为单 Canvas，控制台无 error。开发服务提示过 `.next/trace` 的 `EPERM`，但随后正常 Ready 并完成 `/chat` 编译；完整麦克风权限下的 STT/TTS 仍需用户体验确认。窄桌面断点已调整为 `1180px` 隐藏右栏、`900px` 收起左栏，移动端数字人向左收敛以避免脸部贴边。
 
 ## 产品聚焦与下一阶段规划（2026-07-21，文档决策）
 

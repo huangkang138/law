@@ -268,13 +268,10 @@ export default function DailyConversationPage() {
             <div className={styles.heroMeta}>
               <span className={styles.onlineStatus}><i /> 在线 · 随时为你服务</span>
             </div>
-            <div className={styles.heroHint}>
-              不知道该去哪个功能？先告诉我你的情况。
-            </div>
           </div>
           <div className={styles.avatarStage} aria-label={`法小助：${statusLabel}`}>
             <div className={styles.avatarBubble} aria-hidden="true">
-              您好！我是法小助<br />有法律问题，随时问我～
+              有问题？直接问我～
             </div>
             <div className={styles.avatarHalo} aria-hidden="true" />
             <DigitalHumanAvatar
