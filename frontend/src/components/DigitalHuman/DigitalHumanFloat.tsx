@@ -55,10 +55,9 @@ export default function DigitalHumanFloat() {
         </>
       ) : (
         <div className="dh-launcher-wrap">
-          <div className="dh-invite" aria-hidden="true">
-            <MessageCircleMore size={17} />
-            有法律问题？问问法小助
-          </div>
+          <button type="button" className="dh-invite" onClick={open} aria-label="打开法小助数字人助手">
+            有法律问题？ 问问我
+          </button>
           <button type="button" className="dh-launcher" onClick={open} aria-label="打开法小助数字人助手">
             <DigitalHumanAvatar
               emotion={emotion}
@@ -66,8 +65,13 @@ export default function DigitalHumanFloat() {
               voiceSpeaking={voiceSpeaking}
               size="small"
               variant="launcher"
+              useLegacyImageFallback={false}
             />
             <span className="dh-launcher-status" aria-hidden="true" />
+          </button>
+          <button type="button" className="dh-launcher-cta" onClick={open}>
+            <MessageCircleMore size={17} aria-hidden="true" />
+            <span>问问法小助</span>
           </button>
         </div>
       )}
@@ -75,56 +79,96 @@ export default function DigitalHumanFloat() {
       <style jsx global>{`
         .dh-root {
           position: fixed;
-          right: 28px;
+          right: 24px;
           bottom: 18px;
           z-index: 40;
           font-family: var(--font-sans), system-ui, sans-serif;
         }
 
         .dh-launcher-wrap {
-          display: flex;
-          align-items: flex-end;
-          gap: 12px;
+          position: relative;
+          width: 184px;
+          height: 210px;
           animation: dh-rise-in 420ms cubic-bezier(.2,.8,.2,1) both;
+          transition: transform 180ms ease;
+        }
+
+        .dh-launcher-wrap:hover {
+          transform: translateY(-2px);
         }
 
         .dh-invite {
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: 3;
           display: flex;
           align-items: center;
-          gap: 7px;
-          padding: 10px 14px;
-          color: #1e4f8f;
-          background: rgba(255, 255, 255, .94);
-          border: 1px solid rgba(96, 165, 250, .35);
-          border-radius: 12px;
-          box-shadow: 0 10px 28px rgba(30, 64, 175, .13);
-          backdrop-filter: blur(12px);
+          width: 150px;
+          min-height: 40px;
+          padding: 8px 14px;
+          color: #1858a8;
+          background: rgba(255, 255, 255, .97);
+          border: 1px solid rgba(147, 197, 253, .3);
+          border-radius: 18px;
+          box-shadow: 0 5px 14px rgba(37, 99, 235, .1);
           font-size: 13px;
-          font-weight: 600;
+          font-family: inherit;
+          font-weight: 650;
+          line-height: 1.35;
+          text-decoration: none;
           white-space: nowrap;
+          cursor: pointer;
+        }
+
+        .dh-invite::after {
+          content: '';
+          position: absolute;
+          right: 20px;
+          bottom: -8px;
+          width: 0;
+          height: 0;
+          border-top: 10px solid rgba(255, 255, 255, .97);
+          border-left: 9px solid transparent;
         }
 
         .dh-launcher {
-          position: relative;
+          position: absolute;
+          top: 42px;
+          left: 41px;
+          z-index: 1;
           width: 118px;
-          height: 156px;
+          height: 150px;
           padding: 0;
           overflow: visible;
           border: 0;
           border-radius: 0;
           background: transparent;
-          filter: drop-shadow(0 16px 20px rgba(30, 64, 175, .18));
+          filter: drop-shadow(0 10px 14px rgba(30, 64, 175, .12));
           cursor: pointer;
-          animation: dh-float 4.2s ease-in-out infinite;
-          transition: filter 180ms ease, transform 180ms ease;
+          text-decoration: none;
+          transition: filter 180ms ease;
+        }
+
+        .dh-launcher::before {
+          content: '';
+          position: absolute;
+          left: 50%;
+          top: 54%;
+          width: 126px;
+          height: 126px;
+          border-radius: 50%;
+          background: rgba(219, 238, 255, .58);
+          transform: translate(-50%, -50%);
         }
 
         .dh-launcher:hover {
-          filter: drop-shadow(0 20px 24px rgba(30, 64, 175, .26));
-          transform: translateY(-3px);
+          filter: drop-shadow(0 12px 17px rgba(30, 64, 175, .18));
         }
 
+        .dh-invite:focus-visible,
         .dh-launcher:focus-visible,
+        .dh-launcher-cta:focus-visible,
         .dh-panel button:focus-visible,
         .dh-panel textarea:focus-visible {
           outline: 3px solid rgba(37, 99, 235, .35);
@@ -134,13 +178,46 @@ export default function DigitalHumanFloat() {
         .dh-launcher-status {
           position: absolute;
           right: 4px;
-          bottom: 10px;
-          width: 15px;
-          height: 15px;
-          border: 3px solid white;
+          top: 72px;
+          z-index: 2;
+          width: 12px;
+          height: 12px;
+          border: 2px solid rgba(255, 255, 255, .95);
           border-radius: 50%;
           background: #22c55e;
-          box-shadow: 0 2px 8px rgba(34, 197, 94, .4);
+          box-shadow: 0 2px 6px rgba(34, 197, 94, .28);
+        }
+
+        .dh-launcher-cta {
+          position: absolute;
+          left: 22px;
+          bottom: 0;
+          z-index: 3;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          width: 146px;
+          height: 40px;
+          padding: 0 18px;
+          color: #fff;
+          background: linear-gradient(100deg, #3b82f6 0%, #38bdf8 100%);
+          border: 0;
+          border-radius: 999px;
+          box-shadow: 0 7px 16px rgba(37, 99, 235, .2);
+          font-size: 14px;
+          font-family: inherit;
+          font-weight: 650;
+          line-height: 1;
+          text-decoration: none;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: background 180ms ease, box-shadow 180ms ease;
+        }
+
+        .dh-launcher-cta:hover {
+          background: linear-gradient(100deg, #2563eb 0%, #0ea5e9 100%);
+          box-shadow: 0 8px 18px rgba(37, 99, 235, .25);
         }
 
         .dh-avatar {
@@ -162,7 +239,27 @@ export default function DigitalHumanFloat() {
 
         .dh-avatar-launcher {
           width: 118px;
-          height: 156px;
+          height: 150px;
+          overflow: hidden;
+        }
+
+        .dh-avatar-launcher .dh-rive-layer {
+          inset: auto;
+          top: 0;
+          left: 50%;
+          width: 180px;
+          height: 228px;
+          transform: translateX(-50%);
+          mix-blend-mode: multiply;
+        }
+
+        .dh-avatar-launcher .dh-avatar-image {
+          inset: auto;
+          top: 0;
+          left: 50%;
+          width: 150px;
+          height: 190px;
+          transform: translateX(-50%);
         }
 
         .dh-avatar-portrait {
@@ -1059,18 +1156,39 @@ export default function DigitalHumanFloat() {
 
         @media (max-width: 640px) {
           .dh-root {
-            right: 12px;
-            bottom: 8px;
+            right: 16px;
+            bottom: 16px;
           }
 
-          .dh-invite {
-            display: none;
+          .dh-launcher-wrap {
+            width: 174px;
+            height: 200px;
           }
 
-          .dh-launcher,
+          .dh-launcher {
+            left: 38px;
+            width: 112px;
+            height: 142px;
+          }
+
           .dh-avatar-launcher {
-            width: 94px;
-            height: 128px;
+            width: 112px;
+            height: 142px;
+          }
+
+          .dh-avatar-launcher .dh-rive-layer {
+            width: 170px;
+            height: 216px;
+          }
+
+          .dh-avatar-launcher .dh-avatar-image {
+            width: 142px;
+            height: 180px;
+          }
+
+          .dh-launcher-cta {
+            left: 18px;
+            width: 144px;
           }
 
           .dh-panel {

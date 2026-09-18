@@ -270,6 +270,10 @@ class FloatStyleAppendTest(unittest.TestCase):
         for cls in (".dh-send-button {", ".dh-route-button {", ".dh-companion-composer {"):
             self.assertIn(cls, self.float, f"既有样式 class 被破坏: {cls}")
 
+    def test_launcher_opens_existing_float_chat(self):
+        self.assertEqual(self.float.count("onClick={open}"), 3)
+        self.assertNotIn('href="/chat"', self.float)
+
 
 if __name__ == "__main__":
     unittest.main()
