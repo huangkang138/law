@@ -20,6 +20,19 @@
   animation: orbit-breathe 7.2s ease-in-out infinite;
 }
 
+.mainOrbitFloat,
+.auxiliaryOrbitFloat {
+  will-change: transform;
+}
+
+.mainOrbitFloat {
+  animation: main-orbit-float 7s ease-in-out infinite;
+}
+
+.auxiliaryOrbitFloat {
+  animation: auxiliary-orbit-float 8.5s ease-in-out -2.2s infinite;
+}
+
 .trackGlow,
 .trackBody,
 .trackHighlight {
@@ -62,12 +75,12 @@
 
 .ballUpper {
   offset-path: var(--main-orbit-path);
-  animation: orbit-ball-a 15s linear -2.5s infinite;
+  animation: orbit-ball-a 11.5s linear -2.5s infinite;
 }
 
 .ballLower {
   offset-path: var(--auxiliary-orbit-path);
-  animation: orbit-ball-b 18.5s linear -10s infinite;
+  animation: orbit-ball-b 16s linear -7s infinite reverse;
 }
 
 .ballDepth {
@@ -118,13 +131,56 @@
   50% { opacity: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .trackGroup,
-  .ballUpper,
-  .ballLower {
-    animation: none;
+@keyframes main-orbit-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes auxiliary-orbit-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(5px); }
+}
+
+@media (max-width: 640px) {
+  @keyframes main-orbit-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
   }
 
-  .ballUpper { offset-distance: 14%; }
-  .ballLower { offset-distance: 68%; }
+  @keyframes auxiliary-orbit-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trackGroup {
+    animation-duration: 12s;
+  }
+
+  .mainOrbitFloat {
+    animation: reduced-main-orbit-float 10s ease-in-out infinite;
+  }
+
+  .auxiliaryOrbitFloat {
+    animation: reduced-auxiliary-orbit-float 12s ease-in-out -3s infinite;
+  }
+
+  .ballUpper {
+    animation-duration: 16s;
+  }
+
+  .ballLower {
+    animation-duration: 22s;
+  }
+
+  @keyframes reduced-main-orbit-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+
+  @keyframes reduced-auxiliary-orbit-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(2px); }
+  }
 }

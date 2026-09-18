@@ -11,13 +11,13 @@ const AUXILIARY_ORBIT =
   'M 89 322 A 260 82 -15 1 1 591 188 A 260 82 -15 1 1 89 322 Z';
 const ORBIT_PERSPECTIVE = 'translate(340 258) rotate(-4) scale(1.04 0.88) translate(-340 -250)';
 
-function OrbitTrack({ path }: { path: string }) {
+function OrbitTrack({ path, className }: { path: string; className: string }) {
   return (
-    <>
+    <g className={className}>
       <path className={styles.trackGlow} d={path} />
       <path className={styles.trackBody} d={path} />
       <path className={styles.trackHighlight} d={path} />
-    </>
+    </g>
   );
 }
 
@@ -96,8 +96,8 @@ export default function HeroOrbit({ layer }: HeroOrbitProps) {
         mask={`url(#${isFront ? 'front' : 'back'}-mask-${layer})`}
         transform={ORBIT_PERSPECTIVE}
       >
-        <OrbitTrack path={MAIN_ORBIT} />
-        <OrbitTrack path={AUXILIARY_ORBIT} />
+        <OrbitTrack path={MAIN_ORBIT} className={styles.mainOrbitFloat} />
+        <OrbitTrack path={AUXILIARY_ORBIT} className={styles.auxiliaryOrbitFloat} />
       </g>
 
       <g
@@ -113,8 +113,12 @@ export default function HeroOrbit({ layer }: HeroOrbitProps) {
         mask={`url(#${isFront ? 'front' : 'back'}-mask-${layer})`}
         transform={ORBIT_PERSPECTIVE}
       >
-        <OrbitBall orbit="upper" />
-        <OrbitBall orbit="lower" />
+        <g className={styles.mainOrbitFloat}>
+          <OrbitBall orbit="upper" />
+        </g>
+        <g className={styles.auxiliaryOrbitFloat}>
+          <OrbitBall orbit="lower" />
+        </g>
       </g>
     </svg>
   );
