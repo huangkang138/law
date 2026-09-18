@@ -195,15 +195,18 @@
   animation: home-card-float 6.4s ease-in-out infinite;
   color: #173f76;
   text-decoration: none;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  translate: 0 0;
+  transition: translate 220ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
   transform: rotate(var(--card-rotate));
   transform-origin: center;
+  will-change: transform, translate;
 }
 
 .featureCard:hover {
   border-color: rgba(75, 148, 225, .58);
   background: linear-gradient(135deg, rgba(255, 255, 255, .97), rgba(246, 251, 255, .86));
   box-shadow: 0 18px 40px rgba(57, 116, 187, .13), inset 0 1px 0 rgba(255, 255, 255, .96);
+  translate: 0 -8px;
 }
 
 .featureCard:focus-visible {
@@ -295,18 +298,29 @@
 .sideSlogan {
   position: absolute;
   z-index: 3;
-  top: 141px;
-  color: #819db9;
+  top: 229px;
+  color: #356fbd;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: .22em;
   line-height: 2.25;
   white-space: nowrap;
 }
 
-.sideSlogan p { margin: 0; }
-.sideSloganLeft { left: clamp(58px, 6.2vw, 96px); text-align: left; }
-.sideSloganRight { right: clamp(58px, 6.2vw, 96px); text-align: right; }
+.sideSlogan p {
+  margin: 0;
+  color: transparent;
+  background: linear-gradient(100deg, #2d7bc9 8%, #5669d8 58%, #7559dc 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.sideSloganLeft {
+  left: clamp(24px, 3.2vw, 52px);
+  text-align: left;
+  transform: translateY(36px);
+}
+.sideSloganRight { right: clamp(24px, 3.2vw, 52px); text-align: right; }
 
 .sloganLine {
   display: block;
@@ -314,12 +328,12 @@
   height: 1px;
   margin-bottom: 14px;
   border-radius: 99px;
-  background: linear-gradient(90deg, rgba(88, 151, 211, .5), rgba(113, 184, 236, .04));
+  background: linear-gradient(90deg, rgba(45, 123, 201, .58), rgba(117, 89, 220, .08));
 }
 
 .sideSloganRight .sloganLine {
   margin-left: auto;
-  background: linear-gradient(270deg, rgba(88, 151, 211, .5), rgba(113, 184, 236, .04));
+  background: linear-gradient(270deg, rgba(45, 123, 201, .58), rgba(117, 89, 220, .08));
 }
 
 .heroCopy {
@@ -400,7 +414,7 @@
   max-width: 1340px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 22px auto 0;
-  padding: 22px 0;
+  padding: 20px 0;
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
   background: transparent;
@@ -413,56 +427,61 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   padding: 0 24px;
 }
 
 .valueItem:not(:last-child)::after {
   position: absolute;
-  top: 10%;
+  top: 4%;
   right: 0;
   width: 1px;
-  height: 80%;
-  background: linear-gradient(180deg, transparent, rgba(126, 180, 223, .24) 22%, rgba(126, 180, 223, .24) 78%, transparent);
+  height: 92%;
+  background: linear-gradient(180deg, transparent, rgba(90, 145, 230, .22) 25%, rgba(90, 145, 230, .22) 75%, transparent);
   content: '';
 }
 
 .valueIcon {
   display: inline-flex;
-  width: 54px;
-  height: 54px;
+  width: 60px;
+  height: 60px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(115, 178, 235, .28);
+  border: 1px solid rgba(90, 160, 255, .12);
   border-radius: 50%;
-  color: #287fd4;
-  background: linear-gradient(145deg, rgba(249, 253, 255, .98), rgba(226, 241, 255, .92));
-  box-shadow: 0 8px 18px rgba(76, 133, 190, .09), 0 0 18px rgba(116, 178, 233, .07), inset 0 1px 0 #fff;
+  color: #1672e8;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 8px 24px rgba(70, 130, 220, .1), inset 0 1px 0 rgba(255, 255, 255, .88);
 }
 
 .valueItem > span:last-child {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  height: 70px;
+  gap: 3px;
+  justify-content: flex-start;
 }
 
 .valueIcon svg {
-  transform: scale(1.06);
+  width: 26px;
+  height: 26px;
+  stroke-width: 2;
 }
 
 .valueItem strong {
-  color: #1762aa;
-  font-size: 17px;
-  font-weight: 750;
-  letter-spacing: .08em;
+  color: #126ee5;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  line-height: 1.3;
 }
 
 .valueItem small {
-  color: #6b839d;
-  font-size: 12px;
-  line-height: 1.55;
+  color: rgba(50, 90, 135, .72);
+  font-size: 14px;
+  line-height: 1.65;
   white-space: normal;
 }
 
@@ -558,7 +577,7 @@
   .featureLeftBottom { top: 540px; left: calc(50% - 450px); }
   .featureRightTop { top: 435px; right: calc(50% - 450px); }
   .featureRightBottom { top: 540px; right: calc(50% - 450px); }
-  .sideSlogan { top: 182px; }
+  .sideSlogan { top: 229px; }
   .heroCopy { margin-top: 0; }
 }
 
