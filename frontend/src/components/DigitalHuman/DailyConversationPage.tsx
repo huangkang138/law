@@ -1,9 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Check, Copy, FilePenLine, FileText, Gavel, History, Lightbulb, MessageCircle, Plus, RotateCcw, Settings, Square, Trash2, Volume2 } from 'lucide-react';
+import { ArrowRight, Check, Copy, FilePenLine, FileText, Gavel, History, Lightbulb, MessageCircle, Plus, RotateCcw, Settings, Square, Trash2, UserRound, Volume2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+import lawAssistantHead from '../../../digital-human/law_xiaozhi/head_reference.png';
 
 import { isTtsSupported } from '@/lib/voice/ttsController';
 import { useVoiceReady } from '@/lib/voice/useVoiceReady';
@@ -316,58 +319,78 @@ export default function DailyConversationPage() {
               return (
                 <article key={message.id} className={`${styles.messageRow} ${message.role === 'user' ? styles.userRow : styles.assistantRow}`}>
                   {message.role === 'assistant' && (
-                    <div className={styles.messageMarker} aria-label="法小助头像"><MessageCircle size={15} /></div>
+                    <div className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-label="法小助头像">
+                      <Image src={lawAssistantHead} alt="" aria-hidden="true" className={styles.assistantAvatarImage} />
+                    </div>
                   )}
-                  <div className={`${styles.messageCard} ${message.role === 'assistant' ? styles.assistantCard : styles.userCard}`}>
-                    {message.role === 'assistant' && (
-                      <div className={styles.messageHeader}>
-                        <strong>法小助</strong>
-                        <time dateTime={new Date(message.createdAt).toISOString()}>{formatMessageTime(message.createdAt)}</time>
-                      </div>
-                    )}
-                    {isLatestAssistant && <span className={styles.latestLabel}>最新回答</span>}
-                    <ConversationMessageContent role={message.role} content={message.content} />
-                    {message.role === 'user' && <time className={styles.userMessageTime} dateTime={new Date(message.createdAt).toISOString()}>{formatMessageTime(message.createdAt)}</time>}
-                    {canRoute && (
-                      <button type="button" className={styles.routeButton} onClick={() => handleRoute(message.route as string)}>
-                        打开{message.routeLabel}
-                        <ArrowRight size={15} />
-                      </button>
-                    )}
-                    {message.role === 'assistant' && (
-                      <div className={styles.messageActions}>
-                        {ttsSupported && (
-                          <button type="button" onClick={() => isSpeaking ? stopSpeaking() : speakMessage(message.id, message.content)}>
-                            {isSpeaking ? <Square size={13} /> : <Volume2 size={13} />}
-                            {isSpeaking ? '停止朗读' : '朗读'}
-                          </button>
-                        )}
-                        <button type="button" onClick={() => void handleCopy(message.id, message.content)}>
-                          {copiedMessageId === message.id ? <Check size={13} /> : <Copy size={13} />}
-                          {copiedMessageId === message.id ? '已复制' : '复制'}
+                  <div className={message.role === 'assistant' ? styles.assistantMessageBody : styles.userMessageBody}>
+                    <div className={`${styles.messageCard} ${message.role === 'assistant' ? styles.assistantCard : styles.userCard}`}>
+                      {message.role === 'assistant' && (
+                        <div className={styles.messageHeader}>
+                          <strong>法小助</strong>
+                          <time dateTime={new Date(message.createdAt).toISOString()}>{formatMessageTime(message.createdAt)}</time>
+                          {isLatestAssistant && <span className={styles.latestLabel}>最新回答</span>}
+                        </div>
+                      )}
+                      <ConversationMessageContent role={message.role} content={message.content} />
+                      {canRoute && (
+                        <button type="button" className={styles.routeButton} onClick={() => handleRoute(message.route as string)}>
+                          打开{message.routeLabel}
+                          <ArrowRight size={15} />
                         </button>
-                      </div>
+                      )}
+                      {message.role === 'assistant' && (
+                        <div className={styles.messageActions}>
+                          {ttsSupported && (
+                            <button type="button" onClick={() => isSpeaking ? stopSpeaking() : speakMessage(message.id, message.content)}>
+                              {isSpeaking ? <Square size={13} /> : <Volume2 size={13} />}
+                              {isSpeaking ? '停止朗读' : '朗读'}
+                            </button>
+                          )}
+                          <button type="button" onClick={() => void handleCopy(message.id, message.content)}>
+                            {copiedMessageId === message.id ? <Check size={13} /> : <Copy size={13} />}
+                            {copiedMessageId === message.id ? '已复制' : '复制'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {message.role === 'user' && (
+                      <time className={styles.userMessageTime} dateTime={new Date(message.createdAt).toISOString()}>
+                        {formatMessageTime(message.createdAt)}
+                      </time>
                     )}
                   </div>
+                  {message.role === 'user' && (
+                    <div className={`${styles.messageAvatar} ${styles.userAvatar}`} aria-label="用户头像">
+                      <UserRound size={21} aria-hidden="true" />
+                    </div>
+                  )}
                 </article>
               );
             })}
 
             {streamingMessage && (
               <article className={`${styles.messageRow} ${styles.assistantRow}`}>
-                <div className={styles.messageMarker} aria-label="法小助头像"><MessageCircle size={15} /></div>
-                <div className={`${styles.messageCard} ${styles.assistantCard} ${styles.latestCard}`} aria-label="法小助正在回答">
-                  <div className={styles.messageHeader}><strong>法小助</strong><time>现在</time></div>
-                  <span className={styles.latestLabel}>实时回答</span>
-                  <ConversationMessageContent role="assistant" content={streamingMessage.content} streaming />
+                <div className={`${styles.messageAvatar} ${styles.assistantAvatar}`} aria-label="法小助头像">
+                  <Image src={lawAssistantHead} alt="" aria-hidden="true" className={styles.assistantAvatarImage} />
+                </div>
+                <div className={styles.assistantMessageBody}>
+                  <div className={`${styles.messageCard} ${styles.assistantCard} ${styles.latestCard}`} aria-label="法小助正在回答">
+                    <div className={styles.messageHeader}><strong>法小助</strong><time>现在</time><span className={styles.latestLabel}>实时回答</span></div>
+                    <ConversationMessageContent role="assistant" content={streamingMessage.content} streaming />
+                  </div>
                 </div>
               </article>
             )}
             {isLoading && !streamingMessage && (
               <div className={`${styles.messageRow} ${styles.assistantRow}`} aria-label="法小助正在思考">
-                <div className={styles.messageMarker}><MessageCircle size={14} /></div>
-                <div className={`${styles.messageCard} ${styles.assistantCard} ${styles.typingCard}`}>
-                  <span /><span /><span /><em>法小助正在思考…</em>
+                <div className={`${styles.messageAvatar} ${styles.assistantAvatar}`}>
+                  <Image src={lawAssistantHead} alt="" aria-hidden="true" className={styles.assistantAvatarImage} />
+                </div>
+                <div className={styles.assistantMessageBody}>
+                  <div className={`${styles.messageCard} ${styles.assistantCard} ${styles.typingCard}`}>
+                    <span /><span /><span /><em>法小助正在思考…</em>
+                  </div>
                 </div>
               </div>
             )}

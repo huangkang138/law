@@ -1,10 +1,19 @@
 # 当前任务
 
+- 阶段/任务名称：普法问答聊天内容排版优化
+- 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-17；类型、差异及 1440×900/375×812 浏览器视觉检查通过）
+- 目标：只优化 `/chat` 中间聊天消息区域的横向利用、AI/用户身份区分、头像、气泡宽度与信息层级。
+- 修改范围：仅 `DailyConversationPage.tsx` 的消息节点结构、`DailyConversationPage.module.css` 的消息局部样式及必要项目记录；不修改顶部导航、Hero 数字人、左侧会话、右侧状态、快捷卡片、推荐问题、输入框关系、Store/API/SSE/TTS/后端。
+- 已完成：AI 左侧复用现有法小助头部素材、用户右侧使用默认人物 Icon；桌面 AI 消息最大宽度 80%、用户消息最大宽度 60%，短消息内容自适应；名称/时间/最新回答同区，用户时间移到气泡下方；消息区域取消 860px 居中限宽并保留滚动。
+- 验收：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；独立预览在 1440×900 三栏与 375×812 移动端无横向溢出，消息身份与左右对齐清晰。
+
+> 以下为上一项 Rive 数字人接入任务记录。
+
 - 阶段/任务名称：法小助全身 Rive 资源与身体动作接入
 - 当前状态：`READY_FOR_ACCEPTANCE`（2026-09-17；已将内部身体组件重叠的 `digitalv2.riv` 替换为 `digitalv3.riv`，恢复原半身渐变；类型、差异及浏览器 idle/朗读组合验证通过）
 - 目标：使用用户新增的全身 Rive 文件，页面仍按原方案显示半身；身体仅由 `bodyState` 五态控制，脸部由 `expression / speaking / blink` 组合驱动，不叠加 CSS 身体动画。
 - 修改范围：`RiveDigitalHuman.tsx`、`DigitalHumanAvatar.tsx`、`DailyConversationPage.module.css` 的数字人视口、`DigitalHumanFloat.tsx` 的共享头像动画规则、`frontend/public/digital-human/law-xiaozhi/digitalv3.riv` 及必要项目记录；不修改 Store/API/SSE/TTS、三栏结构、案件流程或后端。
-- CURRENT_TASK_MISMATCH：本次用户目标已从上一项 `/chat` UI 精修切换为全身 Rive 资源接入；以下 UI 内容保留为已完成背景。
+- CURRENT_TASK_MISMATCH：本次用户目标已从上一项 `/chat` UI 精修切换为聊天内容排版优化；以下 UI 内容保留为已完成背景。
 - 已确认：顶部导航保留；左侧约 240px 只读 `digitalHumanStore`/后端数字人会话记录；中央保持回答卡片既有尺寸；右侧约 300px 增加只读真实上下文栏，移动端顺序堆叠；数字人居中放大并以渐变柔和遮挡下半身；快捷问题只预填不自动发送。
 - 已确认：普通法律问题直接回答；合同审查、文书起草等使用已有 `route/routeLabel` 按钮；明确劳动仲裁/维权/案件处理只引导用户进入现有劳动仲裁 Agent/案件工作台，不自动跳转、不新增 Agent；`/chat` 不显示右下角重复数字人，其他页面继续保留。
 - 已确认：数字人状态继续由真实 `emotion`、`isLoading`、`voiceSpeaking` 驱动，STT 识别期间补充“正在聆听”；对话区保留全部用户和 AI 消息，AI 回答支持朗读/停止与复制；不编造摘要、结论或业务状态；不修改后端/API/数据库/Agent/SSE/TTS 契约。

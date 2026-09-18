@@ -1285,3 +1285,10 @@
 - 正式资源切换为 `digitalv3.riv`，其 Rive 合同仍为 `Artboard 1 / AvatarStateMachine / ViewModel1`，并保留 `bodyState / expression / speaking / blink`，无需改状态映射。
 - 恢复原半身底部渐变；继续禁用页面与共享入口对整个角色施加的 CSS 身体动画，保证身体只由 `bodyState` 控制、脸部动作独立组合。
 - 源文件与公开文件 SHA-256 一致；浏览器确认 idle 与朗读组合均无身体组件重叠、Hero 内只有 1 个 Canvas，控制台无报错；`npx tsc --noEmit --incremental false` 与 `git diff --check` 通过。
+
+## 2026-09-17（普法问答聊天内容排版优化）
+
+- 仅调整 `/chat` 中间消息列表：移除 860px 居中限宽，桌面 AI 消息最大宽度设为 80%、用户消息最大宽度设为 60%，短消息仍按内容收缩，AI 左对齐、用户右对齐。
+- AI 消息左侧直接复用 `law_xiaozhi/head_reference.png` 头部素材；用户消息右侧使用 Lucide 默认人物 Icon，不新增角色图片或 Rive 实例。名称、时间、最新回答归入同一信息区，用户时间移到气泡下方。
+- 未修改顶部导航、Hero 数字人、左右栏、快捷卡片、推荐问题、输入框位置关系、Store/API/SSE/TTS、案件流程或后端。
+- 验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；独立预览在 1440×900 与 375×812 实测消息宽度、头像、左右对齐正常，页面与聊天容器无横向溢出。
