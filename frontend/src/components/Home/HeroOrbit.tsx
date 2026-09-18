@@ -6,9 +6,9 @@ type HeroOrbitProps = {
 };
 
 const MAIN_ORBIT =
-  'M 100 280 C 170 200 330 135 500 125 C 585 120 610 150 555 195 C 450 275 260 330 130 315 C 85 310 70 295 100 280 Z';
+  'M 89 232 A 260 82 -15 1 1 591 98 A 260 82 -15 1 1 89 232 Z';
 const AUXILIARY_ORBIT =
-  'M 100 370 C 170 290 330 225 500 215 C 585 210 610 240 555 285 C 450 365 260 420 130 405 C 85 400 70 385 100 370 Z';
+  'M 89 322 A 260 82 -15 1 1 591 188 A 260 82 -15 1 1 89 322 Z';
 const ORBIT_PERSPECTIVE = 'translate(340 258) rotate(-4) scale(1.04 0.88) translate(-340 -250)';
 
 function OrbitTrack({ path }: { path: string }) {
