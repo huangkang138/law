@@ -58,7 +58,7 @@ export default function HomePage() {
           <span className={styles.backgroundBallRight} />
         </div>
 
-        <div className={styles.heroCore}>
+        <div className={styles.heroLayout}>
           <div className={styles.heroStage}>
             <aside className={`${styles.sideSlogan} ${styles.sideSloganLeft}`} aria-label="品牌理念">
               <span className={styles.sloganLine} />

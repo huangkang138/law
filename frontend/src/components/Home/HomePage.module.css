@@ -100,11 +100,16 @@
   opacity: .58;
 }
 
-.heroCore {
+.heroLayout {
   display: flex;
   width: 100%;
   flex-direction: column;
   transform: translateY(30px);
+}
+
+.heroCore {
+  position: relative;
+  isolation: isolate;
 }
 
 .heroStage {
@@ -118,7 +123,7 @@
 
 .lawVisual {
   position: absolute;
-  top: -22px;
+  top: -10px;
   left: 50%;
   z-index: 2;
   width: 680px;
@@ -132,42 +137,47 @@
   object-fit: contain;
 }
 
-.orbit {
+.coreShadow {
   position: absolute;
-  top: -28px;
-  left: 50%;
-  width: 570px;
-  height: 570px;
-  animation: home-orbit-drift 19s linear infinite;
-  filter: drop-shadow(0 16px 30px rgba(77, 141, 231, .12));
-  transform: translateX(-50%);
-  transform-origin: center;
-}
-
-.logoFloat {
-  position: absolute;
-  top: 52px;
+  top: 334px;
   left: 50%;
   z-index: 2;
-  width: 338px;
-  height: 338px;
-  animation: home-logo-float 6s ease-in-out infinite;
+  width: 184px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(77, 132, 213, .28) 0%, rgba(128, 174, 232, .12) 46%, transparent 74%);
+  filter: blur(9px);
+  opacity: .16;
+  transform: translateX(-50%) scaleX(1);
+  animation: home-core-shadow 4.8s ease-in-out infinite;
+}
+
+.heroLogo {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 3;
+  width: 350px;
+  height: 350px;
+  animation: home-logo-float 4.8s ease-in-out infinite;
   filter: drop-shadow(0 24px 28px rgba(43, 111, 226, .18));
   transform: translateX(-50%);
 }
 
 .platform {
   position: absolute;
-  bottom: -2px;
+  bottom: 42px;
   left: 50%;
   z-index: 1;
   width: 680px;
-  height: 226px;
+  height: 145px;
   animation: home-platform-breathe 5.8s ease-in-out infinite;
+  mask-image: radial-gradient(ellipse 55% 68% at 50% 44%, #000 0 60%, rgba(0, 0, 0, .82) 74%, transparent 100%);
   transform: translateX(-50%);
 }
 
 .featureCard {
+  --card-rotate: 0deg;
   position: absolute;
   z-index: 4;
   display: grid;
@@ -186,6 +196,8 @@
   color: #173f76;
   text-decoration: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  transform: rotate(var(--card-rotate));
+  transform-origin: center;
 }
 
 .featureCard:hover {
@@ -199,10 +211,10 @@
   outline-offset: 3px;
 }
 
-.featureLeftTop { top: 58px; left: clamp(238px, calc(19vw + 20px), 306px); }
-.featureLeftBottom { top: 247px; left: clamp(214px, calc(17vw + 20px), 276px); }
-.featureRightTop { top: 58px; right: clamp(238px, calc(19vw + 20px), 306px); }
-.featureRightBottom { top: 247px; right: clamp(214px, calc(17vw + 20px), 276px); }
+.featureLeftTop { --card-rotate: -1.5deg; top: 54px; left: clamp(256px, calc(19vw + 38px), 324px); }
+.featureLeftBottom { --card-rotate: -1deg; top: 252px; left: clamp(232px, calc(17vw + 38px), 294px); }
+.featureRightTop { --card-rotate: -2deg; top: 72px; right: clamp(256px, calc(19vw + 38px), 324px); }
+.featureRightBottom { --card-rotate: 1deg; top: 268px; right: clamp(232px, calc(17vw + 38px), 294px); }
 
 .featureIcon {
   position: relative;
@@ -502,22 +514,22 @@
 
 @keyframes home-logo-float {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-7px); }
+  50% { transform: translateX(-50%) translateY(-5px); }
 }
 
-@keyframes home-orbit-drift {
-  from { transform: translateX(-50%) rotate(0deg); }
-  to { transform: translateX(-50%) rotate(360deg); }
+@keyframes home-core-shadow {
+  0%, 100% { opacity: .18; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: .11; transform: translateX(-50%) scaleX(.94); }
 }
 
 @keyframes home-platform-breathe {
-  0%, 100% { filter: brightness(.98) drop-shadow(0 18px 20px rgba(75, 137, 219, .13)); opacity: .92; }
-  50% { filter: brightness(1.04) drop-shadow(0 21px 26px rgba(75, 137, 219, .19)); opacity: 1; }
+  0%, 100% { filter: brightness(.98) drop-shadow(0 18px 20px rgba(75, 137, 219, .13)); opacity: .92; transform: translateX(-50%) scale(1); }
+  50% { filter: brightness(1.04) drop-shadow(0 21px 26px rgba(75, 137, 219, .19)); opacity: 1; transform: translateX(-50%) scale(1.015); }
 }
 
 @keyframes home-card-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(0) rotate(var(--card-rotate)); }
+  50% { transform: translateY(-3px) rotate(var(--card-rotate)); }
 }
 
 @media (max-width: 1700px) and (min-width: 961px) {
@@ -530,9 +542,9 @@
 @media (max-width: 1400px) {
   .hero { padding-inline: 22px; }
   .lawVisual { width: 610px; }
-  .orbit { width: 520px; height: 520px; top: -5px; }
-  .logoFloat { width: 310px; height: 310px; top: 73px; }
-  .platform { width: 610px; height: 204px; bottom: 2px; }
+  .heroLogo { width: 321px; height: 321px; top: 45px; }
+  .coreShadow { top: 346px; width: 174px; height: 24px; }
+  .platform { width: 610px; height: 130px; bottom: 40px; }
   .sideSlogan { font-size: 12px; }
   .valueItem { padding-inline: 17px; }
 }
@@ -540,7 +552,7 @@
 @media (max-width: 1199px) {
   .hero { padding-top: 24px; }
   .heroStage { height: 650px; }
-  .lawVisual { top: -18px; }
+  .lawVisual { top: -6px; }
   .featureCard { width: 224px; }
   .featureLeftTop { top: 435px; left: calc(50% - 450px); }
   .featureLeftBottom { top: 540px; left: calc(50% - 450px); }
@@ -553,11 +565,11 @@
 @media (max-width: 960px) {
   .hero { min-height: auto; padding: 24px 18px 36px; }
   .heroStage { display: grid; height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 465px; transform: none; }
-  .lawVisual { top: -12px; width: 520px; height: 440px; }
-  .orbit { width: 460px; height: 460px; }
-  .logoFloat { top: 65px; width: 270px; height: 270px; }
-  .platform { width: 520px; height: 174px; }
-  .featureCard { position: relative; inset: auto; width: 100%; min-height: 82px; animation: none; }
+  .lawVisual { top: 0; width: 520px; height: 440px; }
+  .heroLogo { top: 51px; width: 279px; height: 279px; }
+  .coreShadow { top: 313px; width: 156px; height: 22px; }
+  .platform { bottom: 34px; width: 520px; height: 111px; }
+  .featureCard { --card-rotate: 0deg; position: relative; inset: auto; width: 100%; min-height: 82px; animation: none; }
   .sideSlogan { display: none; }
   .backgroundBallLeft,
   .backgroundBallRight { display: none; }
@@ -570,9 +582,9 @@
 @media (max-width: 640px) {
   .heroStage { grid-template-columns: 1fr; padding-top: 350px; }
   .lawVisual { width: 390px; height: 340px; }
-  .orbit { top: -8px; width: 350px; height: 350px; }
-  .logoFloat { top: 46px; width: 210px; height: 210px; }
-  .platform { bottom: 0; width: 410px; height: 137px; }
+  .heroLogo { top: 38px; width: 217px; height: 217px; }
+  .coreShadow { top: 239px; width: 126px; height: 18px; }
+  .platform { bottom: 25px; width: 410px; height: 88px; }
   .heroCopy h1 { gap: 13px; font-size: 29px; letter-spacing: .05em; }
   .titleDivider { height: 26px; }
   .heroCopy p { font-size: 13px; letter-spacing: .12em; }
@@ -586,8 +598,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orbit,
-  .logoFloat,
+  .coreShadow,
+  .heroLogo,
   .platform,
   .featureCard {
     animation: none;
