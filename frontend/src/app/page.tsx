@@ -50,39 +50,49 @@ export default function HomePage() {
   return (
     <div className={styles.pageShell}>
       <section className={styles.hero} aria-labelledby="home-hero-title">
-        <div className={styles.heroStage}>
-          <aside className={`${styles.sideSlogan} ${styles.sideSloganLeft}`} aria-label="品牌理念">
-            <span className={styles.sloganLine} />
-            <p>以 专 业 之 力</p>
-            <p>守 护 每 一 次 选 择</p>
-          </aside>
-
-          {heroFeatures.map((feature) => (
-            <HeroFeatureCard key={feature.title} {...feature} />
-          ))}
-
-          <HeroLawVisual />
-
-          <aside className={`${styles.sideSlogan} ${styles.sideSloganRight}`} aria-label="服务理念">
-            <span className={styles.sloganLine} />
-            <p>让</p>
-            <p>法 律 服 务</p>
-            <p>触 手 可 及</p>
-          </aside>
+        <div className={styles.backgroundLayers} aria-hidden="true">
+          <span className={styles.backgroundCurveLeft} />
+          <span className={styles.backgroundCurveRight} />
+          <span className={styles.backgroundGlowBottom} />
+          <span className={styles.backgroundBallLeft} />
+          <span className={styles.backgroundBallRight} />
         </div>
 
-        <div className={styles.heroCopy}>
-          <h1 id="home-hero-title">
-            <span>知法于心</span>
-            <span className={styles.titleDivider} aria-hidden="true" />
-            <span className={styles.titleGradient}>行法于行</span>
-          </h1>
-          <p>用 AI 让法律服务更简单、更可靠</p>
-          <div className={styles.titleIndicator} aria-hidden="true">
-            <span />
-            <i />
-            <i />
-            <span />
+        <div className={styles.heroCore}>
+          <div className={styles.heroStage}>
+            <aside className={`${styles.sideSlogan} ${styles.sideSloganLeft}`} aria-label="品牌理念">
+              <span className={styles.sloganLine} />
+              <p>以 专 业 之 力</p>
+              <p>守 护 每 一 次 选 择</p>
+            </aside>
+
+            {heroFeatures.map((feature) => (
+              <HeroFeatureCard key={feature.title} {...feature} />
+            ))}
+
+            <HeroLawVisual />
+
+            <aside className={`${styles.sideSlogan} ${styles.sideSloganRight}`} aria-label="服务理念">
+              <span className={styles.sloganLine} />
+              <p>让</p>
+              <p>法 律 服 务</p>
+              <p>触 手 可 及</p>
+            </aside>
+          </div>
+
+          <div className={styles.heroCopy}>
+            <h1 id="home-hero-title">
+              <span>知法于心</span>
+              <span className={styles.titleDivider} aria-hidden="true" />
+              <span className={styles.titleGradient}>行法于行</span>
+            </h1>
+            <p>用 AI 让法律服务更简单、更可靠</p>
+            <div className={styles.titleIndicator} aria-hidden="true">
+              <span />
+              <i />
+              <i />
+              <span />
+            </div>
           </div>
         </div>
 
@@ -97,10 +107,15 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+
+        <div className={styles.valueTagline} aria-hidden="true">
+          <span />
+          <p>科技让法治更美好</p>
+          <span />
+        </div>
       </section>
 
       <footer className={styles.footer}>
-        <p>科技让法治更美好</p>
         <span>© 2026 律知智能法律服务平台</span>
       </footer>
     </div>
