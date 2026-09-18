@@ -37,17 +37,19 @@
   max-width: 1500px;
   height: 500px;
   margin: 0 auto;
+  transform: translateY(-18px);
 }
 
 .lawVisual {
   position: absolute;
-  top: 0;
+  top: -22px;
   left: 50%;
   z-index: 2;
   width: 680px;
   height: 500px;
   pointer-events: none;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(.94);
+  transform-origin: center top;
 }
 
 .visualImage {
@@ -120,10 +122,10 @@
   outline-offset: 3px;
 }
 
-.featureLeftTop { top: 78px; left: 12.5%; }
-.featureLeftBottom { top: 282px; left: 9.5%; }
-.featureRightTop { top: 78px; right: 12.5%; }
-.featureRightBottom { top: 282px; right: 9.5%; }
+.featureLeftTop { top: 62px; left: 17%; }
+.featureLeftBottom { top: 252px; left: 14.5%; }
+.featureRightTop { top: 62px; right: 17%; }
+.featureRightBottom { top: 252px; right: 14.5%; }
 
 .featureIcon {
   display: inline-flex;
@@ -170,7 +172,7 @@
 .sideSlogan {
   position: absolute;
   z-index: 3;
-  top: 166px;
+  top: 150px;
   color: #87a6c5;
   font-size: 14px;
   font-weight: 500;
@@ -180,8 +182,8 @@
 }
 
 .sideSlogan p { margin: 0; }
-.sideSloganLeft { left: 1.5%; text-align: left; }
-.sideSloganRight { right: 1.5%; text-align: right; }
+.sideSloganLeft { left: 4%; text-align: left; }
+.sideSloganRight { right: 4%; text-align: right; }
 
 .sloganLine {
   display: block;
@@ -200,7 +202,7 @@
 .heroCopy {
   position: relative;
   z-index: 4;
-  margin: -18px auto 0;
+  margin: -45px auto 0;
   text-align: center;
 }
 
@@ -269,10 +271,11 @@
   width: 100%;
   max-width: 1320px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 31px auto 0;
-  padding: 18px 0;
+  margin: 20px auto 0;
+  padding: 24px 0;
   border-top: 1px solid rgba(137, 187, 229, .2);
   border-bottom: 1px solid rgba(137, 187, 229, .2);
+  transform: translateY(50%);
 }
 
 .valueItem {
@@ -281,7 +284,7 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 13px;
+  gap: 14px;
   padding: 0 25px;
 }
 
@@ -297,8 +300,8 @@
 
 .valueIcon {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -315,16 +318,20 @@
   gap: 4px;
 }
 
+.valueIcon svg {
+  transform: scale(1.06);
+}
+
 .valueItem strong {
   color: #245789;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: .1em;
 }
 
 .valueItem small {
   overflow: hidden;
   color: #8296ab;
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -386,12 +393,12 @@
   .orbit { width: 520px; height: 520px; top: -5px; }
   .logoFloat { width: 310px; height: 310px; top: 73px; }
   .platform { width: 610px; height: 204px; bottom: 2px; }
-  .featureLeftTop { left: 11%; }
-  .featureLeftBottom { left: 7%; }
-  .featureRightTop { right: 11%; }
-  .featureRightBottom { right: 7%; }
-  .sideSloganLeft { left: 0; }
-  .sideSloganRight { right: 0; }
+  .featureLeftTop { left: 16%; }
+  .featureLeftBottom { left: 13%; }
+  .featureRightTop { right: 16%; }
+  .featureRightBottom { right: 13%; }
+  .sideSloganLeft { left: 4%; }
+  .sideSloganRight { right: 4%; }
   .sideSlogan { font-size: 12px; }
   .valueItem { padding-inline: 17px; }
 }
@@ -399,7 +406,7 @@
 @media (max-width: 1199px) {
   .hero { padding-top: 24px; }
   .heroStage { height: 650px; }
-  .lawVisual { top: 0; }
+  .lawVisual { top: -18px; }
   .featureCard { width: 214px; }
   .featureLeftTop { top: 435px; left: calc(50% - 450px); }
   .featureLeftBottom { top: 540px; left: calc(50% - 450px); }
@@ -411,15 +418,15 @@
 
 @media (max-width: 960px) {
   .hero { min-height: auto; padding: 24px 18px 36px; }
-  .heroStage { display: grid; height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 465px; }
-  .lawVisual { top: 0; width: 520px; height: 440px; }
+  .heroStage { display: grid; height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 465px; transform: none; }
+  .lawVisual { top: -12px; width: 520px; height: 440px; }
   .orbit { width: 460px; height: 460px; }
   .logoFloat { top: 65px; width: 270px; height: 270px; }
   .platform { width: 520px; height: 174px; }
   .featureCard { position: relative; inset: auto; width: 100%; min-height: 82px; animation: none; }
   .sideSlogan { display: none; }
-  .heroCopy { margin-top: 30px; }
-  .valueBar { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 22px; }
+  .heroCopy { margin-top: 18px; }
+  .valueBar { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 22px; transform: none; }
   .valueItem:nth-child(2)::after { display: none; }
 }
 

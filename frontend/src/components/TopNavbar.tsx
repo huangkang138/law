@@ -134,38 +134,37 @@ export default function TopNavbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 border-b border-blue-100/80 transition-all duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-white/95 backdrop-blur-xl shadow-lg shadow-blue-100/40'
-          : 'bg-white/90 backdrop-blur-md'
+          ? 'bg-gradient-to-r from-sky-100/95 via-blue-100/95 to-indigo-100/95 backdrop-blur-xl shadow-2xl shadow-blue-200/30'
+          : 'bg-gradient-to-r from-sky-100/90 via-blue-100/90 to-indigo-100/90 backdrop-blur-md'
       }`}
     >
-      {/* 顶部蓝色装饰线 */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-sky-400/80 to-transparent" />
+      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-80" />
 
-      <div className="mx-auto w-full max-w-[1600px] px-5 py-3">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto h-[84px] w-full max-w-[1440px] px-5 2xl:px-6">
+        <div className="flex h-full items-center gap-6 max-[1400px]:gap-3">
           {/* Logo */}
-          <Link href="/" className="group flex flex-shrink-0 items-center gap-3">
-            <div className="relative h-12 w-12 transition-transform duration-300 group-hover:scale-[1.04]">
+          <Link href="/" className="group flex w-[230px] flex-none items-center gap-3.5 max-[1400px]:w-[190px] max-[1400px]:gap-2.5">
+            <div className="relative h-[52px] w-[52px] flex-none transition-transform duration-300 group-hover:scale-[1.03] max-[1400px]:h-11 max-[1400px]:w-11">
               <Image
                 src="/home/lvzhi-logo.png"
                 alt="律知"
                 fill
-                sizes="48px"
-                className="object-contain drop-shadow-[0_7px_10px_rgba(37,99,235,0.16)]"
+                sizes="52px"
+                className="object-contain drop-shadow-[0_6px_9px_rgba(37,99,235,0.14)]"
               />
             </div>
-            <div className="flex flex-col leading-none">
-              <h1 className="bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 bg-clip-text text-2xl font-bold tracking-[0.2em] text-transparent">
+            <div className="flex min-w-0 flex-col leading-none">
+              <h1 className="text-[27px] font-extrabold tracking-[0.16em] text-[#10296f] max-[1400px]:text-2xl">
                 律知
               </h1>
-              <p className="mt-1.5 text-[11px] tracking-[0.2em] text-slate-500">智能法律服务平台</p>
+              <p className="mt-1.5 whitespace-nowrap text-[12px] tracking-[0.08em] text-[#7a91ad] max-[1400px]:text-[11px]">智能法律服务平台</p>
             </div>
           </Link>
 
-          {/* Desktop Menu - 大气排版 */}
-          <nav className="hidden xl:flex items-center gap-0">
+          {/* Desktop Menu */}
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1.5 xl:flex max-[1400px]:gap-0">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const itemIsActive = isActive(item.href) || isChildActive(item.children);
@@ -183,13 +182,12 @@ export default function TopNavbar() {
                   >
                     <button
                       onClick={() => setOpenDropdown(isDropdownOpen ? null : item.href)}
-                      className={`relative flex items-center gap-1 px-2 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                      className={`relative flex items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2 py-2 transition-all duration-300 ${
                         itemIsActive
-                          ? 'bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20 border border-blue-400/50'
-                          : 'text-blue-700/90 hover:text-blue-800 border border-transparent hover:border-blue-400/30'
+                          ? 'border-blue-400/50 bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20'
+                          : 'border-transparent text-blue-700/90 hover:border-blue-400/30 hover:text-blue-800'
                       }`}
                     >
-                      {/* 背景光效 */}
                       <div
                         className={`absolute inset-0 bg-gradient-to-r from-blue-400/10 to-transparent transition-opacity duration-300 ${
                           isHovered ? 'opacity-100' : 'opacity-0'
@@ -198,11 +196,11 @@ export default function TopNavbar() {
 
                       {/* 图标容器 */}
                       <div
-                        className={`relative flex items-center justify-center w-5 h-6 rounded-lg transition-all duration-300 ${
+                        className={`relative flex h-6 w-5 items-center justify-center rounded-lg transition-all duration-300 ${
                           itemIsActive
                             ? 'bg-blue-400/20'
                             : isHovered
-                            ? 'bg-blue-400/10 scale-110'
+                            ? 'scale-110 bg-blue-400/10'
                             : 'bg-transparent'
                         }`}
                       >
@@ -231,10 +229,9 @@ export default function TopNavbar() {
                         }`}
                       />
 
-                      {/* 底部下划线动画 */}
                       <div
                         className={`absolute bottom-1 left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent transition-all duration-300 ${
-                          itemIsActive ? 'opacity-100 scale-x-100' : isHovered ? 'opacity-70 scale-x-75' : 'opacity-0 scale-x-0'
+                          itemIsActive ? 'scale-x-100 opacity-100' : isHovered ? 'scale-x-75 opacity-70' : 'scale-x-0 opacity-0'
                         }`}
                       />
                     </button>
@@ -242,7 +239,7 @@ export default function TopNavbar() {
                     {/* 下拉菜单 */}
                     {isDropdownOpen && (
                       <div 
-                        className="absolute top-full left-0 mt-1 w-48 py-2 bg-gradient-to-b from-sky-50/95 to-blue-50/95 rounded-xl border border-blue-300/30 backdrop-blur-xl shadow-2xl z-50"
+                        className="absolute top-full left-0 z-50 mt-1 w-48 rounded-xl border border-blue-300/30 bg-gradient-to-b from-sky-50/95 to-blue-50/95 py-2 shadow-2xl backdrop-blur-xl"
                         onMouseEnter={() => handleDropdownMouseEnter(item.href)}
                         onMouseLeave={handleDropdownMouseLeave}
                       >
@@ -250,19 +247,36 @@ export default function TopNavbar() {
                           const ChildIcon = child.icon;
                           const childIsActive = isActive(child.href);
                           const isSmallText = child.name === '合同违约金计算';
+                          const childClassName = `flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                            childIsActive
+                              ? 'bg-blue-400/20 text-blue-700'
+                              : 'text-blue-700/80 hover:bg-blue-300/10 hover:text-blue-800'
+                          }`;
+
+                          if (child.href === CASE_WORKSPACE_ACTION) {
+                            return (
+                              <button
+                                key={child.href}
+                                type="button"
+                                onClick={() => handleNavigation(child.href)}
+                                className={childClassName}
+                              >
+                                <ChildIcon size={16} className={childIsActive ? 'text-blue-600' : 'text-blue-600/70'} />
+                                <span className={`font-medium ${isSmallText ? 'text-xs' : 'text-sm'}`}>{child.name}</span>
+                              </button>
+                            );
+                          }
+
                           return (
-                            <button
+                            <Link
                               key={child.href}
-                              onClick={() => handleNavigation(child.href)}
-                              className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 cursor-pointer ${
-                                childIsActive
-                                  ? 'bg-blue-400/20 text-blue-700'
-                                  : 'text-blue-700/80 hover:bg-blue-300/10 hover:text-blue-800'
-                              }`}
+                              href={child.href}
+                              onClick={() => setOpenDropdown(null)}
+                              className={childClassName}
                             >
                               <ChildIcon size={16} className={childIsActive ? 'text-blue-600' : 'text-blue-600/70'} />
                               <span className={`font-medium ${isSmallText ? 'text-xs' : 'text-sm'}`}>{child.name}</span>
-                            </button>
+                            </Link>
                           );
                         })}
                       </div>
@@ -273,18 +287,18 @@ export default function TopNavbar() {
 
               // 普通菜单项
               return (
-                <button
+                <Link
                   key={item.href}
-                  onClick={() => handleNavigation(item.href)}
+                  href={item.href}
+                  onClick={() => setOpenDropdown(null)}
                   onMouseEnter={() => setHoveredItem(item.href)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  className={`relative flex items-center gap-1 px-2 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden cursor-pointer ${
+                  className={`relative flex cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2 py-2 transition-all duration-300 ${
                     itemIsActive
-                      ? 'bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20 border border-blue-400/50'
-                      : 'text-blue-700/90 hover:text-blue-800 border border-transparent hover:border-blue-400/30'
+                      ? 'border-blue-400/50 bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20'
+                      : 'border-transparent text-blue-700/90 hover:border-blue-400/30 hover:text-blue-800'
                   }`}
                 >
-                  {/* 背景光效 */}
                   <div
                     className={`absolute inset-0 bg-gradient-to-r from-blue-400/10 to-transparent transition-opacity duration-300 ${
                       isHovered ? 'opacity-100' : 'opacity-0'
@@ -293,11 +307,11 @@ export default function TopNavbar() {
 
                   {/* 图标容器 */}
                   <div
-                    className={`relative flex items-center justify-center w-5 h-6 rounded-lg transition-all duration-300 ${
+                    className={`relative flex h-6 w-5 items-center justify-center rounded-lg transition-all duration-300 ${
                       itemIsActive
                         ? 'bg-blue-400/20'
                         : isHovered
-                        ? 'bg-blue-400/10 scale-110'
+                        ? 'scale-110 bg-blue-400/10'
                         : 'bg-transparent'
                     }`}
                   >
@@ -318,20 +332,19 @@ export default function TopNavbar() {
                     {item.name}
                   </span>
 
-                  {/* 底部下划线动画 */}
                   <div
                     className={`absolute bottom-1 left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent transition-all duration-300 ${
-                      itemIsActive ? 'opacity-100 scale-x-100' : isHovered ? 'opacity-70 scale-x-75' : 'opacity-0 scale-x-0'
+                      itemIsActive ? 'scale-x-100 opacity-100' : isHovered ? 'scale-x-75 opacity-70' : 'scale-x-0 opacity-0'
                     }`}
                   />
-                </button>
+                </Link>
               );
             })}
           </nav>
 
           {/* Mobile Menu Button */}
           <button
-            className="xl:hidden text-blue-600 hover:text-blue-700 transition-colors p-2 rounded-lg hover:bg-blue-400/10"
+            className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-400/10 hover:text-blue-700 xl:hidden"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -364,22 +377,39 @@ export default function TopNavbar() {
                           const ChildIcon = child.icon;
                           const childIsActive = isActive(child.href);
                           const isSmallText = child.name === '合同违约金计算';
+                          const childClassName = `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer ${
+                            childIsActive
+                              ? 'bg-blue-400/20 text-blue-700'
+                              : 'text-blue-700/80 hover:bg-blue-300/10 hover:text-blue-800'
+                          }`;
+
+                          if (child.href === CASE_WORKSPACE_ACTION) {
+                            return (
+                              <button
+                                key={child.href}
+                                type="button"
+                                onClick={() => {
+                                  handleNavigation(child.href);
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={childClassName}
+                              >
+                                <ChildIcon size={18} className={childIsActive ? 'text-blue-600' : 'text-blue-600/70'} />
+                                <span className={`font-medium ${isSmallText ? 'text-xs' : 'text-sm'}`}>{child.name}</span>
+                              </button>
+                            );
+                          }
+
                           return (
-                            <button
+                            <Link
                               key={child.href}
-                              onClick={() => {
-                                handleNavigation(child.href);
-                                setIsMobileMenuOpen(false);
-                              }}
-                              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer ${
-                                childIsActive
-                                  ? 'bg-blue-400/20 text-blue-700'
-                                  : 'text-blue-700/80 hover:bg-blue-300/10 hover:text-blue-800'
-                              }`}
+                              href={child.href}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              className={childClassName}
                             >
                               <ChildIcon size={18} className={childIsActive ? 'text-blue-600' : 'text-blue-600/70'} />
                               <span className={`font-medium ${isSmallText ? 'text-xs' : 'text-sm'}`}>{child.name}</span>
-                            </button>
+                            </Link>
                           );
                         })}
                       </div>
@@ -388,12 +418,10 @@ export default function TopNavbar() {
                 }
 
                 return (
-                  <button
+                  <Link
                     key={item.href}
-                    onClick={() => {
-                      handleNavigation(item.href);
-                      setIsMobileMenuOpen(false);
-                    }}
+                    href={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 cursor-pointer ${
                     itemIsActive
                       ? 'bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 border border-blue-400/50'
@@ -404,7 +432,7 @@ export default function TopNavbar() {
                     <Icon size={22} className={itemIsActive ? 'text-blue-600' : 'text-blue-600/70'} />
                   </div>
                     <span className="text-base font-medium">{item.name}</span>
-                  </button>
+                  </Link>
                 );
               })}
             </nav>
@@ -412,7 +440,6 @@ export default function TopNavbar() {
         )}
       </div>
 
-      {/* 底部装饰线 */}
       <div className="h-0.5 w-full bg-gradient-to-r from-blue-200 via-blue-400/50 to-blue-200" />
     </header>
   );
