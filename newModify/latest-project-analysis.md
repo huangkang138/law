@@ -1,5 +1,11 @@
 # YYS-Law 最新项目解析
 
+## 首页与全局导航（2026-09-19）
+
+- 正式 `/` 首页已切换为“律知”品牌视觉：中央由 `HeroLawVisual` 组合新版 Logo、空间轨道和悬浮圆台，周围四个 `HeroFeatureCard` 入口继续连接现有业务路由。
+- 首页局部样式集中在 `frontend/src/components/Home/HomePage.module.css`；原首页完整保留为非路由 `LegacyHome.tsx`，不参与正式渲染。
+- 全局 `TopNavbar` 仅更新 Logo、品牌名称和轻量白蓝视觉，菜单、下拉、active route、案件工作台和移动端导航逻辑不变；全局 `DigitalHumanFloat` 继续由根布局挂载，首页重构未修改其内部实现。
+
 更新时间：2026-07-27 +08:00
 
 本文件是当前完整项目状态的权威汇总；以当前源码为准。后续远程仓库更新或用户要求重新解析时，覆盖更新本文件，不再生成多个解析副本。

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Menu, X, Home, MessageSquare, FileText, Shield, Settings, Brain, Scale, FolderOpen, History, Network, LayoutGrid, ChevronDown, Calculator, Calendar, Coins, Briefcase, Clock, Users, FileCheck, ShieldAlert, Gavel, FileSpreadsheet, Award, Landmark, ScrollText } from 'lucide-react';
-import ScaleIcon from '@/components/ScaleIcon';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDigitalHumanStore } from '@/store/digitalHumanStore';
@@ -134,35 +134,38 @@ export default function TopNavbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 border-b border-blue-100/80 transition-all duration-500 ${
         scrolled
-          ? 'bg-gradient-to-r from-sky-100/95 via-blue-100/95 to-indigo-100/95 backdrop-blur-xl shadow-2xl shadow-blue-200/30'
-          : 'bg-gradient-to-r from-sky-100/90 via-blue-100/90 to-indigo-100/90 backdrop-blur-md'
+          ? 'bg-white/95 backdrop-blur-xl shadow-lg shadow-blue-100/40'
+          : 'bg-white/90 backdrop-blur-md'
       }`}
     >
       {/* 顶部蓝色装饰线 */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-80" />
+      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-sky-400/80 to-transparent" />
 
-      <div className="container mx-auto px-6 py-4">
+      <div className="mx-auto w-full max-w-[1600px] px-5 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-4 flex-shrink-0 group">
-            <div className="relative">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-500 flex items-center justify-center border-2 border-blue-300/80 shadow-lg shadow-blue-200/50 group-hover:shadow-blue-300/30 group-hover:scale-105 transition-all duration-300">
-                <ScaleIcon size={36} className="text-white" withFire={false} />
-              </div>
-              <div className="absolute inset-0 rounded-full bg-blue-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <Link href="/" className="group flex flex-shrink-0 items-center gap-3">
+            <div className="relative h-12 w-12 transition-transform duration-300 group-hover:scale-[1.04]">
+              <Image
+                src="/home/lvzhi-logo.png"
+                alt="律知"
+                fill
+                sizes="48px"
+                className="object-contain drop-shadow-[0_7px_10px_rgba(37,99,235,0.16)]"
+              />
             </div>
-            <div className="flex flex-col">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 bg-clip-text text-transparent tracking-wider">
-                法惠民生
+            <div className="flex flex-col leading-none">
+              <h1 className="bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 bg-clip-text text-2xl font-bold tracking-[0.2em] text-transparent">
+                律知
               </h1>
-              <p className="text-sm text-blue-600/70 tracking-widest">智能法务服务平台</p>
+              <p className="mt-1.5 text-[11px] tracking-[0.2em] text-slate-500">智能法律服务平台</p>
             </div>
           </Link>
 
           {/* Desktop Menu - 大气排版 */}
-          <nav className="hidden xl:flex items-center gap-1">
+          <nav className="hidden xl:flex items-center gap-0">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const itemIsActive = isActive(item.href) || isChildActive(item.children);
@@ -180,7 +183,7 @@ export default function TopNavbar() {
                   >
                     <button
                       onClick={() => setOpenDropdown(isDropdownOpen ? null : item.href)}
-                      className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden ${
+                      className={`relative flex items-center gap-1 px-2 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden ${
                         itemIsActive
                           ? 'bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20 border border-blue-400/50'
                           : 'text-blue-700/90 hover:text-blue-800 border border-transparent hover:border-blue-400/30'
@@ -195,7 +198,7 @@ export default function TopNavbar() {
 
                       {/* 图标容器 */}
                       <div
-                        className={`relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-300 ${
+                        className={`relative flex items-center justify-center w-5 h-6 rounded-lg transition-all duration-300 ${
                           itemIsActive
                             ? 'bg-blue-400/20'
                             : isHovered
@@ -275,7 +278,7 @@ export default function TopNavbar() {
                   onClick={() => handleNavigation(item.href)}
                   onMouseEnter={() => setHoveredItem(item.href)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden cursor-pointer ${
+                  className={`relative flex items-center gap-1 px-2 py-2 rounded-xl transition-all duration-300 whitespace-nowrap overflow-hidden cursor-pointer ${
                     itemIsActive
                       ? 'bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20 border border-blue-400/50'
                       : 'text-blue-700/90 hover:text-blue-800 border border-transparent hover:border-blue-400/30'
@@ -290,7 +293,7 @@ export default function TopNavbar() {
 
                   {/* 图标容器 */}
                   <div
-                    className={`relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-300 ${
+                    className={`relative flex items-center justify-center w-5 h-6 rounded-lg transition-all duration-300 ${
                       itemIsActive
                         ? 'bg-blue-400/20'
                         : isHovered
