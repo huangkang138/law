@@ -8,18 +8,14 @@ import { useDigitalHumanStore } from '@/store/digitalHumanStore';
 import { isTtsSupported } from '@/lib/voice/ttsController';
 import { useVoiceReady } from '@/lib/voice/useVoiceReady';
 
-import DigitalHumanAvatar, { EMOTION_LABELS } from './DigitalHumanAvatar';
+import { EMOTION_LABELS } from './DigitalHumanAvatar';
 import ConversationComposer from './ConversationComposer';
 import ConversationMessageContent from './ConversationMessageContent';
 import LaborTriageCard from './LaborTriageCard';
 import MatterEntryCard from './MatterEntryCard';
 import { useLaborTriage } from './useLaborTriage';
 
-interface DigitalHumanChatProps {
-  avatarVisible?: boolean;
-}
-
-export default function DigitalHumanChat({ avatarVisible = true }: DigitalHumanChatProps) {
+export default function DigitalHumanChat() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [caseEntryExpanded, setCaseEntryExpanded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -174,16 +170,6 @@ export default function DigitalHumanChat({ avatarVisible = true }: DigitalHumanC
 
       <div className="dh-panel-body">
       <div className="dh-chat-column">
-      <div className="dh-portrait-stage">
-        <DigitalHumanAvatar
-          emotion={emotion}
-          isLoading={isLoading}
-          voiceSpeaking={voiceSpeaking}
-          variant="portrait"
-          visible={avatarVisible}
-        />
-      </div>
-
       <div ref={messagesRef} className="dh-messages" aria-live="polite">
         {messages.map((message) => (
           <div key={message.id} className={`dh-message-row dh-message-${message.role}`}>

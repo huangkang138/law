@@ -569,7 +569,7 @@
 .avatarBubble {
   position: absolute;
   top: 18px;
-  right: clamp(8px, 5%, 26px);
+  right: clamp(36px, 11%, 60px);
   z-index: 4;
   width: clamp(110px, 26%, 140px);
   box-sizing: border-box;
@@ -831,10 +831,18 @@
 .streamNotice { margin: 0; color: #a26839; font-size: 11px; text-align: center; }
 
 .composerArea {
-  width: min(100%, 1000px);
+  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
-  margin: 0 auto;
-  padding: 8px 28px 11px;
+  margin: 0;
+  padding: 8px 10px 11px;
+}
+
+.composerPanel {
+  padding: 12px 14px 14px;
+  background: rgba(255, 255, 255, .58);
+  border: 1px solid #dce8f2;
+  border-radius: 18px;
 }
 
 .quickHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 auto 8px; color: #416988; font-size: 12px; font-weight: 750; }
@@ -926,7 +934,7 @@
   .onlineStatus { min-height: auto; gap: 6px; padding: 5px 9px; font-size: 11px; }
   .onlineStatus i { width: 7px; height: 7px; }
   .avatarStage { width: 100%; height: 100%; min-height: 0; }
-  .avatarBubble { top: 7px; right: 0; width: 110px; padding: 7px 8px; font-size: 9px; }
+  .avatarBubble { top: 7px; right: 16px; width: 110px; padding: 7px 8px; font-size: 9px; }
   .avatarStage :global(.dh-avatar) { top: 6px; left: 30%; width: clamp(250px, 78vw, 320px); height: clamp(250px, 78vw, 320px); }
   .conversation { margin: 6px 8px 0; padding: 9px 10px 11px; }
   .conversationInner { width: 100%; gap: 9px; }
@@ -934,7 +942,8 @@
   .userMessageBody { max-width: 78%; }
   .messageCard { max-width: 100%; padding: 10px 11px; }
   .messageAvatar { width: 34px; height: 34px; }
-  .composerArea { padding: 7px 14px 10px; }
+  .composerArea { padding: 7px 8px 10px; }
+  .composerPanel { padding: 10px; border-radius: 15px; }
   .quickHeader { align-items: flex-start; flex-direction: column; gap: 2px; }
   .quickPrompts { gap: 5px; margin-bottom: 7px; }
   .quickPrompts button { overflow: hidden; padding: 7px 5px; font-size: 10px; text-overflow: ellipsis; }

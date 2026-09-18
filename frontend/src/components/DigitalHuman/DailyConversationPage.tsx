@@ -406,28 +406,30 @@ export default function DailyConversationPage() {
         </section>
 
         <section className={styles.composerArea} aria-label="继续提问">
-          <div className={styles.quickHeader}>
-            <span className={styles.quickTitle}><Lightbulb size={14} />你也可以这样问</span>
-            <div className={styles.quickHeaderActions}>
-              <small>点击后可修改，确认后再发送</small>
-              <button type="button" className={styles.quickRefresh} onClick={() => setQuickPromptGroup((group) => (group + 1) % QUICK_PROMPT_GROUPS.length)}>
-                <RotateCcw size={12} />换一批
-              </button>
+          <div className={styles.composerPanel}>
+            <div className={styles.quickHeader}>
+              <span className={styles.quickTitle}><Lightbulb size={14} />你也可以这样问</span>
+              <div className={styles.quickHeaderActions}>
+                <small>点击后可修改，确认后再发送</small>
+                <button type="button" className={styles.quickRefresh} onClick={() => setQuickPromptGroup((group) => (group + 1) % QUICK_PROMPT_GROUPS.length)}>
+                  <RotateCcw size={12} />换一批
+                </button>
+              </div>
             </div>
+            <div className={styles.quickPrompts}>
+              {QUICK_PROMPT_GROUPS[quickPromptGroup].map((question) => (
+                <button type="button" key={question} onClick={() => handlePreset(question)}>
+                  <FileText size={14} />
+                  {question}
+                </button>
+              ))}
+            </div>
+            <ConversationComposer
+              preset={preset}
+              onPresetConsumed={() => setPreset(null)}
+              onListeningChange={setIsListening}
+            />
           </div>
-          <div className={styles.quickPrompts}>
-            {QUICK_PROMPT_GROUPS[quickPromptGroup].map((question) => (
-              <button type="button" key={question} onClick={() => handlePreset(question)}>
-                <FileText size={14} />
-                {question}
-              </button>
-            ))}
-          </div>
-          <ConversationComposer
-            preset={preset}
-            onPresetConsumed={() => setPreset(null)}
-            onListeningChange={setIsListening}
-          />
           <p className={styles.disclaimer}>法小助提供 AI 辅助信息，重要法律事项请结合具体材料并咨询专业人士。</p>
         </section>
       </main>

@@ -45,7 +45,19 @@ export default function DigitalHumanFloat() {
       {isOpen ? (
         <>
           <div className={workspaceOpen ? 'dh-chat-hidden' : ''}>
-            <DigitalHumanChat avatarVisible={!workspaceOpen} />
+            <div className="dh-assistant-wrapper">
+              <div className="dh-assistant-avatar" aria-label="法小助数字人形象">
+                <DigitalHumanAvatar
+                  emotion={emotion}
+                  isLoading={isLoading}
+                  voiceSpeaking={voiceSpeaking}
+                  variant="portrait"
+                  visible={!workspaceOpen}
+                  useLegacyImageFallback={false}
+                />
+              </div>
+              <DigitalHumanChat />
+            </div>
           </div>
           {(workspaceOpen || workspaceMounted) && (
             <div className={workspaceOpen ? '' : 'dh-chat-hidden'}>
@@ -67,7 +79,6 @@ export default function DigitalHumanFloat() {
               variant="launcher"
               useLegacyImageFallback={false}
             />
-            <span className="dh-launcher-status" aria-hidden="true" />
           </button>
           <button type="button" className="dh-launcher-cta" onClick={open}>
             <MessageCircleMore size={17} aria-hidden="true" />
@@ -173,19 +184,6 @@ export default function DigitalHumanFloat() {
         .dh-panel textarea:focus-visible {
           outline: 3px solid rgba(37, 99, 235, .35);
           outline-offset: 2px;
-        }
-
-        .dh-launcher-status {
-          position: absolute;
-          right: 4px;
-          top: 72px;
-          z-index: 2;
-          width: 12px;
-          height: 12px;
-          border: 2px solid rgba(255, 255, 255, .95);
-          border-radius: 50%;
-          background: #22c55e;
-          box-shadow: 0 2px 6px rgba(34, 197, 94, .28);
         }
 
         .dh-launcher-cta {
@@ -328,6 +326,28 @@ export default function DigitalHumanFloat() {
           animation: dh-panel-in 320ms cubic-bezier(.2,.8,.2,1) both;
         }
 
+        .dh-assistant-wrapper {
+          display: flex;
+          align-items: flex-end;
+          gap: 12px;
+        }
+
+        .dh-assistant-avatar {
+          width: 150px;
+          height: 236px;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          flex: none;
+          overflow: visible;
+          background: transparent;
+        }
+
+        .dh-assistant-avatar .dh-avatar-portrait {
+          width: 150px;
+          height: 236px;
+        }
+
         .dh-panel-body {
           min-height: 0;
           display: grid;
@@ -338,7 +358,7 @@ export default function DigitalHumanFloat() {
           min-width: 0;
           min-height: 0;
           display: grid;
-          grid-template-rows: auto minmax(0, 1fr) auto auto;
+          grid-template-rows: minmax(0, 1fr) auto auto;
         }
 
         .dh-workspace-column {
@@ -615,16 +635,6 @@ export default function DigitalHumanFloat() {
         .dh-history-delete:hover {
           color: #dc2626 !important;
           background: #fef2f2 !important;
-        }
-
-        .dh-portrait-stage {
-          position: relative;
-          height: 162px;
-          display: grid;
-          place-items: center;
-          overflow: hidden;
-          background: linear-gradient(180deg, rgba(239, 246, 255, .86), rgba(255, 255, 255, .72));
-          border-bottom: 1px solid rgba(147, 197, 253, .2);
         }
 
         .dh-messages {
@@ -1197,6 +1207,20 @@ export default function DigitalHumanFloat() {
             border-radius: 18px;
           }
 
+          .dh-assistant-wrapper {
+            gap: 8px;
+          }
+
+          .dh-assistant-avatar {
+            width: 118px;
+            height: 186px;
+          }
+
+          .dh-assistant-avatar .dh-avatar-portrait {
+            width: 118px;
+            height: 186px;
+          }
+
           .dh-panel-expanded {
             width: calc(100vw - 24px);
             height: calc(100dvh - 24px);
@@ -1253,10 +1277,6 @@ export default function DigitalHumanFloat() {
             display: none;
           }
 
-          .dh-portrait-stage {
-            height: 132px;
-          }
-
           .dh-avatar-large {
             width: 120px;
             height: 148px;
@@ -1264,6 +1284,12 @@ export default function DigitalHumanFloat() {
 
           .dh-avatar-portrait { width: 118px; height: 146px; }
           .dh-avatar-compact { width: 62px; height: 78px; }
+        }
+
+        @media (max-width: 540px) {
+          .dh-assistant-avatar {
+            display: none;
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {
