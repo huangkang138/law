@@ -156,7 +156,7 @@ export default function TopNavbar() {
               />
             </div>
             <div className="flex min-w-0 flex-col leading-none">
-              <h1 className="text-[27px] font-extrabold tracking-[0.16em] text-[#10296f] max-[1400px]:text-2xl">
+              <h1 className="relative top-1 text-[27px] font-extrabold tracking-[0.16em] text-[#10296f] max-[1400px]:text-2xl">
                 律知
               </h1>
               <p className="mt-1.5 whitespace-nowrap text-[12px] tracking-[0.08em] text-[#7a91ad] max-[1400px]:text-[11px]">智能法律服务平台</p>

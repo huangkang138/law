@@ -142,12 +142,12 @@
   top: 334px;
   left: 50%;
   z-index: 2;
-  width: 184px;
-  height: 26px;
+  width: 218px;
+  height: 30px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(77, 132, 213, .28) 0%, rgba(128, 174, 232, .12) 46%, transparent 74%);
-  filter: blur(9px);
-  opacity: .16;
+  background: radial-gradient(ellipse, rgba(44, 103, 198, .42) 0%, rgba(86, 146, 224, .2) 44%, transparent 76%);
+  filter: blur(8px);
+  opacity: .52;
   transform: translateX(-50%) scaleX(1);
   animation: home-core-shadow 4.8s ease-in-out infinite;
 }
@@ -175,6 +175,32 @@
   mask-image: radial-gradient(ellipse 55% 68% at 50% 44%, #000 0 60%, rgba(0, 0, 0, .82) 74%, transparent 100%);
   transform: translateX(-50%);
 }
+
+.platformRipple {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  z-index: 0;
+  width: 610px;
+  height: 112px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.platformRipple span {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid rgba(84, 153, 236, .48);
+  border-radius: 50%;
+  box-shadow: 0 5px 14px rgba(70, 139, 226, .1);
+  clip-path: inset(50% -20px -20px -20px);
+  opacity: 0;
+  transform: scale(.58, .68);
+  animation: home-platform-ripple 5.4s ease-out infinite;
+}
+
+.platformRipple span:nth-child(2) { animation-delay: 1.8s; }
+.platformRipple span:nth-child(3) { animation-delay: 3.6s; }
 
 .featureCard {
   --card-rotate: 0deg;
@@ -362,6 +388,13 @@
   background: linear-gradient(180deg, transparent, #bad5ee, transparent);
 }
 
+.titlePrimaryGradient {
+  color: transparent;
+  background: linear-gradient(100deg, #173f75 0%, #1751ad 50%, #2868ee 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
 .titleGradient {
   color: transparent;
   background: linear-gradient(100deg, #278bd4 8%, #6467df 58%, #8059df 100%);
@@ -537,13 +570,20 @@
 }
 
 @keyframes home-core-shadow {
-  0%, 100% { opacity: .18; transform: translateX(-50%) scaleX(1); }
-  50% { opacity: .11; transform: translateX(-50%) scaleX(.94); }
+  0%, 100% { opacity: .52; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: .34; transform: translateX(-50%) scaleX(.92); }
 }
 
 @keyframes home-platform-breathe {
   0%, 100% { filter: brightness(.98) drop-shadow(0 18px 20px rgba(75, 137, 219, .13)); opacity: .92; transform: translateX(-50%) scale(1); }
   50% { filter: brightness(1.04) drop-shadow(0 21px 26px rgba(75, 137, 219, .19)); opacity: 1; transform: translateX(-50%) scale(1.015); }
+}
+
+@keyframes home-platform-ripple {
+  0% { opacity: 0; transform: scale(.58, .68); }
+  16% { opacity: .58; }
+  72% { opacity: .16; }
+  100% { opacity: 0; transform: scale(1.12, 1); }
 }
 
 @keyframes home-card-float {
@@ -562,8 +602,9 @@
   .hero { padding-inline: 22px; }
   .lawVisual { width: 610px; }
   .heroLogo { width: 321px; height: 321px; top: 45px; }
-  .coreShadow { top: 346px; width: 174px; height: 24px; }
+  .coreShadow { top: 346px; width: 202px; height: 27px; }
   .platform { width: 702px; height: 134px; bottom: 40px; }
+  .platformRipple { bottom: 7px; width: 560px; height: 104px; }
   .sideSlogan { font-size: 12px; }
   .valueItem { padding-inline: 17px; }
 }
@@ -586,8 +627,9 @@
   .heroStage { display: grid; height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 465px; transform: none; }
   .lawVisual { top: 0; width: 520px; height: 440px; }
   .heroLogo { top: 51px; width: 279px; height: 279px; }
-  .coreShadow { top: 313px; width: 156px; height: 22px; }
+  .coreShadow { top: 313px; width: 176px; height: 24px; }
   .platform { bottom: 34px; width: 598px; height: 114px; }
+  .platformRipple { bottom: 6px; width: 486px; height: 90px; }
   .featureCard { --card-rotate: 0deg; position: relative; inset: auto; width: 100%; min-height: 82px; animation: none; }
   .sideSlogan { display: none; }
   .backgroundBallLeft,
@@ -602,8 +644,9 @@
   .heroStage { grid-template-columns: 1fr; padding-top: 350px; }
   .lawVisual { width: 390px; height: 340px; }
   .heroLogo { top: 38px; width: 217px; height: 217px; }
-  .coreShadow { top: 239px; width: 126px; height: 18px; }
+  .coreShadow { top: 239px; width: 142px; height: 20px; }
   .platform { bottom: 25px; width: 472px; height: 91px; }
+  .platformRipple { bottom: 3px; width: 372px; height: 70px; }
   .heroCopy h1 { gap: 13px; font-size: 29px; letter-spacing: .05em; }
   .titleDivider { height: 26px; }
   .heroCopy p { font-size: 13px; letter-spacing: .12em; }
@@ -622,5 +665,9 @@
   .platform,
   .featureCard {
     animation: none;
+  }
+
+  .platformRipple span {
+    animation-duration: 8.5s;
   }
 }

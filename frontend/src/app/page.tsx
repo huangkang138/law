@@ -82,7 +82,7 @@ export default function HomePage() {
 
           <div className={styles.heroCopy}>
             <h1 id="home-hero-title">
-              <span>知法于心</span>
+              <span className={styles.titlePrimaryGradient}>知法于心</span>
               <span className={styles.titleDivider} aria-hidden="true" />
               <span className={styles.titleGradient}>行法于行</span>
             </h1>

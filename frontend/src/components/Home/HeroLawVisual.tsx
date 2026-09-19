@@ -19,6 +19,12 @@ export default function HeroLawVisual() {
         />
       </div>
 
+      <div className={styles.platformRipple} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+
       <div className={styles.coreShadow} aria-hidden="true" />
 
       <div className={styles.heroLogo}>
