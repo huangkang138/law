@@ -161,18 +161,19 @@ export default function LaborDisputeForm({
   const { showWage, showProbation, showTermination, showCompensation, showOvertime } = requirements.flags;
   const missing = new Set(missingFacts);
   const missingFields = new Set(requirements.missingFields);
+  const requiredFields = new Set(requirements.requiredFields);
   const set = (field: keyof LaborDisputeFormValue, next: string) => onChange({ ...value, [field]: next });
   const fieldClass = (fields: string[]) => [
     // 橙色边框/黄底只在校验触发后出现，让警告色真正具有定位问题的意义。
     highlightMissing && fields.some((field) => missing.has(field) || missingFields.has(field)) ? styles.missing : '',
-    // 红星表示“当前还没填”，字段满足规则后立即消失，避免已填写项仍被误认为缺失。
-    fields.some((field) => missingFields.has(field)) ? styles.required : '',
+    // 红星表示当前规则下必填，填写后仍保留；缺失态单独由 missingFields 控制。
+    fields.some((field) => requiredFields.has(field)) ? styles.required : '',
   ].filter(Boolean).join(' ');
 
   return <div className={styles.form}>
     <div className={styles.guide}>
       <span><b>*</b> 必填</span>
-      <span>没有星号的项目均可留空</span>
+      <span>星号填写后仍保留；标注“二选一”或“至少一项”的按组满足</span>
     </div>
     {missingFacts.length > 0 && <section className={styles.missingSummary}>
       <strong>当前还缺 {missingFacts.length} 项必填信息</strong>

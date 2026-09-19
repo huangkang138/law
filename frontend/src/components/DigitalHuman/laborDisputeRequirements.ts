@@ -90,11 +90,12 @@ export function getLaborDisputeRequirements(
   });
 
   if (flags.showWage) {
+    ['wage_arrears_amount', 'wage_arrears_months', 'wage_arrears_start_date', 'wages_paid_through']
+      .forEach((field) => requiredFields.add(field));
     const hasAmount = value.wage_arrears_amount !== ''
       || (monthlySalary !== '' && value.wage_arrears_months !== '');
     if (!hasAmount) {
       ['wage_arrears_amount', 'wage_arrears_months'].forEach((field) => {
-        requiredFields.add(field);
         missingFields.add(field);
       });
       missingFacts.push('wage_arrears_amount_or_salary_and_months');
@@ -102,7 +103,6 @@ export function getLaborDisputeRequirements(
     const hasPeriod = value.wage_arrears_start_date !== '' || value.wages_paid_through !== '';
     if (!hasPeriod) {
       ['wage_arrears_start_date', 'wages_paid_through'].forEach((field) => {
-        requiredFields.add(field);
         missingFields.add(field);
       });
       missingFacts.push('wage_arrears_period');
@@ -139,6 +139,8 @@ export function getLaborDisputeRequirements(
 
   if (flags.showOvertime) {
     requireEmpty('working_hours_system');
+    ['overtime_workday_hours', 'overtime_rest_day_hours', 'overtime_statutory_holiday_hours']
+      .forEach((field) => requiredFields.add(field));
     if (value.working_hours_system && value.working_hours_system !== 'standard') {
       missingFields.add('working_hours_system');
       missingFacts.push('standard_working_hours_system_required');
@@ -152,7 +154,6 @@ export function getLaborDisputeRequirements(
     if (overtimeHours <= 0) {
       ['overtime_workday_hours', 'overtime_rest_day_hours', 'overtime_statutory_holiday_hours']
         .forEach((field) => {
-          requiredFields.add(field);
           missingFields.add(field);
         });
       missingFacts.push('overtime_hours_by_type');

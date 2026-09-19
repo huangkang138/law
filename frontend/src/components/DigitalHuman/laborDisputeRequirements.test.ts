@@ -72,6 +72,11 @@ test('条件必填字段填完后从缺失字段中移除', () => {
       .map((field) => result.missingFields.includes(field)),
     [false, false, false, false],
   );
+  assert.deepEqual(
+    ['termination_date', 'employment_active', 'compensation_kind', 'local_average_monthly_salary']
+      .map((field) => result.requiredFields.includes(field)),
+    [true, true, true, true],
+  );
 });
 
 test('解除争议要求解除日期、原因和提出方', () => {
@@ -95,6 +100,11 @@ test('欠薪金额和欠薪期间支持二选一输入', () => {
   }), '8000');
   assert.equal(alternative.missingFacts.includes('wage_arrears_amount_or_salary_and_months'), false);
   assert.equal(alternative.missingFacts.includes('wage_arrears_period'), false);
+  assert.deepEqual(
+    ['wage_arrears_amount', 'wage_arrears_months', 'wage_arrears_start_date', 'wages_paid_through']
+      .map((field) => alternative.requiredFields.includes(field)),
+    [true, true, true, true],
+  );
 
   const empty = getLaborDisputeRequirements(facts({
     wage_arrears_amount: '',
@@ -137,7 +147,11 @@ test('加班时数为组合必填，填写任意一种即可', () => {
     overtime_rest_day_hours: '8',
   }), '8000');
   assert.equal(supplied.missingFacts.includes('overtime_hours_by_type'), false);
-  assert.equal(supplied.requiredFields.includes('overtime_workday_hours'), false);
+  assert.deepEqual(
+    ['overtime_workday_hours', 'overtime_rest_day_hours', 'overtime_statutory_holiday_hours']
+      .map((field) => supplied.requiredFields.includes(field)),
+    [true, true, true],
+  );
 });
 
 test('存续劳动关系与解除或补偿诉求冲突时给出明确提示', () => {
@@ -147,4 +161,29 @@ test('存续劳动关系与解除或补偿诉求冲突时给出明确提示', ()
   }), '8000');
   assert.equal(result.conflicts.length, 1);
   assert.equal(result.missingFacts.includes('employment_status_conflict'), true);
+});
+
+test('欠薪、加班、违法解除和赔偿均填完后无缺失，但必填标记保留', () => {
+  const result = getLaborDisputeRequirements(facts({
+    claim_types: '欠薪、加班费、违法解除、赔偿金',
+    employment_active: 'false',
+    termination_date: '2026-06-15',
+    termination_reason: '公司以严重违反考勤制度为由立即解除',
+    termination_initiator: 'employer',
+    compensation_kind: 'damages',
+    local_average_monthly_salary: '12000',
+    wage_arrears_amount: '14700',
+    wage_arrears_start_date: '2026-05-01',
+    working_hours_system: 'standard',
+    overtime_workday_hours: '20',
+    overtime_rest_day_hours: '16',
+    overtime_statutory_holiday_hours: '8',
+  }), '9800');
+  assert.deepEqual(result.missingFacts, []);
+  assert.deepEqual(result.missingFields, []);
+  assert.deepEqual(
+    ['wage_arrears_start_date', 'working_hours_system', 'overtime_workday_hours',
+      'termination_date', 'compensation_kind'].map((field) => result.requiredFields.includes(field)),
+    [true, true, true, true, true],
+  );
 });

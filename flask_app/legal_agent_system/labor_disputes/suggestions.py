@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple
 from core.database import SessionLocal
 from models.db_models import AgentDocument, LegalFact
 from .material_adapters import LaborMaterialAdapterRegistry
+from .material_adapters.narrative import NarrativeSummaryAdapter
 
 
 FIELD_LABELS = {
@@ -32,6 +33,16 @@ FIELD_LABELS = {
     "wage_arrears_amount": "欠薪金额",
     "wages_paid_through": "工资已支付至",
     "wage_payment_day": "约定发薪日",
+    "wage_arrears_start_date": "欠薪开始日期",
+    "working_hours_system": "工时制度",
+    "overtime_workday_hours": "工作日加班小时",
+    "overtime_rest_day_hours": "休息日加班小时",
+    "overtime_statutory_holiday_hours": "法定节假日加班小时",
+    "rest_day_compensatory_leave_hours": "休息日已补休小时",
+    "overtime_paid_amount": "已支付加班费",
+    "employment_active": "劳动关系是否仍存续",
+    "termination_initiator": "解除提出方",
+    "compensation_kind": "请求类型",
 }
 
 
@@ -44,6 +55,7 @@ class LaborFactSuggestionService:
         self.materials = materials
         self.llm_extractor = llm_extractor
         self.adapters = LaborMaterialAdapterRegistry()
+        self.narrative = NarrativeSummaryAdapter()
 
     def suggest(self, matter_id: str, client_id: str) -> Dict:
         self.materials.get_matter(matter_id, client_id)
@@ -83,6 +95,15 @@ class LaborFactSuggestionService:
                 adapted = self.adapters.extract(document.filename, document.content)
                 document_types[document.id] = adapted["document_type"]
                 for item in adapted["candidates"]:
+                    self._put(suggestions, item.field, item.value, item.confidence, {
+                        "document_id": document.id,
+                        "fact_id": None,
+                        "quote": item.quote,
+                        "start_offset": item.start_offset,
+                        "end_offset": item.end_offset,
+                        "document_type": item.document_type,
+                    })
+                for item in self.narrative.extract(document.content):
                     self._put(suggestions, item.field, item.value, item.confidence, {
                         "document_id": document.id,
                         "fact_id": None,
@@ -195,6 +216,8 @@ class LaborFactSuggestionService:
 
     @staticmethod
     def _claim_types(sentence: str) -> List[str]:
+        if any(phrase in sentence for phrase in ("不应直接认定", "不能直接认定", "尚不能认定")):
+            return []
         mapping = {
             "欠薪": ("欠薪", "拖欠工资", "尚未支付"),
             "违法解除": ("违法解除", "不同意公司所述解除理由"),
