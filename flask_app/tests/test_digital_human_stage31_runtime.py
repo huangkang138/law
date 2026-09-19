@@ -81,6 +81,11 @@ class DigitalHumanStage31RuntimeIntegrationTest(unittest.TestCase):
             "effective_from": "2020-01-01T00:00:00+00:00",
         })
         self.authority_ids.append(authority["authority_id"])
+        self.facade.capability_runtime.authority_sync = lambda: {
+            "ok": False,
+            "error_code": "AUTHORITY_COVERAGE_INCOMPLETE",
+            "health": {"status": "degraded"},
+        }
         approval = self.facade.continue_labor_dispute_run(
             self.run_id, self.client_id, "retry_authority",
         )

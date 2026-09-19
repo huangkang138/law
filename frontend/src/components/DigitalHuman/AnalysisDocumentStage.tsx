@@ -168,10 +168,11 @@ export default function AnalysisDocumentStage({
         </div>
         <div className={styles.authorityList}>{verifiedAuthorities.map((authority) => {
           const relatedIssues = decisions.filter((decision) => decision.authority_refs.includes(authority.authority_id)).map((decision) => issueLabel(decision.issue_tag));
+          const isLimitationSource = ['npc-labor-arbitration-law-27', 'mohrss-arbitration-rules-26-28'].includes(authority.external_id || '');
           return <article key={authority.authority_id} className={styles.authorityItem}>
             <strong>{authority.title}</strong>
             {authority.provision && <p>{authority.provision}</p>}
-            <small>与本案关联：{relatedIssues.length ? `用于${Array.from(new Set(relatedIssues)).join('、')}分析` : '作为本案已验证分析依据'}</small>
+            <small>与本案关联：{isLimitationSource ? '用于仲裁时效分析' : relatedIssues.length ? `用于${Array.from(new Set(relatedIssues)).join('、')}分析` : '作为本案相关法律依据'}</small>
             <details><summary>查看完整信息</summary><p>发布机关：{authority.issuing_body}</p><a href={authority.source_url} target="_blank" rel="noreferrer">查看原文</a></details>
           </article>;
         })}</div>

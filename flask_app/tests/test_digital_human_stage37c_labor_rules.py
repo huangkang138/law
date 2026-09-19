@@ -50,19 +50,24 @@ class Stage37CLaborRulesTest(unittest.TestCase):
         })
         return matter_id
 
-    def _authority(self):
+    def _authority(
+        self,
+        title="3.7C 实体规则测试来源",
+        text="劳动争议仲裁时效期间为一年。劳动关系、劳动报酬、安排劳动者延长工作时间、加班费、试用期、解除和经济补偿规则仅用于自动化测试。",
+    ):
         row = self.facade.register_test_authority({
             "country_code": "CN",
             "authority_type": "statute",
-            "title": "3.7C 实体规则测试来源",
+            "title": title,
             "provision": "测试条款",
-            "text": "劳动争议仲裁时效期间为一年。劳动关系、劳动报酬、安排劳动者延长工作时间、加班费、试用期、解除和经济补偿规则仅用于自动化测试。",
+            "text": text,
             "source_url": f"https://{uuid.uuid4().hex}.invalid/stage37c",
             "issuing_body": "自动化测试机构",
             "status": "effective",
             "effective_from": "2020-01-01T00:00:00+00:00",
         })
         self.authority_ids.append(row["authority_id"])
+        return row
 
     @staticmethod
     def _facts():
@@ -237,7 +242,14 @@ class Stage37CLaborRulesTest(unittest.TestCase):
         self.assertEqual(overtime["calculations"]["estimated_unpaid_overtime_pay"], 1650)
 
     def test_composite_frontend_facts_can_continue_through_approval_to_draft(self):
-        self._authority()
+        limitation_authority = self._authority(
+            title="3.7C 仲裁时效测试来源",
+            text="劳动争议仲裁时效期间为一年。",
+        )
+        substantive_authority = self._authority(
+            title="3.7C 劳动实体规则测试来源",
+            text="劳动关系、劳动报酬、试用期、解除和经济补偿规则仅用于自动化测试。",
+        )
         matter_id = self._matter()
         self.facade.add_material(
             matter_id, self.client_id, "劳动合同.txt",
@@ -259,7 +271,10 @@ class Stage37CLaborRulesTest(unittest.TestCase):
         draft = completed["final_output"]["draft_labor_arbitration_application"]
         self.assertEqual(draft["status"], "draft")
         self.assertIn("劳动仲裁申请书", draft["content"])
-        self.assertTrue(draft["authority_refs"])
+        self.assertIn(limitation_authority["authority_id"], draft["authority_refs"])
+        self.assertIn(substantive_authority["authority_id"], draft["authority_refs"])
+        self.assertIn(limitation_authority["title"], draft["content"])
+        self.assertIn(substantive_authority["title"], draft["content"])
 
     def test_complete_rule_facts_without_authority_fail_closed(self):
         matter_id = self._matter()

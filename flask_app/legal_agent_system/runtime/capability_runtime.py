@@ -124,7 +124,12 @@ class CapabilityRuntime:
                 raise AgentRuntimeError("任务当前不需要重试法律来源", ErrorCode.INVALID_STATE.value)
             if self.authority_sync is not None:
                 sync_result = self.authority_sync()
-                if isinstance(sync_result, dict) and not sync_result.get("ok", True):
+                sync_failed = (
+                    isinstance(sync_result, dict)
+                    and not sync_result.get("ok", True)
+                    and sync_result.get("error_code") != "AUTHORITY_COVERAGE_INCOMPLETE"
+                )
+                if sync_failed:
                     state.blocked_reason = "官方法源同步失败，请稍后重试或转人工复核"
                     state.error_code = "AUTHORITY_SYNC_FAILED"
                     self.repository.save_state(state, "authority_sync_failed", {"error_code": sync_result.get("error_code")})

@@ -31,6 +31,7 @@ class LaborDisputeService:
     """围绕一个 Matter 提供可暂停、恢复和审阅的劳动纠纷闭环。"""
 
     REQUIRED_FIELDS = tuple(FIELD_QUESTIONS)
+    DRAFT_TEMPLATE_VERSION = "2"
 
     def __init__(self, materials, authorities) -> None:
         self.materials = materials
@@ -170,7 +171,18 @@ class LaborDisputeService:
                 for authority_id in decision.get("authority_refs", [])
             ],
         ]))
-        content = self._draft_text(facts, analysis["deadline"], analysis["authorities"])
+        jurisdiction = self.materials.get_confirmed_jurisdiction(matter_id, client_id)
+        draft_authorities = []
+        for authority_id in authority_ids:
+            verification = self.authorities.verify(
+                authority_id,
+                jurisdiction["effective_at"],
+                jurisdiction["country_code"],
+            )
+            if not verification["valid"]:
+                raise AgentRuntimeError("文书法源验证失败，不能生成草稿", "AUTHORITY_REQUIRED")
+            draft_authorities.append(verification["authority"])
+        content = self._draft_text(facts, analysis["deadline"], draft_authorities)
         fingerprint = hashlib.sha256(json.dumps({
             "facts": facts,
             "authority_ids": authority_ids,
@@ -179,6 +191,7 @@ class LaborDisputeService:
                 *[item["rule_version"] for item in analysis.get("rule_decisions", [])],
             ],
             "type": "labor_arbitration_application",
+            "draft_template_version": self.DRAFT_TEMPLATE_VERSION,
         }, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
         db = SessionLocal()
         try:

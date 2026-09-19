@@ -287,6 +287,7 @@ export interface LaborAnalysisResult {
     issuing_body: string;
     trust_level: string;
     version: string;
+    external_id?: string | null;
   }>;
   rule_decisions?: LaborRuleDecision[];
 }
@@ -368,7 +369,7 @@ export interface LaborAuthorityCatalog {
   authorities: Array<{
     authority_id: string; title: string; provision: string | null;
     source_url: string; issuing_body: string; trust_level: string;
-    version: string; last_verified_at: string | null;
+    version: string; last_verified_at: string | null; external_id?: string | null;
   }>;
   governance: {
     status: 'ready' | 'degraded' | 'unavailable';

@@ -532,7 +532,23 @@ export function useMatterWorkspace(): MatterWorkspaceFlow {
     laborRun?.final_output?.analyze_labor_dispute
     || laborRun?.final_output?.analyze_labor_case
   ) as LaborAnalysisResult | undefined;
-  const verifiedAuthorities = runtimeAnalysis?.authorities || [];
+  const claimTypes = Array.isArray(laborFacts.claim_types)
+    ? laborFacts.claim_types.map(String)
+    : String(laborFacts.claim_types || '').split(/[、,，]/).filter(Boolean);
+  const relevantAuthorityIds = new Set([
+    'npc-labor-arbitration-law-27',
+    'mohrss-arbitration-rules-26-28',
+    ...(claimTypes.some((item) => ['欠薪', '加班费'].includes(item)) ? ['samr-labor-law-wages'] : []),
+    ...(claimTypes.some((item) => ['欠薪', '违法解除', '解除', '赔偿金', '经济补偿'].includes(item))
+      ? ['samr-labor-contract-law-substantive']
+      : []),
+  ]);
+  const catalogAuthorities = authorityCatalog?.authorities.filter(
+    (authority) => !authority.external_id || relevantAuthorityIds.has(authority.external_id),
+  ) || [];
+  const verifiedAuthorities = catalogAuthorities.length > 0
+    ? catalogAuthorities
+    : runtimeAnalysis?.authorities || [];
   const clientMissingLaborFacts = findMissingLaborDisputeFacts(laborFacts, salary);
 
   return {
