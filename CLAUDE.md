@@ -1,4 +1,4 @@
-# YYS-Law Claude Code Bootstrap
+# Law Claude Code Bootstrap
 
 用户当前明确指令优先。执行任务时遵循：
 

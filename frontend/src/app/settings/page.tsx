@@ -282,9 +282,9 @@ export default function SettingsPage() {
               {/* 关于 */}
               <div className="border-t border-border pt-6">
                 <div className="rounded-lg border border-border bg-card p-4">
-                  <h3 className="text-sm font-medium">关于 YYS-Law</h3>
+                  <h3 className="text-sm font-medium">关于律知</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    版本：2.2.0
+                    版本：3.1.0
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     开源智能法律助手
@@ -754,7 +754,7 @@ export default function SettingsPage() {
                         <span className="text-2xl">⚖️</span>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-foreground">YYS-Law 智能法律助手</h4>
+                        <h4 className="font-semibold text-foreground">律知智能法律服务平台</h4>
                       </div>
                     </div>
                     <div className="rounded-md border border-border bg-background p-4 space-y-3">

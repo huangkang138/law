@@ -1,4 +1,4 @@
-# YYS-Law Agent Bootstrap
+# Law Agent Bootstrap
 
 用户当前明确指令优先。源码事实高于所有文档。
 
