@@ -280,6 +280,7 @@ export default function DailyConversationPage() {
               isLoading={isLoading}
               voiceSpeaking={voiceSpeaking}
               useLegacyImageFallback={false}
+              useLoadingPlaceholder
               variant="portrait"
               visible
             />

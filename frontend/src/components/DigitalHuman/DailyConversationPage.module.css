@@ -473,7 +473,7 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: url('/images/chat-hero-background.png') center / cover no-repeat;
+  background: url('/optimized/chat-background-b8401c88.webp') center / cover no-repeat;
   content: '';
   filter: saturate(.72) contrast(.86) brightness(1.06);
   transform: scale(1.01);
@@ -626,7 +626,10 @@
 }
 
 .avatarStage :global(.dh-avatar-image) { z-index: 1; object-fit: contain; }
-.avatarStage :global(.dh-rive-layer) { z-index: 2; pointer-events: none; }
+.avatarStage :global(.dh-avatar-placeholder) { object-position: bottom center; transition: opacity 240ms ease; }
+.avatarStage :global(.dh-avatar-rive-ready .dh-avatar-placeholder) { opacity: 0; }
+.avatarStage :global(.dh-rive-layer) { z-index: 2; pointer-events: none; opacity: 0; transition: opacity 240ms ease; }
+.avatarStage :global(.dh-avatar-rive-ready .dh-rive-layer) { opacity: 1; }
 .avatarStage :global(.dh-rive-canvas) { display: block; width: 100%; height: 100%; }
 
 .heroActions {

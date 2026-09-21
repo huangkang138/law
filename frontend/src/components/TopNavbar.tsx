@@ -148,9 +148,10 @@ export default function TopNavbar() {
           <Link href="/" className="group flex w-[230px] flex-none items-center gap-3.5 max-[1400px]:w-[190px] max-[1400px]:gap-2.5">
             <div className="relative h-[52px] w-[52px] flex-none transition-transform duration-300 group-hover:scale-[1.03] max-[1400px]:h-11 max-[1400px]:w-11">
               <Image
-                src="/home/lvzhi-logo.png"
+                src="/optimized/nav-logo-a604330f.webp"
                 alt="律知"
                 fill
+                priority
                 sizes="52px"
                 className="object-contain drop-shadow-[0_6px_9px_rgba(37,99,235,0.14)]"
               />

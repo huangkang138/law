@@ -159,9 +159,15 @@
   z-index: 3;
   width: 350px;
   height: 350px;
-  animation: home-logo-float 4.8s ease-in-out infinite;
+  animation: home-logo-float 4.6s ease-in-out infinite;
   filter: drop-shadow(0 24px 28px rgba(43, 111, 226, .18));
   transform: translateX(-50%);
+  will-change: transform;
+}
+
+.heroLogo .visualImage {
+  transform: scaleX(.97) scaleY(1.04);
+  transform-origin: center;
 }
 
 .platform {
@@ -566,7 +572,16 @@
 
 @keyframes home-logo-float {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-5px); }
+  25% { transform: translateX(-50%) translateY(-12px); }
+  50% { transform: translateX(-50%) translateY(0); }
+  75% { transform: translateX(-50%) translateY(8px); }
+}
+
+@keyframes home-logo-float-reduced {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  25% { transform: translateX(-50%) translateY(-7px); }
+  50% { transform: translateX(-50%) translateY(0); }
+  75% { transform: translateX(-50%) translateY(5px); }
 }
 
 @keyframes home-core-shadow {
@@ -661,10 +676,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .coreShadow,
-  .heroLogo,
   .platform,
   .featureCard {
     animation: none;
+  }
+
+  .heroLogo {
+    animation: home-logo-float-reduced 6.5s ease-in-out infinite;
   }
 
   .platformRipple span {

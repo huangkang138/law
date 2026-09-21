@@ -16,8 +16,8 @@ import type { DigitalHumanEmotion } from '@/services/digitalHumanApi';
 
 import type { AvatarVisualState } from './AvatarStateAdapter';
 
-const RIVE_SRC = '/digital-human/law-xiaozhi/digitalv3.riv';
-const RIVE_WASM_SRC = '/digital-human/law-xiaozhi/rive.wasm';
+const RIVE_SRC = '/optimized/digitalv3-8e3252a4.riv';
+const RIVE_WASM_SRC = '/optimized/rive-c38df10d.wasm';
 const RIVE_ARTBOARD = 'Artboard 1';
 const RIVE_STATE_MACHINE = 'AvatarStateMachine';
 const RIVE_VIEW_MODEL = 'ViewModel1';

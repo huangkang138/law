@@ -14,6 +14,14 @@ const nextConfig = {
   // 压缩输出
   compress: true,
 
+  // Optimized public assets have content hashes in their filenames.
+  async headers() {
+    return [{
+      source: '/optimized/:path*',
+      headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+    }]
+  },
+
   // 启用React严格模式
   reactStrictMode: true,
 
