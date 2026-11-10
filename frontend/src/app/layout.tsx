@@ -5,6 +5,7 @@ import './globals.css';
 import TopNavbar from '@/components/TopNavbar';
 import DigitalHumanFloat from '@/components/DigitalHuman/DigitalHumanFloat';
 import { usePathname } from 'next/navigation';
+import { useSettings } from '@/hooks/useSettings';
 
 export default function RootLayout({
   children,
@@ -12,10 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  useSettings();
   const isHomePage = pathname === '/';
 
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className="font-medium density-standard">
       <head>
         {/* 预加载所有页面 */}
         <link rel="prefetch" href="/" />
@@ -41,7 +43,7 @@ export default function RootLayout({
         <TopNavbar />
 
         {/* 主内容区域 */}
-        <main className={`flex flex-1 flex-col min-h-screen pt-20 ${isHomePage ? '' : 'overflow-y-auto'}`}>
+        <main className={`flex flex-1 flex-col min-h-screen ${isHomePage ? 'pt-[var(--app-header-height)]' : 'business-main pt-[var(--business-page-top)] overflow-y-auto'}`}>
           {children}
         </main>
 

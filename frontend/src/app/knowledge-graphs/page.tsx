@@ -253,7 +253,7 @@ export default function KnowledgeGraphsPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-violet-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="flex flex-col h-[calc(100dvh_-_var(--business-page-top))] bg-gradient-to-br from-slate-50 via-violet-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* 顶部工具栏 */}
       <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-violet-200 dark:border-violet-900/30 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">

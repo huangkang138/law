@@ -306,8 +306,8 @@ export default function FavoritesPage() {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl animate-pulse-slow" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
 
-      <div className="flex h-screen">
-        <div className={`${sidebarOpen ? 'w-80' : 'w-20'} flex-shrink-0 transition-all duration-300 h-screen sticky top-0`}>
+      <div className="flex h-[calc(100dvh_-_var(--business-page-top))]">
+        <div className={`${sidebarOpen ? 'w-80' : 'w-20'} flex-shrink-0 transition-all duration-300 h-full`}>
           <div className="h-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-r border-sky-200 dark:border-sky-900/30 shadow-lg overflow-hidden flex flex-col">
             <div className="p-5 border-b border-sky-200 dark:border-sky-900/30">
               <div className="flex items-center gap-4">

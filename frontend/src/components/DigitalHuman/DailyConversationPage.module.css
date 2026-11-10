@@ -4,7 +4,7 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 312px;
   width: 100%;
-  height: calc(100vh - 80px);
+  height: calc(100dvh - var(--business-page-top));
   min-height: 0;
   overflow: hidden;
   color: #18324f;
@@ -49,11 +49,13 @@
   border-right: 1px solid rgba(125, 172, 220, .28);
   background: rgba(255, 255, 255, .7);
   backdrop-filter: blur(18px);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, .06);
 }
 
 .sidebarHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 24px 18px 16px;
@@ -441,11 +443,11 @@
 .contextServiceMetric strong.contextServiceBusy { color: #357abb; }
 .contextServiceMetric strong.contextServiceOnline { color: #25845b; }
 .contextError { margin: 10px 0 0 !important; padding: 7px 8px; color: #995b37 !important; background: #fff8f0; border-radius: 8px; }
-.contextDecoration { position: relative; display: grid; gap: 6px; min-height: 84px; box-sizing: border-box; overflow: hidden; padding: 14px; color: #326fa9; background: linear-gradient(135deg, #eaf6ff, #eefbf9); border: 1px solid #d3e9f5; border-radius: 15px; }
-.contextDecoration::after { position: absolute; right: -36px; bottom: -50px; width: 150px; height: 110px; border: 1px solid rgba(72, 157, 187, .16); border-radius: 50%; content: ''; transform: rotate(-15deg); }
-.contextDecorationArt { display: flex; gap: 3px; color: #6aa7cf; opacity: .7; }
-.contextDecoration strong { max-width: 190px; font-size: 12px; line-height: 1.35; }
-.contextDecoration p { max-width: 210px; margin: 0; color: #7b9ab2; font-size: 9px; line-height: 1.5; }
+.contextDecoration { position: relative; display: grid; gap: 8px; height: max-content; min-height: 84px; box-sizing: border-box; overflow: hidden; padding: 16px; color: #326fa9; background: linear-gradient(135deg, #eaf6ff, #eefbf9); border: 1px solid #d3e9f5; border-radius: 15px; }
+.contextDecoration::after { position: absolute; right: -36px; bottom: -50px; width: 150px; height: 110px; border: 1px solid rgba(72, 157, 187, .16); border-radius: 50%; content: ''; pointer-events: none; transform: rotate(-15deg); }
+.contextDecorationArt { display: flex; gap: 5px; color: #6aa7cf; opacity: .7; }
+.contextDecoration strong { font-size: 13px; line-height: 1.4; }
+.contextDecoration p { margin: 0; color: #6f8fa8; font-size: 10px; line-height: 1.55; }
 .contextFooter { padding: 0 14px 14px; color: #91a5b7; font-size: 9px; line-height: 1.5; }
 
 .hero {
@@ -626,10 +628,7 @@
 }
 
 .avatarStage :global(.dh-avatar-image) { z-index: 1; object-fit: contain; }
-.avatarStage :global(.dh-avatar-placeholder) { object-position: bottom center; transition: opacity 240ms ease; }
-.avatarStage :global(.dh-avatar-rive-ready .dh-avatar-placeholder) { opacity: 0; }
-.avatarStage :global(.dh-rive-layer) { z-index: 2; pointer-events: none; opacity: 0; transition: opacity 240ms ease; }
-.avatarStage :global(.dh-avatar-rive-ready .dh-rive-layer) { opacity: 1; }
+.avatarStage :global(.dh-rive-layer) { z-index: 2; pointer-events: none; }
 .avatarStage :global(.dh-rive-canvas) { display: block; width: 100%; height: 100%; }
 
 .heroActions {
@@ -907,7 +906,7 @@
 }
 
 @media (max-width: 640px) {
-  .page { display: flex; height: calc(100dvh - 80px); min-height: 0; flex-direction: column; overflow: auto; }
+  .page { display: flex; height: calc(100dvh - var(--business-page-top)); min-height: 0; flex-direction: column; overflow: auto; }
   .sidebar { display: flex; position: relative; width: 100%; min-height: auto; flex: none; border-right: 0; border-bottom: 1px solid rgba(125, 172, 220, .28); }
   .sidebarHeader { padding: 12px 16px 9px; align-items: center; }
   .sidebarHeader h2 { margin-top: 4px; font-size: 15px; }

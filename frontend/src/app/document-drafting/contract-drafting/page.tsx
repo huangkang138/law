@@ -372,7 +372,7 @@ export default function ContractDraftingPage() {
   };
 
   return (
-    <div className="fixed top-20 left-0 right-0 bottom-0 bg-gradient-to-br from-slate-50 via-rose-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground flex overflow-hidden">
+    <div className="fixed business-page-shell left-0 right-0 bottom-0 bg-gradient-to-br from-slate-50 via-rose-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground flex overflow-hidden">
       <div
         className="absolute inset-0 bg-cover bg-center opacity-5 pointer-events-none"
         style={{

@@ -2,12 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 不同页面有无整页滚动条时，固定顶栏始终占用相同的横向空间。 */
+html { scrollbar-gutter: stable; }
+
 /* ============================================
    YYS-Law Design System - Inspired by shadcn/ui
    ============================================ */
 
 @layer base {
   :root {
+    /* 固定顶栏 84px 内容区 + 4px 装饰线；业务页与顶栏统一留出 20px。 */
+    --app-header-height: 88px;
+    --business-page-gap: 20px;
+    --business-page-top: calc(var(--app-header-height) + var(--business-page-gap));
     /* Background Colors - 星空浅色系 */
     --background: 0 0% 100%;
     --foreground: 220 15% 20%;
@@ -94,6 +101,17 @@
     --input: 220 15% 25%;
     --ring: 210 70% 70%;
   }
+}
+
+/* 独立滚动的业务工作区统一从顶栏下方开始，保留原有侧栏宽度。 */
+.business-page-shell {
+  top: var(--business-page-top);
+  box-shadow: 0 -1px 0 rgba(96, 165, 250, 0.12);
+}
+
+/* 业务页自身的全屏背景只填充顶栏以下的可用高度，避免叠加出第二条页面滚动。 */
+.business-main > .min-h-screen {
+  min-height: calc(100dvh - var(--business-page-top));
 }
 
 .dh-agent-card { margin: 0 14px 10px; padding: 10px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; font-size: 12px; color: #334155; }

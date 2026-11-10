@@ -4,7 +4,11 @@
 
 - 正式 `/` 首页已切换为“律知”品牌视觉：中央由 `HeroLawVisual` 组合新版 Logo、空间轨道和悬浮圆台，周围四个 `HeroFeatureCard` 入口继续连接现有业务路由。
 - 首页局部样式集中在 `frontend/src/components/Home/HomePage.module.css`；原首页完整保留为非路由 `LegacyHome.tsx`，不参与正式渲染。
-- 全局 `TopNavbar` 仅更新 Logo、品牌名称和轻量白蓝视觉，菜单、下拉、active route、案件工作台和移动端导航逻辑不变；全局 `DigitalHumanFloat` 继续由根布局挂载，首页重构未修改其内部实现。
+- 全局 `TopNavbar` 仅更新 Logo、品牌名称和轻量白蓝视觉，菜单、下拉、active route、案件工作台和移动端导航逻辑不变；`DigitalHumanFloat` 由根布局挂载，仅在首页渲染。
+- 2026-11-07：业务页面顶部统一由根布局和 `globals.css` 的 `--business-page-top` 控制（88px 顶栏 + 20px 间距）；固定工作区、聊天、历史、收藏和图谱页面使用同一顶部边界，首页仍只预留顶栏自身高度。
+- 2026-11-07：`RootLayout` 统一应用字号/密度等界面设置，避免 `ScaleIcon` 仅在部分页面挂载时才改变根字号；根元素稳定保留滚动条宽度，避免整页滚动状态改变时居中的顶栏横向移动。
+- 2026-11-07：`/chat` 的主视觉仅使用当前 Rive 数字人；移除与其不一致的首屏 WebP 人物占位图，资源加载期间保留背景与光晕，加载完成后直接显示 Rive。
+- 2026-11-07：首页 `HeroOrbit` 为上下两条轨道分别设置前后遮罩区间，上环的前景段提前显现，使两条环都围绕中央 Logo；球体遮罩固定在完整 SVG 坐标系，避免随球移动时裁切球面和光晕。轨道路径、球体动画、Logo 与底座未改变。
 
 更新时间：2026-07-27 +08:00
 
@@ -36,7 +40,7 @@
 
 - 正常视觉主体为 `frontend/public/digital-human/law-xiaozhi/digitalv3.riv`，使用 `@rive-app/react-webgl2@4.34.1` 和同目录本地 WASM。
 - Rive 合同为 `Artboard 1`、`AvatarStateMachine`、`ViewModel1`；`expression`、`speaking`、`blink` 继续复用现有业务状态映射，`bodyState` 驱动全身动作（0 基础站姿、1 挥手、2 思考、3 讲解、4 看书）。
-- 悬浮入口、聊天和工作台使用矩形 Rive 视口，PNG 只作为加载或失败回退；该变化不涉及后端、API、数据库、SSE、TTS 或案件业务。
+- 悬浮入口、聊天和工作台使用矩形 Rive 视口；`/chat` 主视觉不再使用异形象图片占位，其他组件的 PNG 回退机制保持原状。该变化不涉及后端、API、数据库、SSE、TTS 或案件业务。
 - 正式运行资源来自 `frontend/digital-human/law_xiaozhi/digitalv3.riv`，源文件与公开文件 SHA-256 均为 `8E3252A41CF2E17DAE9592FCCC793F01C8689614BCC25F91807E5607AD702AE7`。`digitalv2.riv` 的重叠来自资源内部身体组件，页面继续保留原半身渐变；共享头像的 CSS 整体位移/缩放动画保持禁用，身体只由 `bodyState` 控制。浏览器已确认 idle 与朗读组合无身体重叠、1 个 Canvas、0 控制台 error。
 
 ## 法小助日常交流页（2026-09-16）
@@ -45,7 +49,7 @@
 - 页面复用现有 `digitalHumanStore`、SSE、浏览器 STT/TTS、`ConversationComposer`、劳动分流卡片、案件卡片和真实功能路由；快捷问题只预填，不自动发送。普通问题直接回答，明确功能由真实 `route/routeLabel` 按钮进入。
 - 上下文栏只投影 Store/后端已有的当前会话、当前案件、劳动分流、Workspace Run/Presenter、最近提问和服务状态；没有案件或分流结果时显示明确空态，不生成新的法律结论。主列采用约 252–294px 轻量 Hero + 剩余高度独立滚动消息区 + 底部 Composer；Hero 使用连续浅蓝/蓝白背景，左侧约 35%～40% 为法小助信息引导，右侧为无独立底板的正式 Rive 数字人、轻微光晕和头部对话气泡；回答卡片最大宽度扩展至约 820px，用户气泡约 520px。
 - Hero 底部提供四个真实入口：法律咨询、案件与纠纷只预填问题；合同审查与文书起草沿用 `/contract`、`/document-drafting`，均不自动发送或建案。窄桌面采用两列入口，移动端保持两列堆叠且不产生横向溢出。
-- `DigitalHumanFloat` 只在 `/chat` 隐藏，其他页面行为保持；页面离开后已验证合同审查页可正常显示且悬浮入口恢复。未修改后端、API、数据库、Agent、SSE 或 TTS 契约。
+- 2026-11-07：`DigitalHumanFloat` 仅在首页 `/` 显示；合同审查等业务页不显示悬浮入口，`/chat` 使用独立交流页。离开首页时仍关闭悬浮面板。未修改后端、API、数据库、Agent、SSE 或 TTS 契约。
 - 已验证：`npx tsc --noEmit --incremental false`、`git diff --check` 通过；本地 Next `/chat` 返回 200，真实浏览器 1440×900 与 375×812 均无横向溢出，正式 Rive 为单 Canvas，控制台无 error。开发服务提示过 `.next/trace` 的 `EPERM`，但随后正常 Ready 并完成 `/chat` 编译；完整麦克风权限下的 STT/TTS 仍需用户体验确认。窄桌面断点已调整为 `1180px` 隐藏右栏、`900px` 收起左栏，移动端数字人向左收敛以避免脸部贴边。
 
 ## 产品聚焦与下一阶段规划（2026-07-21，文档决策）

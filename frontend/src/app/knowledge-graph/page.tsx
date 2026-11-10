@@ -481,7 +481,7 @@ export default function KnowledgeGraphPage() {
   }, []);
 
   return (
-    <div className="h-[calc(100vh-80px)] bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 text-foreground relative overflow-hidden flex flex-col">
+    <div className="h-[calc(100dvh_-_var(--business-page-top))] bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 text-foreground relative overflow-hidden flex flex-col">
       
       {/* 星空光晕效果 */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl animate-pulse-slow" />

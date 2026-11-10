@@ -41,6 +41,30 @@ function OrbitBall({ orbit }: { orbit: 'upper' | 'lower' }) {
   );
 }
 
+function OrbitDepthMask({ layer, orbit, frontStart, frontEnd }: {
+  layer: HeroOrbitProps['layer'];
+  orbit: 'upper' | 'lower';
+  frontStart: number;
+  frontEnd: number;
+}) {
+  const isFront = layer === 'front';
+  const fadeId = `orbit-fade-${layer}-${orbit}`;
+
+  return (
+    <>
+      <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor={isFront ? 'black' : 'white'} />
+        <stop offset={frontStart} stopColor={isFront ? 'black' : 'white'} />
+        <stop offset={frontEnd} stopColor={isFront ? 'white' : 'black'} />
+        <stop offset="1" stopColor={isFront ? 'white' : 'black'} />
+      </linearGradient>
+      <mask id={`orbit-mask-${layer}-${orbit}`} maskUnits="userSpaceOnUse" x="0" y="0" width="680" height="500">
+        <rect width="680" height="500" fill={`url(#${fadeId})`} />
+      </mask>
+    </>
+  );
+}
+
 export default function HeroOrbit({ layer }: HeroOrbitProps) {
   const isFront = layer === 'front';
 
@@ -70,34 +94,22 @@ export default function HeroOrbit({ layer }: HeroOrbitProps) {
         <filter id={`ball-glow-${layer}`} x="-80%" y="-80%" width="260%" height="260%">
           <feGaussianBlur stdDeviation="6" />
         </filter>
-        <linearGradient id={`front-fade-${layer}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="black" />
-          <stop offset="0.46" stopColor="black" />
-          <stop offset="0.58" stopColor="white" />
-          <stop offset="1" stopColor="white" />
-        </linearGradient>
-        <linearGradient id={`back-fade-${layer}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="white" />
-          <stop offset="0.46" stopColor="white" />
-          <stop offset="0.58" stopColor="black" />
-          <stop offset="1" stopColor="black" />
-        </linearGradient>
-        <mask id={`front-mask-${layer}`}>
-          <rect width="680" height="500" fill={`url(#front-fade-${layer})`} />
-        </mask>
-        <mask id={`back-mask-${layer}`}>
-          <rect width="680" height="500" fill={`url(#back-fade-${layer})`} />
-        </mask>
+        {/* 上环位置更高，单独提前前景段的遮挡边界，让两条环都绕过 Logo。 */}
+        <OrbitDepthMask layer={layer} orbit="upper" frontStart={0.33} frontEnd={0.45} />
+        <OrbitDepthMask layer={layer} orbit="lower" frontStart={0.46} frontEnd={0.58} />
       </defs>
 
       <g
         className={styles.trackGroup}
         style={{ '--orbit-stroke': `url(#orbit-stroke-${layer})` } as CSSProperties}
-        mask={`url(#${isFront ? 'front' : 'back'}-mask-${layer})`}
         transform={ORBIT_PERSPECTIVE}
       >
-        <OrbitTrack path={MAIN_ORBIT} className={styles.mainOrbitFloat} />
-        <OrbitTrack path={AUXILIARY_ORBIT} className={styles.auxiliaryOrbitFloat} />
+        <g mask={`url(#orbit-mask-${layer}-upper)`}>
+          <OrbitTrack path={MAIN_ORBIT} className={styles.mainOrbitFloat} />
+        </g>
+        <g mask={`url(#orbit-mask-${layer}-lower)`}>
+          <OrbitTrack path={AUXILIARY_ORBIT} className={styles.auxiliaryOrbitFloat} />
+        </g>
       </g>
 
       <g
@@ -110,14 +122,17 @@ export default function HeroOrbit({ layer }: HeroOrbitProps) {
             '--auxiliary-orbit-path': `path('${AUXILIARY_ORBIT}')`,
           } as CSSProperties
         }
-        mask={`url(#${isFront ? 'front' : 'back'}-mask-${layer})`}
         transform={ORBIT_PERSPECTIVE}
       >
-        <g className={styles.mainOrbitFloat}>
-          <OrbitBall orbit="upper" />
+        <g mask={`url(#orbit-mask-${layer}-upper)`}>
+          <g className={styles.mainOrbitFloat}>
+            <OrbitBall orbit="upper" />
+          </g>
         </g>
-        <g className={styles.auxiliaryOrbitFloat}>
-          <OrbitBall orbit="lower" />
+        <g mask={`url(#orbit-mask-${layer}-lower)`}>
+          <g className={styles.auxiliaryOrbitFloat}>
+            <OrbitBall orbit="lower" />
+          </g>
         </g>
       </g>
     </svg>

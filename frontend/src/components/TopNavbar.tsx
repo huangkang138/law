@@ -137,7 +137,7 @@ export default function TopNavbar() {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
           ? 'bg-gradient-to-r from-sky-100/95 via-blue-100/95 to-indigo-100/95 backdrop-blur-xl shadow-2xl shadow-blue-200/30'
-          : 'bg-gradient-to-r from-sky-100/90 via-blue-100/90 to-indigo-100/90 backdrop-blur-md'
+          : 'bg-gradient-to-r from-sky-100/90 via-blue-100/90 to-indigo-100/90 backdrop-blur-md shadow-sm shadow-blue-200/40'
       }`}
     >
       <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-80" />
@@ -165,7 +165,7 @@ export default function TopNavbar() {
           </Link>
 
           {/* Desktop Menu */}
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1.5 xl:flex max-[1400px]:gap-0">
+          <nav className="hidden min-w-0 flex-1 items-center justify-between gap-2 xl:flex max-[1400px]:gap-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const itemIsActive = isActive(item.href) || isChildActive(item.children);
@@ -183,7 +183,7 @@ export default function TopNavbar() {
                   >
                     <button
                       onClick={() => setOpenDropdown(isDropdownOpen ? null : item.href)}
-                      className={`relative flex items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2 py-2 transition-all duration-300 ${
+                      className={`relative flex min-h-11 items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2.5 py-2 transition-all duration-300 max-[1400px]:px-2 ${
                         itemIsActive
                           ? 'border-blue-400/50 bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20'
                           : 'border-transparent text-blue-700/90 hover:border-blue-400/30 hover:text-blue-800'
@@ -294,7 +294,7 @@ export default function TopNavbar() {
                   onClick={() => setOpenDropdown(null)}
                   onMouseEnter={() => setHoveredItem(item.href)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  className={`relative flex cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2 py-2 transition-all duration-300 ${
+                  className={`relative flex min-h-11 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-xl border px-2.5 py-2 transition-all duration-300 max-[1400px]:px-2 ${
                     itemIsActive
                       ? 'border-blue-400/50 bg-gradient-to-r from-blue-400/30 to-indigo-400/20 text-blue-700 shadow-lg shadow-blue-300/20'
                       : 'border-transparent text-blue-700/90 hover:border-blue-400/30 hover:text-blue-800'

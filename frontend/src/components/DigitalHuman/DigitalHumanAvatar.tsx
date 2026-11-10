@@ -19,7 +19,6 @@ interface DigitalHumanAvatarProps {
   voiceSpeaking?: boolean;
   visible?: boolean;
   useLegacyImageFallback?: boolean;
-  useLoadingPlaceholder?: boolean;
   // 保留给后续的局部嘴型覆盖；当前完整 PNG 不叠加任何 AI 拆层素材。
   mouthOpen?: boolean;
 }
@@ -44,7 +43,6 @@ export default function DigitalHumanAvatar({
   voiceSpeaking,
   visible = true,
   useLegacyImageFallback = true,
-  useLoadingPlaceholder = false,
   mouthOpen = false,
 }: DigitalHumanAvatarProps) {
   const isSmall = size === 'small';
@@ -82,17 +80,6 @@ export default function DigitalHumanAvatar({
       style={criticalStyle}
       aria-label={EMOTION_LABELS[current.image]}
     >
-      {useLoadingPlaceholder && (
-        <Image
-          src="/optimized/avatar-placeholder-3ac3781e.webp"
-          alt=""
-          aria-hidden="true"
-          fill
-          priority
-          sizes="(max-width: 640px) 320px, 560px"
-          className="dh-avatar-image dh-avatar-placeholder"
-        />
-      )}
       {useLegacyImageFallback && !riveReady && previous && (
         <Image
           key={`previous-${previous.image}`}

@@ -247,7 +247,7 @@ export default function AgentsOverviewPage() {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl animate-pulse-slow" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-screen flex flex-col">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100dvh_-_var(--business-page-top))] flex flex-col">
         {/* 顶部导航 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

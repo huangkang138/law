@@ -737,7 +737,7 @@ export default function DebatePage() {
         </div>
         
         {/* 法庭场景主体 */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-[calc(100vh-80px)] p-6">
+        <div className="relative z-10 flex flex-col items-center justify-center h-[calc(100dvh_-_var(--business-page-top))] p-6">
           {/* 法官席 - 上方 */}
           <div className={`relative mb-16 transition-all duration-500 ${messages[currentVoiceIndex]?.role === 'judge' ? 'scale-110' : 'scale-100 opacity-70'}`}>
             <div className={`w-48 h-48 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-300 ${

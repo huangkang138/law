@@ -754,16 +754,16 @@ export default function HistoryPage() {
   const ActiveIcon = activeTabObj?.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 text-foreground relative overflow-hidden">
+    <div className="bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 text-foreground relative overflow-hidden">
       {/* 星空光晕效果 */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl animate-pulse-slow" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
 
       {/* 主内容区域 */}
-      <div className="flex h-screen">
+      <div className="flex h-[calc(100dvh_-_var(--business-page-top))] gap-4">
         {/* 左侧侧边栏 - 固定 */}
-        <div className={`${sidebarOpen ? 'w-80' : 'w-20'} flex-shrink-0 transition-all duration-300 h-screen sticky top-0`}>
-          <div className="h-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-r border-sky-200 dark:border-sky-900/30 shadow-lg overflow-hidden flex flex-col">
+        <div className={`${sidebarOpen ? 'w-80' : 'w-20'} flex-shrink-0 transition-all duration-300 h-full`}>
+          <div className="h-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl border border-sky-300 dark:border-sky-700 shadow-lg overflow-hidden flex flex-col">
             {/* 侧边栏头部 */}
             <div className="p-5 border-b border-sky-200 dark:border-sky-900/30">
               <div className="flex items-center gap-4">

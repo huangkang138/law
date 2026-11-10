@@ -36,9 +36,8 @@ export default function DigitalHumanFloat() {
     }
   }, [isOpen, workspaceOpen]);
 
-  // /chat 自己承载完整交流页；只有用户从真实案件数据入口打开工作台时，
-  // 才恢复挂载工作台壳，避免右下角重复聊天入口。
-  if (pathname === '/chat' && !workspaceOpen) return null;
+  // 悬浮入口及展开面板只在首页展示；路由监听仍保持挂载，以便离开首页时收起面板。
+  if (pathname !== '/') return null;
 
   return (
     <div className="dh-root">
